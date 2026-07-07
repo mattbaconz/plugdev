@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.plugdev/run/
+packages/bootstrap-paper/build/
+packages/bootstrap-paper/.gradle/
+test/fixtures/paper-plugin/build/
+test/fixtures/paper-plugin/.gradle/
+*.log
+.DS_Store
+Thumbs.db

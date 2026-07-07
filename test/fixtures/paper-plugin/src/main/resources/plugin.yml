@@ -1,0 +1,6 @@
+name: FixturePlugin
+version: '1.0.0'
+main: dev.plugdev.fixture.FixturePlugin
+api-version: '1.21'
+description: PlugDev test fixture plugin
+author: PlugDev

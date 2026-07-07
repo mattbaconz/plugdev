@@ -1,0 +1,21 @@
+{
+  "name": "plugdev",
+  "private": true,
+  "version": "0.1.0",
+  "description": "npm run dev for Minecraft plugins, mods, and test servers",
+  "workspaces": [
+    "packages/cli"
+  ],
+  "scripts": {
+    "build": "npm run build -w @plugdev/cli && npm run build:bootstrap",
+    "build:cli": "npm run build -w @plugdev/cli",
+    "build:bootstrap": "cd packages/bootstrap-paper && (if exist gradlew.bat (gradlew.bat build -q) else ./gradlew build -q)",
+    "dev": "npm run start -w @plugdev/cli",
+    "test": "npm run test -w @plugdev/cli",
+    "publish:cli": "npm publish -w @plugdev/cli"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  }
+}

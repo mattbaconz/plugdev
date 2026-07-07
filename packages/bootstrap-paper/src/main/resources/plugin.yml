@@ -1,0 +1,17 @@
+name: PlugDev-Bootstrap
+version: ${version}
+main: dev.plugdev.bootstrap.PlugDevBootstrap
+api-version: '1.21'
+load: STARTUP
+folia-supported: true
+description: Internal PlugDev development bootstrap plugin
+author: PlugDev
+commands:
+  plugdev:
+    description: PlugDev development commands
+    usage: /plugdev [reload|info|tp|give]
+    permission: plugdev.admin
+permissions:
+  plugdev.admin:
+    description: Allows PlugDev dev commands
+    default: op

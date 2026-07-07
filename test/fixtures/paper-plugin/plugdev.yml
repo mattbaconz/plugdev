@@ -1,0 +1,24 @@
+# PlugDev configuration — auto-generated
+type: plugin
+server: paper
+version: "1.21.4"
+port: 25565
+
+build:
+  system: gradle
+  task: build
+  jarTask: jar
+
+dev:
+  gamemode: creative
+  world: flat
+  op: true
+  peaceful: true
+  onlineMode: false
+
+watch:
+  paths:
+    - src/
+  debounceMs: 500
+  reload:
+    java: safe

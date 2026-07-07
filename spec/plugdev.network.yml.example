@@ -1,0 +1,34 @@
+# PlugDev configuration — Proxy network example
+# Copy to plugdev.yml for proxy plugin development with backends
+
+type: network
+
+proxy:
+  software: velocity
+  port: 25565
+
+backends:
+  - name: lobby
+    software: paper
+    version: "1.21.4"
+    port: 25566
+  - name: survival
+    software: paper
+    version: "1.21.4"
+    port: 25567
+
+forwarding:
+  generate: true
+  # secret: auto-generated and synced to backends if generate is true
+
+# Optional: proxy plugin under development
+plugin:
+  build:
+    system: gradle
+    task: build
+
+watch:
+  paths:
+    - src/
+  reload:
+    java: safe

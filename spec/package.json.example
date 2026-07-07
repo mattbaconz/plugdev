@@ -1,0 +1,14 @@
+{
+  "name": "my-minecraft-plugin",
+  "private": true,
+  "scripts": {
+    "dev": "plugdev",
+    "dev:watch": "plugdev watch",
+    "dev:server": "plugdev --server",
+    "build": "./gradlew shadowJar",
+    "test": "./gradlew test"
+  },
+  "devDependencies": {
+    "@plugdev/cli": "^0.1.0"
+  }
+}

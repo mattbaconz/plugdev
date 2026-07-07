@@ -1,0 +1,41 @@
+# PlugDev configuration — Paper plugin example
+# Copy to plugdev.yml in your plugin project root
+
+type: plugin
+server: paper
+version: "1.21.4"
+port: 25565
+
+build:
+  system: gradle
+  task: build
+  jarTask: shadowJar
+
+dev:
+  gamemode: creative
+  world: flat
+  op: true
+  peaceful: true
+  onlineMode: false
+
+watch:
+  paths:
+    - src/
+  debounceMs: 500
+  reload:
+    java: safe
+    assets: none
+    data: reload
+
+deps:
+  - name: VaultUnlocked
+    source: hangar
+    author: TNE
+    slug: VaultUnlocked
+  - name: LuckPerms
+    source: hangar
+    version: "5.4.102"
+
+jvm:
+  memory: 2G
+  # debugPort: 5005  # uncomment for JDWP attach

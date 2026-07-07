@@ -1,0 +1,28 @@
+# PlugDev configuration — Fabric mod example
+# Copy to plugdev.yml in your mod project root
+
+type: mod
+loader: fabric
+version: "1.21.4"
+
+dev:
+  mode: client
+  subproject: ":fabric"
+  gamemode: creative
+  world: flat
+
+watch:
+  paths:
+    - src/
+    - src/main/resources/
+  debounceMs: 500
+  reload:
+    java: restart
+    assets: f3t
+    data: reload
+
+jvm:
+  memory: 4G
+  enhancedRedefinition: true
+  mixinAgent: auto
+  debugPort: 5005

@@ -1,0 +1,8 @@
+{
+  "name": "fixtureplugin",
+  "private": true,
+  "scripts": {
+    "dev": "plugdev",
+    "dev:watch": "plugdev watch"
+  }
+}

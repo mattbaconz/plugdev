@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://plugdev.dev/schema/plugdev.json",
+  "title": "PlugDev Configuration",
+  "description": "Configuration schema for plugdev.yml",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/$defs/pluginConfig" },
+    { "$ref": "#/$defs/modConfig" },
+    { "$ref": "#/$defs/networkConfig" },
+    { "$ref": "#/$defs/packConfig" }
+  ],
+  "$defs": {
+    "devDefaults": {
+      "type": "object",
+      "properties": {
+        "gamemode": {
+          "type": "string",
+          "enum": ["survival", "creative", "adventure", "spectator"],
+          "default": "creative"
+        },
+        "world": {
+          "type": "string",
+          "enum": ["flat", "default", "void"],
+          "default": "flat"
+        },
+        "op": { "type": "boolean", "default": true },
+        "peaceful": { "type": "boolean", "default": true },
+        "onlineMode": { "type": "boolean", "default": false }
+      },
+      "additionalProperties": false
+    },
+    "watchConfig": {
+      "type": "object",
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["src/"]
+        },
+        "debounceMs": { "type": "integer", "minimum": 100, "default": 500 },
+        "reload": {
+          "type": "object",
+          "properties": {
+            "java": {
+              "type": "string",
+              "enum": ["safe", "hotswap", "restart"],
+              "description": "Plugin: safe. Mod: hotswap or restart."
+            },
+            "assets": {
+              "type": "string",
+              "enum": ["f3t", "restart", "none"],
+              "default": "f3t"
+            },
+            "data": {
+              "type": "string",
+              "enum": ["reload", "restart", "none"],
+              "default": "reload"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "dependency": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "source": {
+          "type": "string",
+          "enum": ["hangar", "modrinth", "url"],
+          "default": "hangar"
+        },
+        "version": { "type": "string" },
+        "url": { "type": "string", "format": "uri" }
+      },
+      "additionalProperties": false
+    },
+    "jvmConfig": {
+      "type": "object",
+      "properties": {
+        "args": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "memory": { "type": "string", "default": "2G" },
+        "enhancedRedefinition": { "type": "boolean", "default": false },
+        "mixinAgent": {
+          "type": "string",
+          "enum": ["auto", "off"],
+          "default": "auto"
+        },
+        "debugPort": { "type": "integer", "default": 5005 }
+      },
+      "additionalProperties": false
+    },
+    "pluginConfig": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "plugin" },
+        "server": {
+          "type": "string",
+          "enum": ["paper", "spigot", "folia", "purpur"],
+          "default": "paper"
+        },
+        "version": {
+          "type": "string",
+          "description": "Minecraft version, e.g. 1.21.4"
+        },
+        "port": { "type": "integer", "default": 25565 },
+        "build": {
+          "type": "object",
+          "properties": {
+            "system": { "type": "string", "enum": ["gradle", "maven"], "default": "gradle" },
+            "task": { "type": "string", "default": "build" },
+            "jarTask": { "type": "string", "default": "shadowJar" }
+          },
+          "additionalProperties": false
+        },
+        "dev": { "$ref": "#/$defs/devDefaults" },
+        "watch": { "$ref": "#/$defs/watchConfig" },
+        "deps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dependency" }
+        },
+        "jvm": { "$ref": "#/$defs/jvmConfig" }
+      },
+      "additionalProperties": false
+    },
+    "modConfig": {
+      "type": "object",
+      "required": ["type", "loader"],
+      "properties": {
+        "type": { "const": "mod" },
+        "loader": {
+          "type": "string",
+          "enum": ["fabric", "quilt", "neoforge", "forge", "architectury"]
+        },
+        "version": { "type": "string" },
+        "dev": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": ["client", "server", "datagen"],
+              "default": "client"
+            },
+            "subproject": {
+              "type": "string",
+              "description": "Gradle subproject for multi-loader, e.g. :fabric"
+            },
+            "gamemode": { "type": "string", "default": "creative" },
+            "world": { "type": "string", "default": "flat" }
+          },
+          "additionalProperties": false
+        },
+        "watch": { "$ref": "#/$defs/watchConfig" },
+        "jvm": { "$ref": "#/$defs/jvmConfig" }
+      },
+      "additionalProperties": false
+    },
+    "networkConfig": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "network" },
+        "proxy": {
+          "type": "object",
+          "properties": {
+            "software": { "type": "string", "enum": ["velocity", "waterfall"], "default": "velocity" },
+            "port": { "type": "integer", "default": 25565 }
+          },
+          "additionalProperties": false
+        },
+        "backends": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "software": { "type": "string", "default": "paper" },
+              "version": { "type": "string" },
+              "port": { "type": "integer" }
+            },
+            "required": ["name", "port"]
+          }
+        },
+        "forwarding": {
+          "type": "object",
+          "properties": {
+            "secret": { "type": "string" },
+            "generate": { "type": "boolean", "default": true }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "packConfig": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "pack" },
+        "packType": {
+          "type": "string",
+          "enum": ["datapack", "serverpack"],
+          "default": "datapack"
+        },
+        "server": {
+          "type": "object",
+          "properties": {
+            "software": { "type": "string", "default": "paper" },
+            "version": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "watch": {
+          "type": "object",
+          "properties": {
+            "paths": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": ["data/"]
+            },
+            "reloadCommand": { "type": "string", "default": "reload" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
