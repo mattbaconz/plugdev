@@ -1,0 +1,6 @@
+type: mod
+loader: fabric
+version: "1.21.4"
+
+watch:
+  paths: [src/]

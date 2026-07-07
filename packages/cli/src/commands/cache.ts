@@ -1,7 +1,11 @@
-import { rm, readdir, stat } from "node:fs/promises";
+import { rm, readdir, stat, unlink, copyFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { plugdevHome, serversCacheDir, bootstrapCacheDir, depsCacheDir } from "../paths.js";
-import { heading, info, success } from "../util/log.js";
+import { plugdevHome, bootstrapCacheDir, depsCacheDir, projectRunDir } from "../paths.js";
+import { heading, info, success, warn } from "../util/log.js";
+import { detectProject } from "../detect/project.js";
+import { loadConfig } from "../config/loader.js";
+import { DEP_PRESETS } from "../deps/presets.js";
+import { depSearchTerms } from "../deps/hangar.js";
 
 async function dirSize(path: string): Promise<number> {
   let total = 0;
@@ -58,18 +62,90 @@ export async function runCacheClear(flags: {
 export async function runDepsAdd(
   cwd: string,
   name: string,
-  version?: string,
+  opts: { version?: string; source?: string; url?: string } = {},
 ): Promise<number> {
-  const { resolveHangarDep, downloadHangarPlugin } = await import("../deps/hangar.js");
-  const { projectRunDir } = await import("../paths.js");
-  const { copyFile, mkdir } = await import("node:fs/promises");
-  const { join } = await import("node:path");
+  const { downloadHangarPlugin, downloadUrlPlugin, resolveHangarDep } = await import(
+    "../deps/hangar.js"
+  );
+  const { downloadModrinthPlugin } = await import("../deps/modrinth.js");
+  const { hangarPlatform } = await import("../deps/presets.js");
 
-  const resolved = await resolveHangarDep(name, version);
-  const jar = await downloadHangarPlugin(resolved.author, resolved.slug, resolved.version);
+  const project = await detectProject(cwd);
+  const config = await loadConfig(cwd, project);
+  const source = opts.source ?? "hangar";
   const pluginsDir = join(projectRunDir(cwd), "plugins");
   await mkdir(pluginsDir, { recursive: true });
+
+  let jar: string;
+  let label: string;
+
+  if (source === "modrinth") {
+    jar = await downloadModrinthPlugin(name, config.version, opts.version, config.server);
+    label = `modrinth:${name}`;
+  } else if (source === "url") {
+    if (!opts.url) {
+      warn("URL source requires --url <https://...>");
+      return 1;
+    }
+    jar = await downloadUrlPlugin(opts.url, name);
+    label = name;
+  } else {
+    const platform = hangarPlatform(config.server);
+    const resolved = await resolveHangarDep(name, opts.version);
+    jar = await downloadHangarPlugin(
+      resolved.author,
+      resolved.slug,
+      resolved.version,
+      platform,
+    );
+    label = `${resolved.author}/${resolved.slug}@${resolved.version}`;
+  }
+
   await copyFile(jar, join(pluginsDir, jar.split(/[/\\]/).pop()!));
-  success(`Installed ${resolved.author}/${resolved.slug}@${resolved.version}`);
+  success(`Installed ${label}`);
+  return 0;
+}
+
+export async function runDepsRemove(cwd: string, name: string): Promise<number> {
+  const pluginsDir = join(projectRunDir(cwd), "plugins");
+  const terms = depSearchTerms(name);
+
+  let files: string[];
+  try {
+    files = await readdir(pluginsDir);
+  } catch {
+    warn(`Plugins directory not found: ${pluginsDir}`);
+    return 1;
+  }
+
+  const matches = files.filter((file) => {
+    const lower = file.toLowerCase();
+    return terms.some((term) => lower.includes(term));
+  });
+
+  if (matches.length === 0) {
+    warn(`No plugin JAR matching "${name}" in ${pluginsDir}`);
+    return 1;
+  }
+
+  for (const file of matches) {
+    await unlink(join(pluginsDir, file));
+    success(`Removed ${file}`);
+  }
+
+  return 0;
+}
+
+export async function runDepsList(): Promise<number> {
+  heading("Dependency presets\n");
+  for (const preset of DEP_PRESETS) {
+    info(`${preset.aliases[0].padEnd(16)} ${preset.description}`);
+    info(`                 Hangar: ${preset.author}/${preset.slug}`);
+  }
+  info("\nUsage:");
+  info("  plugdev deps add <name> [--version]");
+  info("  plugdev deps add <modrinth-slug> --source modrinth");
+  info("  plugdev deps add myplugin --source url --url https://...");
+  info("  plugdev deps remove <name>");
   return 0;
 }

@@ -1,31 +1,33 @@
-import { access, copyFile, mkdir } from "node:fs/promises";
+import { access } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { constants } from "node:fs";
+import type { ChildProcess } from "node:child_process";
 import { detectProject } from "../detect/project.js";
-import { loadConfig, type CliOverrides } from "../config/loader.js";
-import { ensurePaperJar } from "../cache/fill.js";
+import { loadConfig, type CliOverrides, type ResolvedConfig } from "../config/loader.js";
+import { ensureServerJar, resolveServerProject } from "../cache/server.js";
 import {
   prepareRunDirectory,
   copyPaperToRun,
   writeReloadTrigger,
 } from "../cache/run-template.js";
-import {
-  runGradleBuild,
-  runMavenBuild,
-  deployPluginJar,
-  deployBootstrapJar,
-} from "../build/gradle.js";
+import { runGradleBuild, runMavenBuild, deployPluginJar, deployBootstrapJar, runModGradle } from "../build/gradle.js";
 import {
   startPaperServer,
   attachShutdownHooks,
   printReadyBanner,
+  stopPaperServer,
 } from "../process/spawner.js";
 import { installDeps } from "../deps/hangar.js";
-import { startPluginWatcher, startModWatchNotifier } from "../watch/watcher.js";
+import { startPluginWatcher, startModWatchOrchestrator } from "../watch/watcher.js";
+import { launchClient } from "../client/launch.js";
 import { projectRunDir, bootstrapCacheDir } from "../paths.js";
-import { heading, info, success, error } from "../util/log.js";
+import { heading, info, step, error as logError } from "../util/log.js";
 import { CLI_VERSION } from "../constants.js";
+import { Errors, formatError, getExitCode, PlugDevError } from "../util/errors.js";
+import { requireJava21 } from "../util/tools.js";
+import { isPortAvailable } from "../util/port.js";
+import type { DetectedProject } from "../detect/project.js";
 
 async function resolveBootstrapJar(): Promise<string> {
   const cliRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -46,103 +48,228 @@ async function resolveBootstrapJar(): Promise<string> {
     }
   }
 
-  throw new Error(
-    "Bootstrap plugin JAR not found. Run: npm run build:bootstrap from plugdev repo root.",
-  );
+  throw Errors.bootstrapMissing();
+}
+
+function watchEnabled(overrides: CliOverrides & { watch?: boolean }): boolean {
+  if (overrides.noWatch) return false;
+  if (process.env.CI === "true") return false;
+  return overrides.watch !== false;
+}
+
+function serverDisplayName(server: string): string {
+  switch (server) {
+    case "folia":
+      return "Folia";
+    case "purpur":
+      return "Purpur";
+    case "pufferfish":
+      return "Pufferfish";
+    case "spigot":
+      return "Spigot";
+    default:
+      return "Paper";
+  }
+}
+
+function printDetectionSummary(
+  project: DetectedProject,
+  config: ResolvedConfig,
+): void {
+  const buildLabel =
+    config.build.system === "maven" ? "Maven" : "Gradle";
+  const serverLabel = serverDisplayName(config.server);
+  info(`Detected: ${buildLabel} + ${serverLabel} plugin`);
+  info(`Minecraft: ${config.version}`);
+  info(`Build task: ${config.build.jarTask}`);
+  info(`Server: ${serverLabel}`);
+  if (project.pluginName) info(`Plugin: ${project.pluginName}`);
+}
+
+function shouldJoinClient(overrides: CliOverrides): boolean {
+  return overrides.join === true;
+}
+
+function handleDevError(err: unknown, debug: boolean): number {
+  logError(formatError(err, debug));
+  return getExitCode(err) ?? (err instanceof PlugDevError ? 2 : 1);
 }
 
 export async function runDev(
   cwd: string,
   overrides: CliOverrides & { watch?: boolean },
 ): Promise<number> {
-  const project = await detectProject(cwd);
-  const config = await loadConfig(cwd, project, overrides);
+  const debug = overrides.debug === true;
 
-  if (project.type === "unknown" && config.type === "plugin") {
-    // allow default plugin mode
-  }
+  try {
+    const project = await detectProject(cwd);
+    const config = await loadConfig(cwd, project, overrides);
 
-  heading(`PlugDev ${CLI_VERSION}\n`);
-
-  if (config.type === "mod" || project.type === "mod") {
-    info(`Detected: ${project.loader ?? "mod"} mod project`);
-    if (overrides.watch !== false) {
-      startModWatchNotifier(cwd, config);
+    if (project.type === "unknown" && project.buildSystem === "none") {
+      throw Errors.unknownProject();
     }
-    await runGradleBuild(cwd, config, { ...project, type: "mod" });
+
+    heading(`PlugDev ${CLI_VERSION}\n`);
+
+    if (config.type === "mod" || project.type === "mod") {
+      return runModDev(cwd, config, project, overrides, debug);
+    }
+
+    if (project.buildSystem === "none" && project.type !== "mod") {
+      throw Errors.noBuildSystem();
+    }
+
+    await requireJava21();
+
+    if (config.build.system === "maven" || project.buildSystem === "maven") {
+      return runPluginDev(cwd, config, project, overrides, async () =>
+        runMavenBuild(cwd),
+      );
+    }
+
+    return runPluginDev(cwd, config, project, overrides, async () =>
+      runGradleBuild(cwd, config, project),
+    );
+  } catch (e) {
+    return handleDevError(e, debug);
+  }
+}
+
+async function runModDev(
+  cwd: string,
+  config: ResolvedConfig,
+  project: DetectedProject,
+  overrides: CliOverrides & { watch?: boolean },
+  debug: boolean,
+): Promise<number> {
+  info(`Detected: ${project.loader ?? "mod"} mod project`);
+  info(`Minecraft: ${config.version}`);
+
+  let closeWatcher: (() => void) | undefined;
+
+  if (watchEnabled(overrides)) {
+    closeWatcher = startModWatchOrchestrator(cwd, config, project, debug);
+  }
+
+  try {
+    await runModGradle(cwd, config, project);
+    closeWatcher?.();
     return 0;
+  } catch (e) {
+    closeWatcher?.();
+    return handleDevError(e, debug);
   }
-
-  if (config.build.system === "maven" || project.buildSystem === "maven") {
-    info("Detected: Maven Paper plugin");
-    return runPluginDev(cwd, config, project, overrides, async () => runMavenBuild(cwd));
-  }
-
-  info(
-    `Detected: Gradle Paper plugin${project.pluginName ? ` (${project.pluginName})` : ""}`,
-  );
-  return runPluginDev(cwd, config, project, overrides, async () =>
-    runGradleBuild(cwd, config, project),
-  );
 }
 
 async function runPluginDev(
   cwd: string,
-  config: Awaited<ReturnType<typeof loadConfig>>,
-  project: Awaited<ReturnType<typeof detectProject>>,
+  config: ResolvedConfig,
+  project: DetectedProject,
   overrides: CliOverrides & { watch?: boolean },
   buildFn: () => Promise<{ jarPath: string; task: string }>,
 ): Promise<number> {
-  const paperProject = config.server === "folia" ? "folia" : "paper";
-  info(`Resolving ${paperProject} ${config.version}...`);
-  const paper = await ensurePaperJar(config.version, paperProject as "paper" | "folia");
+  const debug = overrides.debug === true;
+  printDetectionSummary(project, config);
+
+  const serverLabel = serverDisplayName(config.server);
+
+  const serverProject = resolveServerProject(config.server);
+
+  if (!(await isPortAvailable(config.port))) {
+    throw Errors.portInUse(config.port);
+  }
+
+  const serverJarInfo = await ensureServerJar(config.version, serverProject);
+  info(`Cache: ${serverJarInfo.cacheHit ? "hit" : "downloaded"}`);
 
   const runDir = await prepareRunDirectory(cwd, config);
-  const serverJar = await copyPaperToRun(runDir, paper.jarPath);
+  step("Preparing dev server...", "done");
+
+  const serverJar = await copyPaperToRun(runDir, serverJarInfo.jarPath);
   const pluginsDir = join(runDir, "plugins");
 
-  info("Building plugin...");
-  const build = await buildFn();
-  const devJar = await deployPluginJar(build.jarPath, pluginsDir, project.pluginName);
+  const bootstrap = await resolveBootstrapJar();
 
-  try {
-    const bootstrap = await resolveBootstrapJar();
-    await deployBootstrapJar(bootstrap, pluginsDir);
-  } catch (e) {
-    error(String(e));
-    return 2;
-  }
+  let currentProc: ChildProcess | undefined;
+  let closeWatcher: (() => void) | undefined;
 
-  if (config.deps?.length) {
-    await installDeps(pluginsDir, config.deps);
-  }
-
-  await writeReloadTrigger(cwd, [devJar]);
-
-  info("Starting dev server...");
-  const { proc, waitForReady } = startPaperServer(
-    runDir,
-    serverJar,
-    config.jvm.memory,
-    config.jvm.debugPort > 0 ? config.jvm.debugPort : undefined,
-  );
-  attachShutdownHooks(proc);
-
-  try {
-    await waitForReady;
-    printReadyBanner(config.port, project.pluginName);
-
-    if (overrides.watch !== false && !overrides.noWatch) {
-      startPluginWatcher(cwd, config, project, project.pluginName);
-    } else {
-      info("Watch disabled (--no-watch)");
+  const bootServer = async (first = false): Promise<ChildProcess> => {
+    if (currentProc) {
+      await stopPaperServer(currentProc);
+      currentProc = undefined;
     }
 
-    await new Promise<void>((resolve) => proc.on("exit", () => resolve()));
+    step("Building plugin...", "active");
+    const build = await buildFn();
+    step("Building plugin...", "done");
+
+    const devJar = await deployPluginJar(
+      build.jarPath,
+      pluginsDir,
+      project.pluginName,
+    );
+    await deployBootstrapJar(bootstrap, pluginsDir);
+
+    if (first && config.deps?.length) {
+      await installDeps(pluginsDir, config.deps, config.server, config.version);
+    }
+
+    await writeReloadTrigger(cwd, [devJar]);
+    step("Copying plugin JAR...", "done");
+
+    step(`Starting ${serverLabel}...`, "active");
+    const { proc, waitForReady } = startPaperServer(
+      runDir,
+      serverJar,
+      config.jvm.memory,
+      config.jvm.debugPort > 0 ? config.jvm.debugPort : undefined,
+      project.pluginName,
+    );
+    currentProc = proc;
+    attachShutdownHooks(proc);
+
+    await waitForReady;
+    step(`Starting ${serverLabel}...`, "done");
+    printReadyBanner(config.port, project.pluginName);
+
+    if (shouldJoinClient(overrides)) {
+      await launchClient({ config, waitForServer: false });
+    }
+
+    return proc;
+  };
+
+  try {
+    await bootServer(true);
+
+    if (watchEnabled(overrides)) {
+      closeWatcher = startPluginWatcher(
+        cwd,
+        config,
+        project,
+        project.pluginName,
+        {
+          onSafeReload: async () => {
+            // bootstrap ReloadWatcher handles trigger file
+          },
+          onRestart: async () => {
+            await bootServer(false);
+          },
+        },
+        debug,
+      );
+    } else {
+      info("Watch disabled (--no-watch or CI=true)");
+    }
+
+    await new Promise<void>((resolve) => {
+      currentProc?.on("exit", () => resolve());
+    });
+    closeWatcher?.();
     return 0;
   } catch (e) {
-    error(String(e));
-    proc.kill();
-    return 2;
+    closeWatcher?.();
+    if (currentProc) await stopPaperServer(currentProc);
+    return handleDevError(e, debug);
   }
 }

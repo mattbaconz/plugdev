@@ -1,0 +1,12 @@
+type: plugin
+server: paper
+version: "1.21.4"
+port: 25565
+
+build:
+  system: maven
+  task: package
+  jarPattern: "target/*.jar"
+
+watch:
+  paths: [src/]

@@ -20,6 +20,14 @@ export function error(msg: string): void {
   console.error(pc.red("  ✗ ") + msg);
 }
 
+export function step(label: string, state: "active" | "done"): void {
+  if (state === "active") {
+    console.log(pc.dim(`  … ${label}`));
+  } else {
+    console.log(pc.green("  ✓ ") + label);
+  }
+}
+
 export function heading(msg: string): void {
   console.log(pc.bold(msg));
 }

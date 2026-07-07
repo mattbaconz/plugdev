@@ -95,7 +95,8 @@ export async function runInit(cwd: string, force = false): Promise<number> {
   }
 
   const scripts = (pkg.scripts as Record<string, string>) ?? {};
-  scripts.dev = "plugdev";
+  scripts.dev = "plugdev run";
+  scripts["dev:server"] = "plugdev";
   scripts["dev:watch"] = "plugdev watch";
   pkg.scripts = scripts;
 

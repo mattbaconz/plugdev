@@ -4,12 +4,8 @@ import { constants } from "node:fs";
 import { HANGAR_API_BASE, USER_AGENT } from "../constants.js";
 import { depsCacheDir } from "../paths.js";
 import { info, success } from "../util/log.js";
-
-const DEP_ALIASES: Record<string, { author: string; slug: string }> = {
-  vault: { author: "TNE", slug: "VaultUnlocked" },
-  vaultunlocked: { author: "TNE", slug: "VaultUnlocked" },
-  luckperms: { author: "LuckPerms", slug: "LuckPerms" },
-};
+import { DEP_ALIASES, hangarPlatform } from "./presets.js";
+import { downloadModrinthPlugin } from "./modrinth.js";
 
 interface HangarVersion {
   name: string;
@@ -18,12 +14,17 @@ interface HangarVersion {
 export async function resolveHangarDep(
   name: string,
   version?: string,
+  explicit?: { author?: string; slug?: string },
 ): Promise<{ author: string; slug: string; version: string; fileName: string }> {
   const key = name.toLowerCase().replace(/\s+/g, "");
-  const alias = DEP_ALIASES[key];
+  const alias =
+    explicit?.author && explicit?.slug
+      ? { author: explicit.author, slug: explicit.slug }
+      : DEP_ALIASES[key];
+
   if (!alias) {
     throw new Error(
-      `Unknown dep alias "${name}". Use author/slug in plugdev.yml or add mapping.`,
+      `Unknown dep alias "${name}". Run plugdev deps list or use author/slug in plugdev.yml.`,
     );
   }
 
@@ -50,7 +51,7 @@ export async function downloadHangarPlugin(
   author: string,
   slug: string,
   version: string,
-  platform: "PAPER" = "PAPER",
+  platform: "PAPER" | "FOLIA" = "PAPER",
 ): Promise<string> {
   const cacheDir = depsCacheDir();
   await mkdir(cacheDir, { recursive: true });
@@ -64,7 +65,7 @@ export async function downloadHangarPlugin(
   }
 
   const url = `${HANGAR_API_BASE}/projects/${author}/${slug}/versions/${version}/${platform}/download`;
-  info(`Downloading ${author}/${slug}@${version} from Hangar...`);
+  info(`Downloading ${author}/${slug}@${version} (${platform}) from Hangar...`);
   const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
   if (!res.ok) {
     throw new Error(`Hangar download failed: ${res.status} ${url}`);
@@ -75,23 +76,96 @@ export async function downloadHangarPlugin(
   return dest;
 }
 
+export async function downloadUrlPlugin(url: string, name: string): Promise<string> {
+  const cacheDir = depsCacheDir();
+  await mkdir(cacheDir, { recursive: true });
+  const safeName = name.replace(/[^a-zA-Z0-9._-]+/g, "-");
+  const dest = join(cacheDir, `url-${safeName}.jar`);
+
+  try {
+    await access(dest, constants.F_OK);
+    return dest;
+  } catch {
+    // download
+  }
+
+  info(`Downloading ${name} from URL...`);
+  const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+  if (!res.ok) {
+    throw new Error(`URL download failed: ${res.status}`);
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  await writeFile(dest, buf);
+  success(`Cached dep: ${dest}`);
+  return dest;
+}
+
+async function installJarToPlugins(jar: string, pluginsDir: string): Promise<void> {
+  const fileName = jar.split(/[/\\]/).pop()!;
+  await copyFile(jar, join(pluginsDir, fileName));
+}
+
 export async function installDeps(
   pluginsDir: string,
-  deps: Array<{ name: string; version?: string; author?: string; slug?: string }>,
+  deps: Array<{
+    name: string;
+    enabled?: boolean;
+    source?: "hangar" | "modrinth" | "url";
+    version?: string;
+    url?: string;
+    author?: string;
+    slug?: string;
+  }>,
+  server = "paper",
+  mcVersion = "1.21.4",
 ): Promise<void> {
+  const platform = hangarPlatform(server);
+
   for (const dep of deps) {
+    if (dep.enabled === false) continue;
+    const source = dep.source ?? "hangar";
+
+    if (source === "url") {
+      if (!dep.url) {
+        throw new Error(`Dep "${dep.name}" uses source url but has no url field.`);
+      }
+      const jar = await downloadUrlPlugin(dep.url, dep.name);
+      await installJarToPlugins(jar, pluginsDir);
+      continue;
+    }
+
+    if (source === "modrinth") {
+      const slug = dep.slug ?? dep.name;
+      const jar = await downloadModrinthPlugin(slug, mcVersion, dep.version, server);
+      await installJarToPlugins(jar, pluginsDir);
+      continue;
+    }
+
     let author = dep.author;
     let slug = dep.slug;
     let version = dep.version;
 
     if (!author || !slug) {
-      const resolved = await resolveHangarDep(dep.name, dep.version);
+      const resolved = await resolveHangarDep(dep.name, dep.version, {
+        author: dep.author,
+        slug: dep.slug,
+      });
       author = resolved.author;
       slug = resolved.slug;
       version = resolved.version;
     }
 
-    const jar = await downloadHangarPlugin(author!, slug!, version!);
-    await copyFile(jar, join(pluginsDir, jar.split(/[/\\]/).pop()!));
+    const jar = await downloadHangarPlugin(author!, slug!, version!, platform);
+    await installJarToPlugins(jar, pluginsDir);
   }
+}
+
+export function depSearchTerms(name: string): string[] {
+  const key = name.toLowerCase().replace(/\s+/g, "");
+  const alias = DEP_ALIASES[key];
+  const terms = [name.toLowerCase(), key];
+  if (alias) {
+    terms.push(alias.slug.toLowerCase(), alias.author.toLowerCase());
+  }
+  return [...new Set(terms)];
 }

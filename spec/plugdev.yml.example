@@ -10,6 +10,7 @@ build:
   system: gradle
   task: build
   jarTask: shadowJar
+  jarPattern: "build/libs/*.jar"
 
 dev:
   gamemode: creative
@@ -27,15 +28,23 @@ watch:
     assets: none
     data: reload
 
+# Preset test plugins (see docs/plugins/dependency-presets.md)
 deps:
-  - name: VaultUnlocked
-    source: hangar
-    author: TNE
-    slug: VaultUnlocked
-  - name: LuckPerms
-    source: hangar
-    version: "5.4.102"
+  - name: essentials
+    enabled: false
+  - name: vault
+    enabled: false
+  - name: luckperms
+    enabled: false
+
+# Auto-join client (plugdev run)
+client:
+  launcher: auto
+  # executable: "C:\\path\\to\\prismlauncher.exe"  # when auto-detect fails
+  instance: plugdev-1.21.4
+  offlineName: DevPlayer
+  joinOnReady: true
 
 jvm:
   memory: 2G
-  # debugPort: 5005  # uncomment for JDWP attach
+  # debugPort: 5005  # uncomment for JDWP attach, or use plugdev --debug

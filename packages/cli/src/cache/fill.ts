@@ -6,6 +6,7 @@ import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { FILL_API_BASE, USER_AGENT } from "../constants.js";
 import { serversCacheDir } from "../paths.js";
+import { Errors } from "../util/errors.js";
 
 export interface PaperBuild {
   id: number;
@@ -13,6 +14,7 @@ export interface PaperBuild {
   jarPath: string;
   jarName: string;
   sha256: string;
+  cacheHit: boolean;
 }
 
 interface FillDownload {
@@ -32,7 +34,7 @@ async function fillFetch<T>(path: string): Promise<T> {
     headers: { "User-Agent": USER_AGENT },
   });
   if (!res.ok) {
-    throw new Error(`Fill API error ${res.status}: ${path}`);
+    throw Errors.downloadFailed(`Fill API error ${res.status}: ${path}`);
   }
   return res.json() as Promise<T>;
 }
@@ -47,15 +49,15 @@ export async function resolveStablePaperBuild(
 
   const stable = builds.find((b) => b.channel === "STABLE");
   if (!stable) {
-    throw new Error(
-      `No STABLE ${project} build for Minecraft ${mcVersion}. Try a different version.`,
+    throw Errors.downloadFailed(
+      `No STABLE ${project} build for Minecraft ${mcVersion}.`,
     );
   }
 
   const download =
     stable.downloads["server:default"] ?? stable.downloads["server:mojang"];
   if (!download?.url) {
-    throw new Error(`No server:default download for ${project} ${mcVersion}`);
+    throw Errors.downloadFailed(`No server download for ${project} ${mcVersion}.`);
   }
 
   return { build: stable, download };
@@ -72,7 +74,7 @@ export async function ensurePaperJar(
   project: "paper" | "folia" = "paper",
 ): Promise<PaperBuild> {
   const { build, download } = await resolveStablePaperBuild(project, mcVersion);
-  const dir = serversCacheDir(mcVersion);
+  const dir = serversCacheDir(mcVersion, project);
   await mkdir(dir, { recursive: true });
 
   const jarName = download.name || `${project}-${mcVersion}-${build.id}.jar`;
@@ -83,7 +85,14 @@ export async function ensurePaperJar(
     await access(jarPath);
     const ok = await verifySha256(jarPath, download.checksums.sha256);
     if (ok) {
-      return { id: build.id, channel: build.channel, jarPath, jarName, sha256: download.checksums.sha256 };
+      return {
+        id: build.id,
+        channel: build.channel,
+        jarPath,
+        jarName,
+        sha256: download.checksums.sha256,
+        cacheHit: true,
+      };
     }
   } catch {
     // download fresh
@@ -93,22 +102,36 @@ export async function ensurePaperJar(
     headers: { "User-Agent": USER_AGENT },
   });
   if (!res.ok || !res.body) {
-    throw new Error(`Failed to download Paper: ${res.status}`);
+    throw Errors.downloadFailed(`HTTP ${res.status} from Paper Fill API.`);
   }
 
-  await pipeline(Readable.fromWeb(res.body as import("stream/web").ReadableStream), createWriteStream(jarPath));
+  await pipeline(
+    Readable.fromWeb(res.body as import("stream/web").ReadableStream),
+    createWriteStream(jarPath),
+  );
 
   const ok = await verifySha256(jarPath, download.checksums.sha256);
   if (!ok) {
-    throw new Error("Paper JAR SHA256 mismatch after download");
+    throw Errors.downloadFailed("SHA256 checksum mismatch after download.");
   }
 
   await writeFile(
     metaPath,
-    JSON.stringify({ mcVersion, buildId: build.id, jarName, sha256: download.checksums.sha256 }, null, 2),
+    JSON.stringify(
+      { mcVersion, project, buildId: build.id, jarName, sha256: download.checksums.sha256 },
+      null,
+      2,
+    ),
   );
 
-  return { id: build.id, channel: build.channel, jarPath, jarName, sha256: download.checksums.sha256 };
+  return {
+    id: build.id,
+    channel: build.channel,
+    jarPath,
+    jarName,
+    sha256: download.checksums.sha256,
+    cacheHit: false,
+  };
 }
 
 export async function cacheDirSize(dir: string): Promise<number> {

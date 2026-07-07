@@ -1,7 +1,25 @@
 {
   "name": "@plugdev/cli",
-  "version": "0.1.0",
-  "description": "npm run dev for Minecraft Paper plugins",
+  "version": "0.3.1",
+  "description": "npm run dev for Minecraft plugins and mods",
+  "author": "PLUG Labs",
+  "homepage": "https://github.com/mattbaconz/plugdev#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mattbaconz/plugdev.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mattbaconz/plugdev/issues"
+  },
+  "keywords": [
+    "minecraft",
+    "paper",
+    "spigot",
+    "plugin",
+    "dev-server",
+    "cli",
+    "gradle"
+  ],
   "type": "module",
   "bin": {
     "plugdev": "dist/cli.js"
@@ -17,11 +35,14 @@
   ],
   "scripts": {
     "build": "tsup",
+    "prepare": "npm run build",
     "start": "node dist/cli.js",
     "test": "node --test dist/**/*.test.js 2>/dev/null || node --import tsx --test src/**/*.test.ts",
     "prepublishOnly": "cd ../.. && npm run build"
   },
   "dependencies": {
+    "@xmcl/core": "^2.15.1",
+    "@xmcl/installer": "^6.1.2",
     "ajv": "^8.17.1",
     "chokidar": "^4.0.3",
     "commander": "^13.1.0",

@@ -1,0 +1,5 @@
+name: FixtureMaven
+version: 1.0.0
+main: dev.plugdev.fixturemaven.FixtureMavenPlugin
+api-version: '1.21'
+description: PlugDev Maven fixture

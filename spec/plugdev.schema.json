@@ -73,8 +73,39 @@
           "enum": ["hangar", "modrinth", "url"],
           "default": "hangar"
         },
+        "author": { "type": "string", "description": "Hangar author (optional if preset alias)" },
+        "slug": { "type": "string", "description": "Hangar slug or Modrinth project ID/slug" },
         "version": { "type": "string" },
-        "url": { "type": "string", "format": "uri" }
+        "url": { "type": "string", "format": "uri" },
+        "enabled": { "type": "boolean", "default": true }
+      },
+      "additionalProperties": false
+    },
+    "clientConfig": {
+      "type": "object",
+      "properties": {
+        "launcher": {
+          "type": "string",
+          "enum": ["auto", "prism", "multimc", "embedded", "none"],
+          "default": "auto"
+        },
+        "executable": {
+          "type": "string",
+          "description": "Path to prismlauncher.exe or MultiMC.exe when auto-detection fails"
+        },
+        "instance": {
+          "type": "string",
+          "description": "Prism/MultiMC instance folder name, e.g. plugdev-1.21.4"
+        },
+        "offlineName": {
+          "type": "string",
+          "default": "DevPlayer"
+        },
+        "joinOnReady": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-join client when server ready (plugdev run)"
+        }
       },
       "additionalProperties": false
     },
@@ -103,7 +134,7 @@
         "type": { "const": "plugin" },
         "server": {
           "type": "string",
-          "enum": ["paper", "spigot", "folia", "purpur"],
+          "enum": ["paper", "spigot", "folia", "purpur", "pufferfish"],
           "default": "paper"
         },
         "version": {
@@ -116,7 +147,8 @@
           "properties": {
             "system": { "type": "string", "enum": ["gradle", "maven"], "default": "gradle" },
             "task": { "type": "string", "default": "build" },
-            "jarTask": { "type": "string", "default": "shadowJar" }
+            "jarTask": { "type": "string", "default": "shadowJar" },
+            "jarPattern": { "type": "string", "description": "Glob for built JAR, e.g. build/libs/*.jar" }
           },
           "additionalProperties": false
         },
@@ -126,6 +158,7 @@
           "type": "array",
           "items": { "$ref": "#/$defs/dependency" }
         },
+        "client": { "$ref": "#/$defs/clientConfig" },
         "jvm": { "$ref": "#/$defs/jvmConfig" }
       },
       "additionalProperties": false

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "fixturemod",
+  "version": "1.0.0",
+  "name": "Fixture Mod",
+  "description": "PlugDev fabric mod fixture",
+  "authors": ["PlugDev"],
+  "contact": {},
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["dev.plugdev.fixture.FixtureMod"]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.4",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}

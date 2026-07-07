@@ -1,24 +1,34 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { join } from "node:path";
 import { success, info } from "../util/log.js";
+import { Errors } from "../util/errors.js";
 
 export interface ServerProcess {
   proc: ChildProcess;
   waitForReady: Promise<void>;
 }
 
-export function startPaperServer(
+export interface JavaProcessOptions {
+  debugPort?: number;
+  pluginName?: string;
+  readyPattern?: RegExp;
+  args?: string[];
+}
+
+export function startJavaProcess(
   runDir: string,
   serverJar: string,
   memory: string,
-  debugPort?: number,
+  opts: JavaProcessOptions = {},
 ): ServerProcess {
-  const args = [`-Xmx${memory}`, "-jar", serverJar, "nogui"];
-  if (debugPort) {
+  const args = [`-Xmx${memory}`, "-jar", serverJar, ...(opts.args ?? ["nogui"])];
+  if (opts.debugPort) {
     args.unshift(
-      `-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:${debugPort}`,
+      `-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:${opts.debugPort}`,
     );
   }
+
+  const readyPattern = opts.readyPattern ?? /Done \(|Timings Reset/;
+  const pluginName = opts.pluginName;
 
   const proc = spawn("java", args, {
     cwd: runDir,
@@ -29,28 +39,44 @@ export function startPaperServer(
     },
   });
 
+  let pluginError: string | undefined;
+
   const waitForReady = new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => {
-      reject(new Error("Server start timeout (240s)"));
+      reject(Errors.serverStartFailed("Timed out waiting for server (240s)."));
     }, 240_000);
 
     const onData = (chunk: Buffer) => {
       const text = chunk.toString();
       process.stdout.write(chunk);
-      if (text.includes("Done (") || text.includes("Timings Reset")) {
+      if (pluginName && text.includes(`Error occurred while enabling ${pluginName}`)) {
+        pluginError = pluginName;
+      }
+      if (readyPattern.test(text)) {
         clearTimeout(timeout);
         cleanup();
-        resolve();
+        if (pluginError) {
+          reject(Errors.pluginEnableFailed(pluginError));
+        } else {
+          resolve();
+        }
       }
     };
 
     const onErr = (chunk: Buffer) => {
       process.stderr.write(chunk);
       const text = chunk.toString();
-      if (text.includes("Done (") || text.includes("Timings Reset")) {
+      if (pluginName && text.includes(`Error occurred while enabling ${pluginName}`)) {
+        pluginError = pluginName;
+      }
+      if (readyPattern.test(text)) {
         clearTimeout(timeout);
         cleanup();
-        resolve();
+        if (pluginError) {
+          reject(Errors.pluginEnableFailed(pluginError));
+        } else {
+          resolve();
+        }
       }
     };
 
@@ -58,7 +84,7 @@ export function startPaperServer(
       clearTimeout(timeout);
       cleanup();
       if (code !== 0 && code !== null) {
-        reject(new Error(`Server exited with code ${code}`));
+        reject(Errors.serverStartFailed(`Server exited with code ${code}.`));
       }
     };
 
@@ -76,12 +102,53 @@ export function startPaperServer(
   return { proc, waitForReady };
 }
 
-export function attachShutdownHooks(proc: ChildProcess): void {
-  const shutdown = () => {
-    if (!proc.killed) {
-      proc.stdin?.write("stop\n");
-      setTimeout(() => proc.kill(), 5000);
+export function startPaperServer(
+  runDir: string,
+  serverJar: string,
+  memory: string,
+  debugPort?: number,
+  pluginName?: string,
+): ServerProcess {
+  return startJavaProcess(runDir, serverJar, memory, {
+    debugPort,
+    pluginName,
+    readyPattern: /Done \(|Timings Reset/,
+    args: ["nogui"],
+  });
+}
+
+export function stopPaperServer(proc: ChildProcess): Promise<void> {
+  return new Promise((resolve) => {
+    if (proc.killed || proc.exitCode !== null) {
+      resolve();
+      return;
     }
+    proc.once("exit", () => resolve());
+    proc.stdin?.write("stop\n");
+    setTimeout(() => {
+      if (proc.exitCode === null) proc.kill();
+      resolve();
+    }, 8000);
+  });
+}
+
+export function attachShutdownHooks(proc: ChildProcess): void {
+  attachMultiShutdown([proc]);
+}
+
+export function attachMultiShutdown(procs: ChildProcess[]): void {
+  const shutdown = () => {
+    for (const proc of procs) {
+      if (!proc.killed && proc.exitCode === null) {
+        proc.stdin?.write("shutdown\n");
+        proc.stdin?.write("stop\n");
+      }
+    }
+    setTimeout(() => {
+      for (const proc of procs) {
+        if (proc.exitCode === null) proc.kill();
+      }
+    }, 5000);
   };
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);

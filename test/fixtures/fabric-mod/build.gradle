@@ -1,0 +1,22 @@
+plugins {
+  id 'fabric-loom' version '1.9-SNAPSHOT'
+  id 'maven-publish'
+}
+
+version = '1.0.0'
+group = 'dev.plugdev.fixture'
+
+base {
+  archivesName = 'fixture-mod'
+}
+
+repositories {
+  mavenCentral()
+  maven { url 'https://maven.fabricmc.net/' }
+}
+
+dependencies {
+  minecraft "com.mojang:minecraft:${project.minecraft_version}"
+  mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+  modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+}
