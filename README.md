@@ -111,3 +111,12 @@ npm org: **`@plugdev`** (`@plugdev/cli`). Company name is PLUG Labs; product bra
 ## Status
 
 **v0.3.1** — Full test loop: `plugdev run`, client auto-join, dependency presets, Purpur/Pufferfish/Spigot, `plugdev network`.
+
+## Cloning
+
+If you cloned before July 2026, history was rewritten. Re-clone or reset:
+
+```bash
+git fetch origin
+git reset --hard origin/main
+```
