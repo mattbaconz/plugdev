@@ -4,8 +4,6 @@
 
 PlugDev boots a dev server with your plugin loaded, installs preset test dependencies, applies sane defaults (creative, flat world, offline mode), watches your source for safe JAR reload, and optionally opens Minecraft to join automatically.
 
-Future: [PlugDev MCP](docs/mcp/overview.md) exposes this workflow to AI agents through MCP — infrastructure for plugin developers who use Cursor, Claude, or Codex.
-
 ## Quick start
 
 ### From this repo (development)
@@ -101,27 +99,15 @@ client:
   offlineName: DevPlayer
 ```
 
-## Documentation
-
-| Audience | Start here |
-|----------|------------|
-| Humans | [docs/00-index.md](docs/00-index.md) |
-| AI agents | [AGENTS.md](AGENTS.md) |
-| Roadmap / gaps | [TODO.md](TODO.md) |
-
 ## Spec
 
 - Config schema: [`spec/plugdev.schema.json`](spec/plugdev.schema.json)
 - Examples: [`spec/plugdev.yml.example`](spec/plugdev.yml.example)
 
-## Obsidian
-
-Open this repo folder as an Obsidian vault. Start at [docs/00-index.md](docs/00-index.md).
-
 ## Publishing
 
-npm org: **`@plugdev`** (`@plugdev/cli`). Company name is PLUG Labs; product brand is PlugDev. See [docs/shipping.md](docs/shipping.md).
+npm org: **`@plugdev`** (`@plugdev/cli`). Company name is PLUG Labs; product brand is PlugDev.
 
 ## Status
 
-**v0.3.1** — Full test loop: `plugdev run`, client auto-join, dependency presets, Purpur/Pufferfish/Spigot, `plugdev network`. PlugDev MCP spec in [docs/mcp/overview.md](docs/mcp/overview.md). See [docs/roadmap/v0.2.md](docs/roadmap/v0.2.md) and [TODO.md](TODO.md).
+**v0.3.1** — Full test loop: `plugdev run`, client auto-join, dependency presets, Purpur/Pufferfish/Spigot, `plugdev network`.

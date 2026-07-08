@@ -1,6 +1,13 @@
 node_modules/
 dist/
 .plugdev/
+
+# Private docs (local only — not published to GitHub)
+docs/
+AGENTS.md
+TODO.md
+CHANGELOG.md
+templates/
 packages/bootstrap-paper/build/
 packages/bootstrap-paper/.gradle/
 test/fixtures/**/.plugdev/
