@@ -1,6 +1,6 @@
 {
   "name": "@plugdev/mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for PlugDev — agent-controllable Minecraft dev environment",
   "author": "PLUG Labs",
   "homepage": "https://github.com/mattbaconz/plugdev#readme",
@@ -30,7 +30,8 @@
     "start": "node dist/index.js",
     "prepare": "npm run build",
     "prepublishOnly": "cd ../.. && npm run build -w @plugdev/mcp",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "test": "node --import tsx --test src/**/*.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",

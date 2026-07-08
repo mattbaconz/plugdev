@@ -5,16 +5,9 @@ import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import { parsePlugdevJson, type JsonResult } from "./json.js";
 
 const projectRoot = process.env.PLUGDEV_PROJECT_ROOT ?? process.cwd();
-
-type JsonResult = {
-  ok: boolean;
-  data?: Record<string, unknown>;
-  error?: string;
-  hint?: string;
-  code?: string;
-};
 
 function resolvePlugdevInvocation(): { command: string; baseArgs: string[] } {
   const fromEnv = process.env.PLUGDEV_CLI;
@@ -41,19 +34,16 @@ async function plugdev(args: string[]): Promise<JsonResult> {
   });
 
   const combined = [result.stdout, result.stderr].filter(Boolean).join("\n").trim();
-  const match = combined.match(/\{"ok":[^]*?\}(?=\s*$)/);
-  const jsonLine = match?.[0] ?? combined.split("\n").find((l) => l.trim().startsWith('{"ok"'));
+  const parsed = parsePlugdevJson(combined);
 
-  try {
-    return JSON.parse(jsonLine ?? combined) as JsonResult;
-  } catch {
-    return {
-      ok: false,
-      error: result.exitCode !== 0 ? combined || "plugdev command failed" : "Invalid JSON from plugdev",
-      hint: "Ensure plugdev is built (npm run build) and PLUGDEV_CLI points at packages/cli/dist/cli.js",
-      data: { exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr },
-    };
-  }
+  if (parsed) return parsed;
+
+  return {
+    ok: false,
+    error: result.exitCode !== 0 ? combined || "plugdev command failed" : "Invalid JSON from plugdev",
+    hint: "Ensure plugdev is built (npm run build) and PLUGDEV_CLI points at packages/cli/dist/cli.js",
+    data: { exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr },
+  };
 }
 
 function textResult(data: unknown): { content: Array<{ type: "text"; text: string }> } {
@@ -64,8 +54,31 @@ function textResult(data: unknown): { content: Array<{ type: "text"; text: strin
 
 const server = new McpServer({
   name: "plugdev",
-  version: "0.1.0",
+  version: "0.1.1",
 });
+
+server.tool(
+  "plugdev_doctor",
+  "Check project toolchain, cache, and client readiness",
+  {},
+  async () => {
+    const result = await plugdev(["doctor"]);
+    // doctor may return ok:false with setupReady false — still return data
+    if (!result.data && !result.ok) return { ...textResult(result), isError: true };
+    return textResult(result.data ?? result);
+  },
+);
+
+server.tool(
+  "plugdev_setup",
+  "Prefetch Paper server JAR and Minecraft client; provision Prism if found",
+  {},
+  async () => {
+    const result = await plugdev(["setup"]);
+    if (!result.ok && result.error) return { ...textResult(result), isError: true };
+    return textResult(result.data ?? { ok: true, message: "setup complete" });
+  },
+);
 
 server.tool(
   "plugdev_build_plugin",
@@ -185,6 +198,14 @@ server.tool(
   },
   async ({ playerName, version, paper }) => {
     const steps: Record<string, unknown> = {};
+
+    const doctor = await plugdev(["doctor"]);
+    steps.doctor = doctor;
+    const setupReady = (doctor.data as { setupReady?: boolean } | undefined)?.setupReady;
+    if (setupReady === false) {
+      const setup = await plugdev(["setup"]);
+      steps.setup = setup;
+    }
 
     const build = await plugdev(["build"]);
     steps.build = build;

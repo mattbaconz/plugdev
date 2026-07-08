@@ -69,12 +69,14 @@ export async function runClientSetup(
       info("Re-run with --force to reprovision.");
     }
   } else {
-    if (opts.force && exists) {
-      info(`Reprovisioning instance "${instanceId}"...`);
-    }
-    const result = await ensureInstance(launcher, config.version, instanceId);
+    const result = await ensureInstance(launcher, config.version, instanceId, {
+      force: opts.force,
+    });
     if (result.created) {
       success(`Created instance "${result.instanceId}"`);
+      info("Launch it once in Prism to download game files.");
+    } else if (opts.force) {
+      success(`Reprovisioned instance "${result.instanceId}" for MC ${config.version}`);
       info("Launch it once in Prism to download game files.");
     } else {
       success(`Instance "${result.instanceId}" ready`);

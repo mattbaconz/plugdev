@@ -1,6 +1,6 @@
 {
   "name": "@plugdev/cli",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "npm run dev for Minecraft plugins and mods",
   "author": "PLUG Labs",
   "homepage": "https://github.com/mattbaconz/plugdev#readme",
@@ -38,7 +38,7 @@
     "build": "tsup",
     "prepare": "npm run build",
     "start": "node dist/cli.js",
-    "test": "node --test dist/**/*.test.js 2>/dev/null || node --import tsx --test src/**/*.test.ts",
+    "test": "node --import tsx --test src/**/*.test.ts",
     "prepublishOnly": "cd ../.. && npm run build"
   },
   "dependencies": {

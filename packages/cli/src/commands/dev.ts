@@ -78,8 +78,13 @@ function serverDisplayName(server: string): string {
   }
 }
 
-function shouldJoinClient(overrides: CliOverrides): boolean {
-  return overrides.join === true;
+function shouldJoinClient(
+  overrides: CliOverrides,
+  config: ResolvedConfig,
+): boolean {
+  if (overrides.join === true) return true;
+  if (overrides.join === false) return false;
+  return config.client?.joinOnReady === true;
 }
 
 function handleDevError(err: unknown, debug: boolean): number {
@@ -180,7 +185,7 @@ async function runPluginDev(
     throw Errors.portInUse(config.port);
   }
 
-  const prefetchClient = shouldJoinClient(overrides);
+  const prefetchClient = shouldJoinClient(overrides, config);
   const serverCached = await isServerJarCached(config.version, serverProject);
   const clientCached = prefetchClient
     ? await isEmbeddedClientCached(config.version)
@@ -196,6 +201,7 @@ async function runPluginDev(
   try {
     if (needsParallelPrefetch && prefetchClient && !serverCached && !clientCached) {
       phase(`Resolve ${serverLabel} ${config.version}`, "active");
+      phase("Downloading Minecraft client…", "active");
       const [jar] = await Promise.all([
         ensureServerJar(config.version, serverProject, {
           onProgress: (percent, label) => onDownloadProgress(percent, label),
@@ -213,6 +219,7 @@ async function runPluginDev(
         }),
       ];
       if (prefetchClient && !clientCached) {
+        phase("Downloading Minecraft client…", "active");
         tasks.push(prefetchEmbeddedClient(config.version));
       }
       const results = await Promise.all(tasks);
@@ -297,7 +304,7 @@ async function runPluginDev(
       printReadyBanner(config.port, project.pluginName);
     }
 
-    if (shouldJoinClient(overrides)) {
+    if (shouldJoinClient(overrides, config)) {
       phase("Launch Minecraft client", "active");
       await launchClient({ config, waitForServer: false });
       phase("Launch Minecraft client");

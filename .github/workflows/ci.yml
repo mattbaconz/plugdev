@@ -33,13 +33,30 @@ jobs:
       - name: Build CLI
         run: npm run build:cli
 
+      - name: Build MCP
+        run: npm run build -w @plugdev/mcp
+
+      - name: Unit tests
+        run: npm test
+
       - name: Build fixture plugin
         working-directory: test/fixtures/paper-plugin
         run: ./gradlew build -q
 
+      - name: Prefetch Paper cache
+        working-directory: test/fixtures/paper-plugin
+        run: node ../../../packages/cli/dist/cli.js cache prefetch --version 1.21.4 --paper
+
       - name: Doctor smoke
         working-directory: test/fixtures/paper-plugin
-        run: node ../../../packages/cli/dist/cli.js doctor
+        run: |
+          node ../../../packages/cli/dist/cli.js doctor --json > doctor.json
+          node -e "const d=require('./doctor.json'); if(!d.data.toolchainReady) process.exit(3); console.log('toolchainReady ok');"
+
+      - name: MCP smoke
+        run: npm run smoke -w @plugdev/mcp
+        env:
+          PLUGDEV_SMOKE_PORT: "25566"
 
       - name: Server boot smoke
         working-directory: test/fixtures/paper-plugin

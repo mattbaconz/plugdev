@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://plugdev.dev/schema/plugdev.json",
+  "$id": "https://github.com/mattbaconz/plugdev/blob/main/spec/plugdev.schema.json",
   "title": "PlugDev Configuration",
   "description": "Configuration schema for plugdev.yml",
   "type": "object",
@@ -76,7 +76,7 @@
         "author": { "type": "string", "description": "Hangar author (optional if preset alias)" },
         "slug": { "type": "string", "description": "Hangar slug or Modrinth project ID/slug" },
         "version": { "type": "string" },
-        "url": { "type": "string", "format": "uri" },
+        "url": { "type": "string" },
         "enabled": { "type": "boolean", "default": true }
       },
       "additionalProperties": false

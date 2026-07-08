@@ -92,15 +92,17 @@ export async function ensureInstance(
   launcher: DetectedLauncher,
   mcVersion: string,
   instanceId: string,
+  opts: { force?: boolean } = {},
 ): Promise<EnsureInstanceResult> {
   const exists = await instanceExists(launcher, instanceId);
   let instanceDir = join(launcher.dataDir, "instances", instanceId);
   let created = false;
 
-  if (!exists) {
-    info(`Provisioning Prism instance "${instanceId}" for Minecraft ${mcVersion}...`);
+  if (!exists || opts.force) {
+    const label = opts.force && exists ? "Reprovisioning" : "Provisioning";
+    info(`${label} ${launcher.type} instance "${instanceId}" for Minecraft ${mcVersion}...`);
     instanceDir = await provisionInstance(launcher, mcVersion, instanceId);
-    created = true;
+    created = !exists;
     info("Open Prism and launch this instance once if game files are not downloaded yet.");
   }
 

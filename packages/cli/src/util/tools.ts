@@ -37,8 +37,8 @@ export async function checkGradle(cwd: string): Promise<boolean> {
   const gradlew = process.platform === "win32" ? "gradlew.bat" : "gradlew";
   const path = join(cwd, gradlew);
   try {
-    await execa(path, ["--version"], { cwd, reject: false });
-    return true;
+    const result = await execa(path, ["--version"], { cwd, reject: false });
+    return result.exitCode === 0;
   } catch {
     return false;
   }
@@ -46,8 +46,8 @@ export async function checkGradle(cwd: string): Promise<boolean> {
 
 export async function checkMaven(cwd: string): Promise<boolean> {
   try {
-    await execa("mvn", ["--version"], { cwd, reject: false });
-    return true;
+    const result = await execa("mvn", ["--version"], { cwd, reject: false });
+    return result.exitCode === 0;
   } catch {
     return false;
   }

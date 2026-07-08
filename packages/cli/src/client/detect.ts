@@ -30,19 +30,47 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-function prismDataDir(): string {
-  return join(homedir(), "AppData", "Roaming", "PrismLauncher");
+export function prismDataDir(): string {
+  const home = homedir();
+  if (process.platform === "darwin") {
+    return join(home, "Library", "Application Support", "PrismLauncher");
+  }
+  if (process.platform === "linux") {
+    return join(home, ".local", "share", "PrismLauncher");
+  }
+  return join(home, "AppData", "Roaming", "PrismLauncher");
 }
 
-function multimcDataDir(): string {
-  return join(homedir(), "AppData", "Roaming", "MultiMC");
+export function multimcDataDir(): string {
+  const home = homedir();
+  if (process.platform === "darwin") {
+    return join(home, "Library", "Application Support", "MultiMC");
+  }
+  if (process.platform === "linux") {
+    return join(home, ".local", "share", "multimc");
+  }
+  return join(home, "AppData", "Roaming", "MultiMC");
+}
+
+function dataDirFor(launcher: LauncherType): string {
+  return launcher === "prism" ? prismDataDir() : multimcDataDir();
+}
+
+function inferLauncherType(
+  executable: string,
+  preferred?: PlugDevConfig["client"] extends { launcher?: infer L } ? L : never,
+): LauncherType {
+  if (preferred === "multimc") return "multimc";
+  if (preferred === "prism") return "prism";
+  const lower = executable.toLowerCase();
+  if (lower.includes("multimc") || lower.includes("mmc")) return "multimc";
+  return "prism";
 }
 
 async function probePath(
   source: string,
   path: string,
   launcher: LauncherType,
-  dataDir: string,
 ): Promise<DetectionProbe> {
   const found = await exists(path);
   return { source, path, found, launcher: found ? launcher : undefined };
@@ -98,32 +126,17 @@ async function probeWhere(
   }
 }
 
-export async function probeAllLaunchers(
-  client?: PlugDevConfig["client"],
-): Promise<DetectionProbe[]> {
-  const probes: DetectionProbe[] = [];
-
-  if (client?.executable) {
-    probes.push(
-      await probePath("config:client.executable", client.executable, "prism", prismDataDir()),
-    );
-  }
-
-  if (process.env.PLUGDEV_PRISM_EXE) {
-    probes.push(
-      await probePath("env:PLUGDEV_PRISM_EXE", process.env.PLUGDEV_PRISM_EXE, "prism", prismDataDir()),
-    );
-  }
-
-  const prismCandidates: Array<{ source: string; path: string }> = [
+function windowsPrismCandidates(): Array<{ source: string; path: string }> {
+  const home = homedir();
+  return [
     { source: "appdata:PrismLauncher", path: join(prismDataDir(), "prismlauncher.exe") },
     {
       source: "localappdata:Programs",
-      path: join(homedir(), "AppData", "Local", "Programs", "Prism Launcher", "prismlauncher.exe"),
+      path: join(home, "AppData", "Local", "Programs", "Prism Launcher", "prismlauncher.exe"),
     },
     {
       source: "localappdata:Programs/PrismLauncher",
-      path: join(homedir(), "AppData", "Local", "Programs", "PrismLauncher", "prismlauncher.exe"),
+      path: join(home, "AppData", "Local", "Programs", "PrismLauncher", "prismlauncher.exe"),
     },
     {
       source: "programfiles:Prism Launcher",
@@ -135,39 +148,109 @@ export async function probeAllLaunchers(
     },
     {
       source: "scoop:prismlauncher",
-      path: join(homedir(), "scoop", "apps", "prismlauncher", "current", "prismlauncher.exe"),
+      path: join(home, "scoop", "apps", "prismlauncher", "current", "prismlauncher.exe"),
     },
   ];
+}
 
-  for (const c of prismCandidates) {
-    probes.push(await probePath(c.source, c.path, "prism", prismDataDir()));
+function unixPrismCandidates(): Array<{ source: string; path: string }> {
+  const home = homedir();
+  if (process.platform === "darwin") {
+    return [
+      {
+        source: "applications:Prism Launcher",
+        path: "/Applications/Prism Launcher.app/Contents/MacOS/prismlauncher",
+      },
+      {
+        source: "home:Applications/Prism Launcher",
+        path: join(home, "Applications", "Prism Launcher.app", "Contents", "MacOS", "prismlauncher"),
+      },
+    ];
   }
 
-  probes.push(await probeWhere("prism", "prismlauncher"));
-  probes.push(await probeRegistryAppPath("prism", "prismlauncher.exe"));
+  return [
+    { source: "usr-bin:prismlauncher", path: "/usr/bin/prismlauncher" },
+    { source: "usr-local-bin:prismlauncher", path: "/usr/local/bin/prismlauncher" },
+    {
+      source: "flatpak:PrismLauncher",
+      path: join(home, ".local", "share", "flatpak", "exports", "bin", "org.prismlauncher.PrismLauncher"),
+    },
+  ];
+}
 
-  const multimcCandidates = [
+function windowsMultiMcCandidates(): Array<{ source: string; path: string }> {
+  return [
     { source: "appdata:MultiMC", path: join(multimcDataDir(), "MultiMC.exe") },
     { source: "programfiles:MultiMC", path: "C:\\Program Files\\MultiMC\\MultiMC.exe" },
   ];
+}
 
-  for (const c of multimcCandidates) {
-    probes.push(await probePath(c.source, c.path, "multimc", multimcDataDir()));
+function unixMultiMcCandidates(): Array<{ source: string; path: string }> {
+  const home = homedir();
+  if (process.platform === "darwin") {
+    return [
+      {
+        source: "applications:MultiMC",
+        path: "/Applications/MultiMC.app/Contents/MacOS/MultiMC",
+      },
+    ];
+  }
+  return [
+    { source: "usr-bin:multimc", path: "/usr/bin/multimc" },
+    { source: "usr-local-bin:multimc", path: "/usr/local/bin/multimc" },
+    { source: "home-local-bin:MultiMC", path: join(home, ".local", "bin", "MultiMC") },
+  ];
+}
+
+export async function probeAllLaunchers(
+  client?: PlugDevConfig["client"],
+): Promise<DetectionProbe[]> {
+  const probes: DetectionProbe[] = [];
+
+  if (client?.executable) {
+    const type = inferLauncherType(client.executable, client.launcher);
+    probes.push(
+      await probePath("config:client.executable", client.executable, type),
+    );
   }
 
-  probes.push(await probeWhere("multimc", "MultiMC"));
-  probes.push(await probeRegistryAppPath("multimc", "MultiMC.exe"));
+  if (process.env.PLUGDEV_PRISM_EXE) {
+    probes.push(
+      await probePath("env:PLUGDEV_PRISM_EXE", process.env.PLUGDEV_PRISM_EXE, "prism"),
+    );
+  }
+
+  const prismCandidates =
+    process.platform === "win32" ? windowsPrismCandidates() : unixPrismCandidates();
+  for (const c of prismCandidates) {
+    probes.push(await probePath(c.source, c.path, "prism"));
+  }
+
+  probes.push(await probeWhere("prism", "prismlauncher"));
+  if (process.platform === "win32") {
+    probes.push(await probeRegistryAppPath("prism", "prismlauncher.exe"));
+  }
+
+  const multimcCandidates =
+    process.platform === "win32" ? windowsMultiMcCandidates() : unixMultiMcCandidates();
+  for (const c of multimcCandidates) {
+    probes.push(await probePath(c.source, c.path, "multimc"));
+  }
+
+  probes.push(await probeWhere("multimc", process.platform === "win32" ? "MultiMC" : "multimc"));
+  if (process.platform === "win32") {
+    probes.push(await probeRegistryAppPath("multimc", "MultiMC.exe"));
+  }
 
   return probes;
 }
 
 function launcherFromProbe(probe: DetectionProbe): DetectedLauncher | undefined {
   if (!probe.found || !probe.launcher) return undefined;
-  const dataDir = probe.launcher === "prism" ? prismDataDir() : multimcDataDir();
   return {
     type: probe.launcher,
     executable: probe.path,
-    dataDir,
+    dataDir: dataDirFor(probe.launcher),
     probeSource: probe.source,
   };
 }
@@ -186,6 +269,12 @@ export async function detectLauncher(
     }
     return undefined;
   };
+
+  // Prefer explicit config executable when present
+  if (client?.executable) {
+    const configured = probes.find((p) => p.source === "config:client.executable" && p.found);
+    if (configured) return launcherFromProbe(configured);
+  }
 
   if (prefer === "prism") return pick("prism");
   if (prefer === "multimc") return pick("multimc");

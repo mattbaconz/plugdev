@@ -102,6 +102,7 @@ export async function runCacheStatus(): Promise<number> {
   const home = plugdevHome();
   info(`Home: ${home}`);
   info(`Servers: ${formatBytes(await dirSize(join(home, "servers")))}`);
+  info(`Client: ${formatBytes(await dirSize(embeddedClientDir()))}`);
   info(`Bootstrap: ${formatBytes(await dirSize(bootstrapCacheDir()))}`);
   info(`Deps: ${formatBytes(await dirSize(depsCacheDir()))}`);
   return 0;
@@ -113,7 +114,12 @@ export async function runCacheClear(flags: {
   all?: boolean;
 }): Promise<number> {
   const home = plugdevHome();
-  if (flags.all || flags.servers || (!flags.servers && !flags.deps)) {
+  if (!flags.all && !flags.servers && !flags.deps) {
+    warn("Specify what to clear: --servers, --deps, or --all");
+    info("Example: plugdev cache clear --servers");
+    return 1;
+  }
+  if (flags.all || flags.servers) {
     await rm(join(home, "servers"), { recursive: true, force: true });
     success("Cleared server cache");
   }

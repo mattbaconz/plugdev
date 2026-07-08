@@ -149,14 +149,12 @@ export async function runDoctor(cwd: string): Promise<number> {
   }
 
   if (project.buildSystem === "gradle") {
-    const g = await checkGradle(cwd);
-    if (g) phase("Gradle wrapper");
+    if (gradleOk) phase("Gradle wrapper");
     else warn("Gradle wrapper not found");
   }
 
   if (project.buildSystem === "maven") {
-    const m = await checkMaven(cwd);
-    if (m) phase("Maven");
+    if (mavenOk) phase("Maven");
     else warn("Maven not found");
   }
 
@@ -190,13 +188,16 @@ export async function runDoctor(cwd: string): Promise<number> {
     info("Run: plugdev setup");
   }
 
+  if (!toolchainReady) {
+    warn("Not ready — fix toolchain issues above");
+    return 3;
+  }
+
   if (!setupReady) {
-    info("Run: plugdev setup");
+    warn("Not ready — run: plugdev setup");
+    return 2;
   }
 
   phase("Ready for plugdev");
-
-  if (!toolchainReady) return 3;
-  if (!setupReady) return 2;
   return 0;
 }

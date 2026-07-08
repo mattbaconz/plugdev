@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.4 — 2026-07-09
+
+### Trust & Demo
+
+- `checkGradle` / `checkMaven` respect process exit codes
+- `plugdev doctor` only prints "Ready" when toolchain + setup are ready
+- `plugdev client setup --force` actually reprovisions instances
+- Cross-platform Prism/MultiMC detection (Windows, macOS, Linux/Flatpak)
+- `client.executable` uses correct launcher data dir (Prism vs MultiMC)
+- Offline-friendly Paper cache checks via local `meta.json`
+- Parallel prefetch shows Minecraft client download feedback
+- `init` no longer overwrites existing package.json scripts without `--force`
+- `client.joinOnReady` wired for bare `plugdev` runs
+- `cache clear` requires `--servers`, `--deps`, or `--all`
+- `cache status` reports embedded client cache size
+- Schema no longer emits `format: uri` warnings
+- MCP: `plugdev_doctor`, `plugdev_setup`; hardened JSON parsing; `@plugdev/mcp@0.1.1`
+- CI: prefetch + unit tests + MCP smoke
+
 ## 0.4.3 — 2026-07-09
 
 ### Fixes

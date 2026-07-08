@@ -1,7 +1,7 @@
 {
   "name": "plugdev",
   "private": true,
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "npm run dev for Minecraft plugins, mods, and test servers",
   "workspaces": [
     "packages/cli",
@@ -14,7 +14,7 @@
     "dev": "npm run start -w @plugdev/cli",
     "plugdev": "node packages/cli/dist/cli.js",
     "doctor": "npm run plugdev -- doctor",
-    "test": "npm run test -w @plugdev/cli",
+    "test": "npm run test -w @plugdev/cli && npm run test -w @plugdev/mcp",
     "publish:cli": "npm publish -w @plugdev/cli",
     "publish:mcp": "npm publish -w @plugdev/mcp"
   },

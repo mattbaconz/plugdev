@@ -77,9 +77,29 @@ export async function isPaperJarCached(
   mcVersion: string,
   project: "paper" | "folia" = "paper",
 ): Promise<boolean> {
+  const dir = serversCacheDir(mcVersion, project);
+  const metaPath = join(dir, "meta.json");
+
+  try {
+    const meta = JSON.parse(await readFile(metaPath, "utf8")) as {
+      jarName?: string;
+      sha256?: string;
+      mcVersion?: string;
+      project?: string;
+    };
+    if (!meta.jarName || !meta.sha256) return false;
+    if (meta.mcVersion && meta.mcVersion !== mcVersion) return false;
+    if (meta.project && meta.project !== project) return false;
+
+    const jarPath = join(dir, meta.jarName);
+    await access(jarPath);
+    return verifySha256(jarPath, meta.sha256);
+  } catch {
+    // Fall through to network check only if local meta is missing
+  }
+
   try {
     const { build, download } = await resolveStablePaperBuild(project, mcVersion);
-    const dir = serversCacheDir(mcVersion, project);
     const jarName = download.name || `${project}-${mcVersion}-${build.id}.jar`;
     const jarPath = join(dir, jarName);
     await access(jarPath);

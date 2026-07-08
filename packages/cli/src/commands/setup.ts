@@ -17,6 +17,7 @@ import {
 import { banner, phase, info, success, warn } from "../util/log.js";
 import { createDownloadProgress, endDownloadProgress } from "../util/progress.js";
 import { requireJava21, checkGradle } from "../util/tools.js";
+import { isJsonMode, emitJson } from "../util/output.js";
 
 function serverDisplayName(server: string): string {
   switch (server) {
@@ -113,6 +114,19 @@ export async function runSetup(cwd: string): Promise<number> {
   info(`  Server cache: ${join(serversCacheDir(config.version, serverProject), serverJar.jarName)}`);
   info(`  Client cache: ${embeddedClientDir()}`);
   info(`  Run: plugdev run`);
+
+  if (isJsonMode()) {
+    emitJson({
+      ok: true,
+      data: {
+        version: config.version,
+        server: config.server,
+        serverJar: join(serversCacheDir(config.version, serverProject), serverJar.jarName),
+        clientCache: embeddedClientDir(),
+        launcher: launcher?.type ?? "embedded",
+      },
+    });
+  }
 
   return 0;
 }

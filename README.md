@@ -118,6 +118,6 @@ npm org: **`@plugdev`** (`@plugdev/cli`, `@plugdev/mcp`).
 
 ## Status
 
-**v0.4.1** — Easy Setup (`plugdev setup`, embedded client auto-fallback, void world + 1G defaults), cache prefetch, doctor readiness checks.
+**v0.4.4** — Trust & Demo: honest doctor, cross-platform Prism detect, offline cache checks, safer init/cache clear, CI green with unit tests + MCP smoke.
 
-Previous: **v0.4.0** — Demo-ready UX (`--quiet`, phased output, `plugdev demo`), MCP hardening, RCON + headless server commands.
+Previous: **v0.4.3** — in-place download progress. **v0.4.2** — init adds local CLI dep. **v0.4.1** — Easy Setup.

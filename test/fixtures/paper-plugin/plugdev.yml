@@ -9,9 +9,17 @@ build:
   task: build
   jarTask: jar
 
+client:
+  launcher: auto
+  instance: plugdev-1.21.4
+  offlineName: DevPlayer
+
+jvm:
+  memory: 1G
+
 dev:
   gamemode: creative
-  world: flat
+  world: void
   op: true
   peaceful: true
   onlineMode: false
@@ -19,6 +27,6 @@ dev:
 watch:
   paths:
     - src/
-  debounceMs: 500
+  debounceMs: 300
   reload:
     java: safe

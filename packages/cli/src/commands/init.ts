@@ -61,6 +61,13 @@ watch:
     data: reload
 `;
 
+const DEFAULT_SCRIPTS: Record<string, string> = {
+  setup: "plugdev setup",
+  dev: "plugdev run",
+  "dev:server": "plugdev",
+  "dev:watch": "plugdev watch",
+};
+
 export async function runInit(cwd: string, force = false): Promise<number> {
   heading("PlugDev Init\n");
 
@@ -101,8 +108,10 @@ export async function runInit(cwd: string, force = false): Promise<number> {
 
   const pkgPath = join(cwd, "package.json");
   let pkg: Record<string, unknown> = {};
+  let pkgExists = false;
   try {
     pkg = JSON.parse(await readFile(pkgPath, "utf8")) as Record<string, unknown>;
+    pkgExists = true;
   } catch {
     pkg = { name: project.pluginName?.toLowerCase() ?? "my-plugin", private: true };
   }
@@ -114,14 +123,16 @@ export async function runInit(cwd: string, force = false): Promise<number> {
   }
 
   const scripts = (pkg.scripts as Record<string, string>) ?? {};
-  scripts.setup = "plugdev setup";
-  scripts.dev = "plugdev run";
-  scripts["dev:server"] = "plugdev";
-  scripts["dev:watch"] = "plugdev watch";
+  // Only fill missing scripts unless --force (avoid clobbering custom scripts)
+  for (const [key, value] of Object.entries(DEFAULT_SCRIPTS)) {
+    if (force || !scripts[key]) {
+      scripts[key] = value;
+    }
+  }
   pkg.scripts = scripts;
 
   await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
-  success(`Updated ${pkgPath}`);
+  success(pkgExists ? `Updated ${pkgPath}` : `Created ${pkgPath}`);
 
   info("Run: npm install && npm run setup && npm run dev");
   info("Or without installing: npx @plugdev/cli setup && npx @plugdev/cli run");
