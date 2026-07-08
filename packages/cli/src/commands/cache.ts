@@ -2,6 +2,7 @@ import { rm, readdir, stat, unlink, copyFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { plugdevHome, bootstrapCacheDir, depsCacheDir, projectRunDir, serversCacheDir } from "../paths.js";
 import { heading, info, success, warn, phase } from "../util/log.js";
+import { createDownloadProgress, endDownloadProgress } from "../util/progress.js";
 import { detectProject } from "../detect/project.js";
 import { loadConfig } from "../config/loader.js";
 import { DEP_PRESETS } from "../deps/presets.js";
@@ -51,13 +52,11 @@ export async function runCachePrefetch(opts: {
       ? "paper"
       : resolveServerProject(config.server);
 
-  const onProgress = (percent: number | undefined, label: string) => {
-    if (percent !== undefined) {
-      phase(`${label} ${percent}%`, "active");
-    } else {
-      phase(label, "active");
-    }
-  };
+  const onProgress = createDownloadProgress(
+    opts.client
+      ? `Downloading Minecraft ${mcVersion}…`
+      : `Downloading ${serverProject} ${mcVersion}…`,
+  );
 
   if (opts.client) {
     heading(`Prefetch Minecraft client ${mcVersion}\n`);
@@ -67,7 +66,13 @@ export async function runCachePrefetch(opts: {
       info(`Path: ${embeddedClientDir()}`);
       return 0;
     }
-    await prefetchEmbeddedClient(mcVersion, { onProgress });
+    try {
+      await prefetchEmbeddedClient(mcVersion, {
+        onProgress: (percent, label) => onProgress(percent, label),
+      });
+    } finally {
+      endDownloadProgress();
+    }
     success(`Cached Minecraft client ${mcVersion}`);
     info(`Path: ${embeddedClientDir()}`);
     return 0;
@@ -75,7 +80,14 @@ export async function runCachePrefetch(opts: {
 
   heading(`Prefetch ${serverProject} ${mcVersion}\n`);
   const cached = await isServerJarCached(mcVersion, serverProject);
-  const jar = await ensureServerJar(mcVersion, serverProject, { onProgress });
+  let jar: Awaited<ReturnType<typeof ensureServerJar>>;
+  try {
+    jar = await ensureServerJar(mcVersion, serverProject, {
+      onProgress: (percent, label) => onProgress(percent, label),
+    });
+  } finally {
+    endDownloadProgress();
+  }
   if (cached) {
     success(`Cache hit — ${serverProject} ${mcVersion}`);
   } else {

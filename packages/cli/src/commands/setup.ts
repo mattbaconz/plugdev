@@ -15,6 +15,7 @@ import {
   prefetchEmbeddedClient,
 } from "../client/prefetch.js";
 import { banner, phase, info, success, warn } from "../util/log.js";
+import { createDownloadProgress, endDownloadProgress } from "../util/progress.js";
 import { requireJava21, checkGradle } from "../util/tools.js";
 
 function serverDisplayName(server: string): string {
@@ -54,37 +55,43 @@ export async function runSetup(cwd: string): Promise<number> {
     else warn("Gradle wrapper not found — build may fail");
   }
 
-  const onProgress = (percent: number | undefined, label: string) => {
-    if (percent !== undefined) {
-      phase(`${label} ${percent}%`, "active");
-    } else {
-      phase(label, "active");
-    }
-  };
-
   const serverCached = await isServerJarCached(config.version, serverProject);
-  phase(
-    serverCached
-      ? `Cache hit — ${serverLabel} ${config.version}`
-      : `Prefetch ${serverLabel} ${config.version}`,
-    serverCached ? undefined : "active",
-  );
+  const clientCached = await isEmbeddedClientCached(config.version);
 
-  const [serverJar] = await Promise.all([
-    ensureServerJar(config.version, serverProject, { onProgress }),
-    prefetchEmbeddedClient(config.version, { onProgress }),
-  ]);
+  let serverJar: Awaited<ReturnType<typeof ensureServerJar>>;
 
-  if (!serverCached) {
+  if (serverCached) {
+    phase(`Cache hit — ${serverLabel} ${config.version}`);
+    serverJar = await ensureServerJar(config.version, serverProject);
+  } else {
+    const report = createDownloadProgress(
+      `Downloading ${serverLabel} ${config.version}…`,
+    );
+    try {
+      serverJar = await ensureServerJar(config.version, serverProject, {
+        onProgress: (percent, label) => report(percent, label),
+      });
+    } finally {
+      endDownloadProgress();
+    }
     phase(`Downloaded ${serverLabel} ${config.version}`);
   }
 
-  const clientCached = await isEmbeddedClientCached(config.version);
-  phase(
-    clientCached
-      ? `Cache hit — Minecraft client ${config.version}`
-      : `Downloaded Minecraft client ${config.version}`,
-  );
+  if (clientCached) {
+    phase(`Cache hit — Minecraft client ${config.version}`);
+  } else {
+    const report = createDownloadProgress(
+      `Downloading Minecraft client ${config.version}…`,
+    );
+    try {
+      await prefetchEmbeddedClient(config.version, {
+        onProgress: (percent, label) => report(percent, label),
+      });
+    } finally {
+      endDownloadProgress();
+    }
+    phase(`Downloaded Minecraft client ${config.version}`);
+  }
 
   const launcher = await detectLauncher("auto", config.client);
   if (launcher) {

@@ -27,6 +27,7 @@ import { startPluginWatcher, startModWatchOrchestrator } from "../watch/watcher.
 import { launchClient } from "../client/launch.js";
 import { projectRunDir, bootstrapCacheDir } from "../paths.js";
 import { banner, phase, info, error as logError, resetPhases } from "../util/log.js";
+import { createDownloadProgress, endDownloadProgress } from "../util/progress.js";
 import { CLI_VERSION } from "../constants.js";
 import { Errors, formatError, formatErrorJson, getExitCode, PlugDevError } from "../util/errors.js";
 import { requireJava21 } from "../util/tools.js";
@@ -186,45 +187,49 @@ async function runPluginDev(
     : true;
   const needsParallelPrefetch = !serverCached || (prefetchClient && !clientCached);
 
-  const onDownloadProgress = (percent: number | undefined, label: string) => {
-    if (percent !== undefined) {
-      phase(`${label} ${percent}%`, "active");
-    } else {
-      phase(label, "active");
-    }
-  };
+  const onDownloadProgress = createDownloadProgress(
+    `Downloading ${serverLabel} ${config.version}…`,
+  );
 
   let serverJarInfo: Awaited<ReturnType<typeof ensureServerJar>>;
 
-  if (needsParallelPrefetch && prefetchClient && !serverCached && !clientCached) {
-    phase(`Resolve ${serverLabel} ${config.version}`, "active");
-    const [jar] = await Promise.all([
-      ensureServerJar(config.version, serverProject, { onProgress: onDownloadProgress }),
-      prefetchEmbeddedClient(config.version, { onProgress: onDownloadProgress }),
-    ]);
-    serverJarInfo = jar;
-    phase(`Downloaded ${serverLabel} ${config.version}`);
-    phase(`Downloaded Minecraft client ${config.version}`);
-  } else {
-    phase(`Resolve ${serverLabel} ${config.version}`, "active");
-    const tasks: Promise<unknown>[] = [
-      ensureServerJar(config.version, serverProject, { onProgress: onDownloadProgress }),
-    ];
-    if (prefetchClient && !clientCached) {
-      tasks.push(prefetchEmbeddedClient(config.version, { onProgress: onDownloadProgress }));
-    }
-    const results = await Promise.all(tasks);
-    serverJarInfo = results[0] as Awaited<ReturnType<typeof ensureServerJar>>;
-    phase(
-      serverJarInfo.cacheHit
-        ? `Cache hit — ${serverLabel} ${config.version}`
-        : `Downloaded ${serverLabel} ${config.version}`,
-    );
-    if (prefetchClient && !clientCached) {
+  try {
+    if (needsParallelPrefetch && prefetchClient && !serverCached && !clientCached) {
+      phase(`Resolve ${serverLabel} ${config.version}`, "active");
+      const [jar] = await Promise.all([
+        ensureServerJar(config.version, serverProject, {
+          onProgress: (percent, label) => onDownloadProgress(percent, label),
+        }),
+        prefetchEmbeddedClient(config.version),
+      ]);
+      serverJarInfo = jar;
+      phase(`Downloaded ${serverLabel} ${config.version}`);
       phase(`Downloaded Minecraft client ${config.version}`);
-    } else if (prefetchClient && clientCached) {
-      phase(`Cache hit — Minecraft client ${config.version}`);
+    } else {
+      phase(`Resolve ${serverLabel} ${config.version}`, "active");
+      const tasks: Promise<unknown>[] = [
+        ensureServerJar(config.version, serverProject, {
+          onProgress: (percent, label) => onDownloadProgress(percent, label),
+        }),
+      ];
+      if (prefetchClient && !clientCached) {
+        tasks.push(prefetchEmbeddedClient(config.version));
+      }
+      const results = await Promise.all(tasks);
+      serverJarInfo = results[0] as Awaited<ReturnType<typeof ensureServerJar>>;
+      phase(
+        serverJarInfo.cacheHit
+          ? `Cache hit — ${serverLabel} ${config.version}`
+          : `Downloaded ${serverLabel} ${config.version}`,
+      );
+      if (prefetchClient && !clientCached) {
+        phase(`Downloaded Minecraft client ${config.version}`);
+      } else if (prefetchClient && clientCached) {
+        phase(`Cache hit — Minecraft client ${config.version}`);
+      }
     }
+  } finally {
+    endDownloadProgress();
   }
 
   const runDir = await prepareRunDirectory(cwd, config);

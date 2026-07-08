@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.3 — 2026-07-09
+
+### Fixes
+
+- Setup/download progress updates in place (no hundreds of duplicate lines)
+- Parallel prefetch no longer spams two progress streams on one line
+- `plugdev init` replaces `{{version}}` in client instance name
+
 ## 0.4.2 — 2026-07-08
 
 ### Fixes

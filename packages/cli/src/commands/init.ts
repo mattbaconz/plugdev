@@ -88,7 +88,7 @@ export async function runInit(cwd: string, force = false): Promise<number> {
       config.version,
     );
   } else {
-    content = PLUGIN_TEMPLATE.replace("{{version}}", config.version).replace(
+    content = PLUGIN_TEMPLATE.replaceAll("{{version}}", config.version).replace(
       "{{jarTask}}",
       jarTask,
     );

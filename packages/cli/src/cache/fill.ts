@@ -129,6 +129,7 @@ export async function ensurePaperJar(
   const label = `Downloading ${project} ${mcVersion}…`;
   const total = Number(res.headers.get("content-length")) || 0;
   let downloaded = 0;
+  let lastReportedPercent = -1;
 
   const progressStream =
     options.onProgress && total > 0
@@ -136,7 +137,10 @@ export async function ensurePaperJar(
           transform(chunk, _enc, cb) {
             downloaded += chunk.length;
             const percent = Math.min(100, Math.round((downloaded / total) * 100));
-            options.onProgress!(percent, label);
+            if (percent !== lastReportedPercent) {
+              lastReportedPercent = percent;
+              options.onProgress!(percent, label);
+            }
             cb(null, chunk);
           },
         })
