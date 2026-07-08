@@ -8,8 +8,9 @@ PlugDev boots a dev server with your plugin loaded, installs preset test depende
 
 ```bash
 npx @plugdev/cli init
-plugdev setup          # prefetch Paper + Minecraft client (~one-time)
-plugdev run            # or: npm run dev
+npm install
+npm run setup          # prefetch Paper + Minecraft client (~one-time)
+npm run dev            # or: npx @plugdev/cli run
 ```
 
 ### From this repo (development)
@@ -33,8 +34,9 @@ node ../../../packages/cli/dist/cli.js run --quiet --join
 
 ```bash
 npx @plugdev/cli init
-plugdev setup
-npm run dev            # or: plugdev run
+npm install
+npm run setup
+npm run dev            # or: npx @plugdev/cli run
 ```
 
 `plugdev setup` downloads Paper and the embedded Minecraft client to `~/.plugdev/` so first `plugdev run` is fast. No Prism required — `client.launcher: auto` falls back to the embedded client.

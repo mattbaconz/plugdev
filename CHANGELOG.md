@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.2 — 2026-07-08
+
+### Fixes
+
+- `plugdev init` adds `@plugdev/cli` to devDependencies and `setup` npm script
+- Init no longer overwrites existing `plugdev.yml` without `--force`
+- Quick start docs use `npm install && npm run setup` (fixes `plugdev` not on PATH after npx)
+
 ## 0.4.1 — 2026-07-08
 
 ### Easy Setup

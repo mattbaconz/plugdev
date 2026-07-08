@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { constants } from "node:fs";
 import { detectProject } from "../detect/project.js";
 import { loadConfig } from "../config/loader.js";
+import { CLI_VERSION } from "../constants.js";
 import { heading, success, info } from "../util/log.js";
 
 const PLUGIN_TEMPLATE = `# PlugDev configuration — auto-generated
@@ -67,13 +68,15 @@ export async function runInit(cwd: string, force = false): Promise<number> {
   const config = await loadConfig(cwd, project);
   const configPath = join(cwd, "plugdev.yml");
 
+  let configExists = false;
   try {
     await access(configPath, constants.F_OK);
+    configExists = true;
     if (!force) {
       info("plugdev.yml already exists (use --force to overwrite)");
     }
   } catch {
-    // create
+    // will create
   }
 
   const jarTask = project.hasShadowJar ? "shadowJar" : "jar";
@@ -91,8 +94,10 @@ export async function runInit(cwd: string, force = false): Promise<number> {
     );
   }
 
-  await writeFile(configPath, content);
-  success(`Created ${configPath}`);
+  if (!configExists || force) {
+    await writeFile(configPath, content);
+    success(configExists ? `Updated ${configPath}` : `Created ${configPath}`);
+  }
 
   const pkgPath = join(cwd, "package.json");
   let pkg: Record<string, unknown> = {};
@@ -102,15 +107,23 @@ export async function runInit(cwd: string, force = false): Promise<number> {
     pkg = { name: project.pluginName?.toLowerCase() ?? "my-plugin", private: true };
   }
 
+  const devDeps = (pkg.devDependencies as Record<string, string>) ?? {};
+  if (!devDeps["@plugdev/cli"]) {
+    devDeps["@plugdev/cli"] = `^${CLI_VERSION}`;
+    pkg.devDependencies = devDeps;
+  }
+
   const scripts = (pkg.scripts as Record<string, string>) ?? {};
+  scripts.setup = "plugdev setup";
   scripts.dev = "plugdev run";
   scripts["dev:server"] = "plugdev";
   scripts["dev:watch"] = "plugdev watch";
   pkg.scripts = scripts;
 
   await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
-  success(`Updated ${pkgPath} scripts`);
+  success(`Updated ${pkgPath}`);
 
-  info('Run: plugdev setup && npm run dev');
+  info("Run: npm install && npm run setup && npm run dev");
+  info("Or without installing: npx @plugdev/cli setup && npx @plugdev/cli run");
   return 0;
 }

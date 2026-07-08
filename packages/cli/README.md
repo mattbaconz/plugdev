@@ -4,8 +4,9 @@
 
 ```bash
 npx @plugdev/cli init
-plugdev setup
-plugdev run
+npm install
+npm run setup
+npm run dev
 ```
 
 - Boots Paper (or Folia/Purpur) with your plugin loaded
