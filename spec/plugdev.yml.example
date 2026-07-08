@@ -1,6 +1,4 @@
-# PlugDev configuration — Paper plugin example
-# Copy to plugdev.yml in your plugin project root
-
+# PlugDev configuration example
 type: plugin
 server: paper
 version: "1.21.4"
@@ -10,11 +8,18 @@ build:
   system: gradle
   task: build
   jarTask: shadowJar
-  jarPattern: "build/libs/*.jar"
+
+client:
+  launcher: auto
+  instance: plugdev-1.21.4
+  offlineName: DevPlayer
+
+jvm:
+  memory: 1G
 
 dev:
   gamemode: creative
-  world: flat
+  world: void
   op: true
   peaceful: true
   onlineMode: false
@@ -22,29 +27,10 @@ dev:
 watch:
   paths:
     - src/
-  debounceMs: 500
+  debounceMs: 300
   reload:
     java: safe
-    assets: none
-    data: reload
 
-# Preset test plugins (see docs/plugins/dependency-presets.md)
-deps:
-  - name: essentials
-    enabled: false
-  - name: vault
-    enabled: false
-  - name: luckperms
-    enabled: false
-
-# Auto-join client (plugdev run)
-client:
-  launcher: auto
-  # executable: "C:\\path\\to\\prismlauncher.exe"  # when auto-detect fails
-  instance: plugdev-1.21.4
-  offlineName: DevPlayer
-  joinOnReady: true
-
-jvm:
-  memory: 2G
-  # debugPort: 5005  # uncomment for JDWP attach, or use plugdev --debug
+# deps:
+#   - name: vault
+#     enabled: true

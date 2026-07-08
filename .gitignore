@@ -1,12 +1,12 @@
 node_modules/
 dist/
 .plugdev/
+.cursor/
 
 # Private docs (local only — not published to GitHub)
 docs/
 AGENTS.md
 TODO.md
-CHANGELOG.md
 templates/
 .github-support-cache-purge-request.txt
 packages/bootstrap-paper/build/

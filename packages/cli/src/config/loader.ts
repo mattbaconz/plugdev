@@ -114,6 +114,8 @@ export interface CliOverrides {
   server?: boolean;
   loader?: string;
   configPath?: string;
+  detach?: boolean;
+  quiet?: boolean;
 }
 
 let cachedValidator: ReturnType<Ajv2020["compile"]> | undefined;
@@ -234,11 +236,11 @@ export async function loadConfig(
     },
     watch: {
       paths: raw.watch?.paths ?? ["src/"],
-      debounceMs: raw.watch?.debounceMs ?? 500,
+      debounceMs: raw.watch?.debounceMs ?? 300,
       reloadJava: resolveReloadJava(raw),
     },
     jvm: {
-      memory: raw.jvm?.memory ?? "2G",
+      memory: raw.jvm?.memory ?? "1G",
       debugPort,
     },
     dev: raw.dev,

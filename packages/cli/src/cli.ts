@@ -1,15 +1,29 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { CLI_VERSION } from "./constants.js";
+import type { CliOverrides } from "./config/loader.js";
+import { setJsonMode, setLogMode } from "./util/output.js";
 import { runDoctor } from "./commands/doctor.js";
 import { runInit } from "./commands/init.js";
+import { runSetup } from "./commands/setup.js";
 import { runDev } from "./commands/dev.js";
+import { runDemo } from "./commands/demo.js";
 import { runOpen } from "./commands/open.js";
 import { runClientSetup, runClientDetect } from "./commands/client.js";
 import { runNetwork } from "./commands/network.js";
+import { runBuild } from "./commands/build-cmd.js";
+import { runSync } from "./commands/sync-cmd.js";
+import {
+  runServerStart,
+  runServerStop,
+  runServerStatus,
+  runServerCommand,
+  runServerLogs,
+} from "./commands/server-cmd.js";
 import {
   runCacheStatus,
   runCacheClear,
+  runCachePrefetch,
   runDepsAdd,
   runDepsList,
   runDepsRemove,
@@ -33,6 +47,7 @@ function devOptions() {
     configPath: undefined as string | undefined,
     debug: false,
     watch: true,
+    quiet: false,
   };
 }
 
@@ -52,13 +67,23 @@ function parseDevOpts(opts: ReturnType<typeof devOptions>) {
     configPath: opts.configPath,
     debug: opts.debug,
     watch: opts.watch !== false,
+    quiet: opts.quiet,
   };
 }
 
 program
   .name("plugdev")
   .description("npm run dev for Minecraft plugins and mods")
-  .version(CLI_VERSION, "-V");
+  .version(CLI_VERSION, "-V")
+  .option("--json", "emit structured JSON output")
+  .option("--quiet", "suppress server logs; show PlugDev steps only")
+  .option("--verbose", "show full server output (default)")
+  .hook("preAction", (thisCommand) => {
+    const opts = thisCommand.optsWithGlobals();
+    if (opts.json) setJsonMode(true);
+    if (opts.quiet) setLogMode("quiet");
+    else setLogMode("verbose");
+  });
 
 program
   .command("doctor")
@@ -73,6 +98,27 @@ program
   .option("--force", "Overwrite existing plugdev.yml")
   .action(async (opts: { force?: boolean }) => {
     process.exit(await runInit(process.cwd(), opts.force));
+  });
+
+program
+  .command("setup")
+  .description("Prefetch server + client and provision Prism instance")
+  .action(async () => {
+    process.exit(await runSetup(process.cwd()));
+  });
+
+program
+  .command("demo")
+  .description("Run the built-in demo fixture (for recordings)")
+  .option("--no-join", "do not auto-join Minecraft client")
+  .action(async (opts: { join: boolean }) => {
+    const globals = program.opts<{ quiet?: boolean }>();
+    process.exit(
+      await runDemo({
+        join: opts.join,
+        quiet: globals.quiet,
+      }),
+    );
   });
 
 program
@@ -140,6 +186,88 @@ cache
   .option("--all", "Clear everything")
   .action(async (opts: { servers?: boolean; deps?: boolean; all?: boolean }) => {
     process.exit(await runCacheClear(opts));
+  });
+
+cache
+  .command("prefetch")
+  .description("Warm server or embedded client cache")
+  .option("--version <mc>", "Minecraft version")
+  .option("--paper", "prefetch Paper server (default)")
+  .option("--folia", "prefetch Folia server")
+  .option("--client", "prefetch embedded Minecraft client only")
+  .action(async (opts: { version?: string; paper?: boolean; folia?: boolean; client?: boolean }) => {
+    process.exit(await runCachePrefetch(opts));
+  });
+
+program
+  .command("build")
+  .description("Build plugin JAR (Gradle/Maven)")
+  .action(async () => {
+    process.exit(await runBuild(process.cwd()));
+  });
+
+program
+  .command("sync")
+  .description("Build and sync plugin JAR to .plugdev/run/plugins")
+  .option("--jar <path>", "use existing JAR instead of building")
+  .action(async (opts: { jar?: string }) => {
+    process.exit(await runSync(process.cwd(), opts.jar));
+  });
+
+const serverCmd = program.command("server").description("Headless dev server (for agents/MCP)");
+
+function serverStartOverrides(cmd: Command): CliOverrides {
+  const o = cmd.optsWithGlobals() as Record<string, unknown>;
+  return {
+    port: typeof o.port === "number" ? o.port : undefined,
+    minecraftVersion: typeof o.version === "string" ? o.version : undefined,
+    paper: o.paper === true,
+    folia: o.folia === true,
+    purpur: o.purpur === true,
+    detach: o.detach !== false,
+  };
+}
+
+serverCmd
+  .command("start")
+  .description("Start dev server without watch or client join")
+  .option("--port <n>", "server port", (v) => parseInt(v, 10))
+  .option("--version <mc>", "Minecraft version")
+  .option("--paper", "use Paper server")
+  .option("--folia", "use Folia server")
+  .option("--purpur", "use Purpur server")
+  .option("--no-detach", "block until server exits")
+  .action(async function (this: Command) {
+    process.exit(await runServerStart(process.cwd(), serverStartOverrides(this)));
+  });
+
+serverCmd
+  .command("stop")
+  .description("Stop running dev server")
+  .action(async () => {
+    process.exit(await runServerStop(process.cwd()));
+  });
+
+serverCmd
+  .command("status")
+  .description("Show server running state")
+  .action(async () => {
+    process.exit(await runServerStatus(process.cwd()));
+  });
+
+serverCmd
+  .command("command <cmd>")
+  .description("Run a server console command via RCON")
+  .action(async (cmd: string) => {
+    process.exit(await runServerCommand(process.cwd(), cmd));
+  });
+
+serverCmd
+  .command("logs")
+  .description("Tail server logs")
+  .option("--lines <n>", "number of lines", (v) => parseInt(v, 10), 50)
+  .action(async (opts: { lines: number }) => {
+    process.exit(await runServerLogs(process.cwd(), opts.lines));
   });
 
 program

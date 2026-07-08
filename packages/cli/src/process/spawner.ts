@@ -1,10 +1,12 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { success, info } from "../util/log.js";
+import { success, info, dumpLogTail } from "../util/log.js";
 import { Errors } from "../util/errors.js";
+import type { LogMode } from "../util/output.js";
 
 export interface ServerProcess {
   proc: ChildProcess;
   waitForReady: Promise<void>;
+  logRing: string[];
 }
 
 export interface JavaProcessOptions {
@@ -12,6 +14,24 @@ export interface JavaProcessOptions {
   pluginName?: string;
   readyPattern?: RegExp;
   args?: string[];
+  logMode?: LogMode;
+  background?: boolean;
+}
+
+const RING_MAX_LINES = 120;
+
+function pushRing(ring: string[], text: string): void {
+  for (const line of text.split(/\r?\n/)) {
+    if (line.length === 0) continue;
+    ring.push(line);
+  }
+  while (ring.length > RING_MAX_LINES) ring.shift();
+}
+
+function writeServerOutput(chunk: Buffer, logMode: LogMode, stream: NodeJS.WriteStream): void {
+  if (logMode === "verbose") {
+    stream.write(chunk);
+  }
 }
 
 export function startJavaProcess(
@@ -20,6 +40,8 @@ export function startJavaProcess(
   memory: string,
   opts: JavaProcessOptions = {},
 ): ServerProcess {
+  const logMode = opts.logMode ?? "verbose";
+  const logRing: string[] = [];
   const args = [`-Xmx${memory}`, "-jar", serverJar, ...(opts.args ?? ["nogui"])];
   if (opts.debugPort) {
     args.unshift(
@@ -32,6 +54,7 @@ export function startJavaProcess(
 
   const proc = spawn("java", args, {
     cwd: runDir,
+    detached: opts.background ?? false,
     stdio: ["pipe", "pipe", "pipe"],
     env: {
       ...process.env,
@@ -43,12 +66,14 @@ export function startJavaProcess(
 
   const waitForReady = new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => {
+      if (logMode === "quiet") dumpLogTail(logRing);
       reject(Errors.serverStartFailed("Timed out waiting for server (240s)."));
     }, 240_000);
 
     const onData = (chunk: Buffer) => {
       const text = chunk.toString();
-      process.stdout.write(chunk);
+      pushRing(logRing, text);
+      writeServerOutput(chunk, logMode, process.stdout);
       if (pluginName && text.includes(`Error occurred while enabling ${pluginName}`)) {
         pluginError = pluginName;
       }
@@ -56,6 +81,7 @@ export function startJavaProcess(
         clearTimeout(timeout);
         cleanup();
         if (pluginError) {
+          if (logMode === "quiet") dumpLogTail(logRing);
           reject(Errors.pluginEnableFailed(pluginError));
         } else {
           resolve();
@@ -64,8 +90,9 @@ export function startJavaProcess(
     };
 
     const onErr = (chunk: Buffer) => {
-      process.stderr.write(chunk);
       const text = chunk.toString();
+      pushRing(logRing, text);
+      writeServerOutput(chunk, logMode, process.stderr);
       if (pluginName && text.includes(`Error occurred while enabling ${pluginName}`)) {
         pluginError = pluginName;
       }
@@ -73,6 +100,7 @@ export function startJavaProcess(
         clearTimeout(timeout);
         cleanup();
         if (pluginError) {
+          if (logMode === "quiet") dumpLogTail(logRing);
           reject(Errors.pluginEnableFailed(pluginError));
         } else {
           resolve();
@@ -84,6 +112,7 @@ export function startJavaProcess(
       clearTimeout(timeout);
       cleanup();
       if (code !== 0 && code !== null) {
+        if (logMode === "quiet") dumpLogTail(logRing);
         reject(Errors.serverStartFailed(`Server exited with code ${code}.`));
       }
     };
@@ -99,7 +128,7 @@ export function startJavaProcess(
     proc.on("exit", onExit);
   });
 
-  return { proc, waitForReady };
+  return { proc, waitForReady, logRing };
 }
 
 export function startPaperServer(
@@ -108,10 +137,14 @@ export function startPaperServer(
   memory: string,
   debugPort?: number,
   pluginName?: string,
+  logMode: LogMode = "verbose",
+  background = false,
 ): ServerProcess {
   return startJavaProcess(runDir, serverJar, memory, {
     debugPort,
     pluginName,
+    logMode,
+    background,
     readyPattern: /Done \(|Timings Reset/,
     args: ["nogui"],
   });

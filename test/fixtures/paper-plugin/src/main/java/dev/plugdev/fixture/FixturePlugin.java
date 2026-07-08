@@ -13,6 +13,10 @@ public final class FixturePlugin extends JavaPlugin {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (command.getName().equalsIgnoreCase("hello")) {
+            sender.sendMessage("Hello from PlugDev!");
+            return true;
+        }
         if (command.getName().equalsIgnoreCase("fixture")) {
             sender.sendMessage("FixturePlugin OK");
             return true;

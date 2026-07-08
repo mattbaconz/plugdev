@@ -1,8 +1,12 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { execa } from "execa";
-import { plugdevHome } from "../../paths.js";
-import { info, step } from "../../util/log.js";
+import { info } from "../../util/log.js";
+import {
+  embeddedClientDir,
+  isEmbeddedClientCached,
+  prefetchEmbeddedClient,
+} from "../prefetch.js";
 import type {
   ClientAdapterContext,
   DetectedLauncher,
@@ -10,10 +14,6 @@ import type {
   JoinTarget,
   LauncherAdapter,
 } from "./types.js";
-
-function minecraftCacheDir(): string {
-  return join(plugdevHome(), "minecraft");
-}
 
 async function resolveJavaPath(): Promise<string> {
   if (process.env.JAVA_HOME) {
@@ -29,11 +29,6 @@ async function resolveJavaPath(): Promise<string> {
   return first?.trim() || "java";
 }
 
-interface VersionManifestEntry {
-  id: string;
-  url: string;
-}
-
 export const embeddedAdapter: LauncherAdapter = {
   id: "embedded",
 
@@ -41,7 +36,7 @@ export const embeddedAdapter: LauncherAdapter = {
     return {
       id: "embedded",
       executable: "embedded",
-      dataDir: minecraftCacheDir(),
+      dataDir: embeddedClientDir(),
       probeSource: "embedded:@xmcl",
     };
   },
@@ -61,32 +56,16 @@ export const embeddedAdapter: LauncherAdapter = {
   },
 
   async launch(instance: InstanceInfo, join: JoinTarget): Promise<void> {
-    const gamePath = minecraftCacheDir();
+    const gamePath = embeddedClientDir();
     await mkdir(gamePath, { recursive: true });
 
-    step("Installing Minecraft client (first run may take a while)...", "active");
-
-    const manifestRes = await fetch(
-      "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json",
-    );
-    if (!manifestRes.ok) {
-      throw new Error(`Failed to fetch Minecraft version manifest: ${manifestRes.status}`);
-    }
-    const manifest = (await manifestRes.json()) as {
-      versions: VersionManifestEntry[];
-    };
-    const versionMeta = manifest.versions.find((v) => v.id === instance.mcVersion);
-    if (!versionMeta) {
-      throw new Error(`Minecraft version ${instance.mcVersion} not found in manifest`);
+    if (!(await isEmbeddedClientCached(instance.mcVersion))) {
+      info("Installing Minecraft client (first run may take a while)...");
+      await prefetchEmbeddedClient(instance.mcVersion);
     }
 
     const { MinecraftFolder, launch } = await import("@xmcl/core");
-    const { install } = await import("@xmcl/installer");
-
     const folder = MinecraftFolder.from(gamePath);
-    await install(versionMeta, folder.path, { side: "client" });
-
-    step("Installing Minecraft client (first run may take a while)...", "done");
 
     const address = `${join.host}:${join.port}`;
     info(`Launching embedded client → ${address}`);

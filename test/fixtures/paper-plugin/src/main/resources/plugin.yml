@@ -4,3 +4,10 @@ main: dev.plugdev.fixture.FixturePlugin
 api-version: '1.21'
 description: PlugDev test fixture plugin
 author: PlugDev
+commands:
+  hello:
+    description: Demo hello command
+    usage: /hello
+  fixture:
+    description: Smoke test command
+    usage: /fixture

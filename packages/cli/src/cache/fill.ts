@@ -3,10 +3,14 @@ import { createWriteStream } from "node:fs";
 import { mkdir, readFile, stat, writeFile, access } from "node:fs/promises";
 import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
-import { Readable } from "node:stream";
+import { Readable, Transform } from "node:stream";
 import { FILL_API_BASE, USER_AGENT } from "../constants.js";
 import { serversCacheDir } from "../paths.js";
 import { Errors } from "../util/errors.js";
+
+export interface EnsurePaperJarOptions {
+  onProgress?: (percent: number | undefined, label: string) => void;
+}
 
 export interface PaperBuild {
   id: number;
@@ -69,9 +73,26 @@ async function verifySha256(filePath: string, expected: string): Promise<boolean
   return hash.toLowerCase() === expected.toLowerCase();
 }
 
+export async function isPaperJarCached(
+  mcVersion: string,
+  project: "paper" | "folia" = "paper",
+): Promise<boolean> {
+  try {
+    const { build, download } = await resolveStablePaperBuild(project, mcVersion);
+    const dir = serversCacheDir(mcVersion, project);
+    const jarName = download.name || `${project}-${mcVersion}-${build.id}.jar`;
+    const jarPath = join(dir, jarName);
+    await access(jarPath);
+    return verifySha256(jarPath, download.checksums.sha256);
+  } catch {
+    return false;
+  }
+}
+
 export async function ensurePaperJar(
   mcVersion: string,
   project: "paper" | "folia" = "paper",
+  options: EnsurePaperJarOptions = {},
 ): Promise<PaperBuild> {
   const { build, download } = await resolveStablePaperBuild(project, mcVersion);
   const dir = serversCacheDir(mcVersion, project);
@@ -105,10 +126,32 @@ export async function ensurePaperJar(
     throw Errors.downloadFailed(`HTTP ${res.status} from Paper Fill API.`);
   }
 
-  await pipeline(
-    Readable.fromWeb(res.body as import("stream/web").ReadableStream),
-    createWriteStream(jarPath),
-  );
+  const label = `Downloading ${project} ${mcVersion}…`;
+  const total = Number(res.headers.get("content-length")) || 0;
+  let downloaded = 0;
+
+  const progressStream =
+    options.onProgress && total > 0
+      ? new Transform({
+          transform(chunk, _enc, cb) {
+            downloaded += chunk.length;
+            const percent = Math.min(100, Math.round((downloaded / total) * 100));
+            options.onProgress!(percent, label);
+            cb(null, chunk);
+          },
+        })
+      : null;
+
+  if (options.onProgress && !total) {
+    options.onProgress(undefined, label);
+  }
+
+  const source = Readable.fromWeb(res.body as import("stream/web").ReadableStream);
+  if (progressStream) {
+    await pipeline(source, progressStream, createWriteStream(jarPath));
+  } else {
+    await pipeline(source, createWriteStream(jarPath));
+  }
 
   const ok = await verifySha256(jarPath, download.checksums.sha256);
   if (!ok) {

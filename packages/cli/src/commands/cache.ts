@@ -1,11 +1,17 @@
 import { rm, readdir, stat, unlink, copyFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { plugdevHome, bootstrapCacheDir, depsCacheDir, projectRunDir } from "../paths.js";
-import { heading, info, success, warn } from "../util/log.js";
+import { plugdevHome, bootstrapCacheDir, depsCacheDir, projectRunDir, serversCacheDir } from "../paths.js";
+import { heading, info, success, warn, phase } from "../util/log.js";
 import { detectProject } from "../detect/project.js";
 import { loadConfig } from "../config/loader.js";
 import { DEP_PRESETS } from "../deps/presets.js";
 import { depSearchTerms } from "../deps/hangar.js";
+import { ensureServerJar, resolveServerProject, isServerJarCached } from "../cache/server.js";
+import {
+  embeddedClientDir,
+  isEmbeddedClientCached,
+  prefetchEmbeddedClient,
+} from "../client/prefetch.js";
 
 async function dirSize(path: string): Promise<number> {
   let total = 0;
@@ -26,6 +32,57 @@ function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export async function runCachePrefetch(opts: {
+  version?: string;
+  paper?: boolean;
+  folia?: boolean;
+  client?: boolean;
+  cwd?: string;
+}): Promise<number> {
+  const cwd = opts.cwd ?? process.cwd();
+  const project = await detectProject(cwd);
+  const config = await loadConfig(cwd, project);
+  const mcVersion = opts.version ?? config.version;
+  const serverProject = opts.folia
+    ? "folia"
+    : opts.paper
+      ? "paper"
+      : resolveServerProject(config.server);
+
+  const onProgress = (percent: number | undefined, label: string) => {
+    if (percent !== undefined) {
+      phase(`${label} ${percent}%`, "active");
+    } else {
+      phase(label, "active");
+    }
+  };
+
+  if (opts.client) {
+    heading(`Prefetch Minecraft client ${mcVersion}\n`);
+    const cached = await isEmbeddedClientCached(mcVersion);
+    if (cached) {
+      success(`Cache hit — Minecraft ${mcVersion}`);
+      info(`Path: ${embeddedClientDir()}`);
+      return 0;
+    }
+    await prefetchEmbeddedClient(mcVersion, { onProgress });
+    success(`Cached Minecraft client ${mcVersion}`);
+    info(`Path: ${embeddedClientDir()}`);
+    return 0;
+  }
+
+  heading(`Prefetch ${serverProject} ${mcVersion}\n`);
+  const cached = await isServerJarCached(mcVersion, serverProject);
+  const jar = await ensureServerJar(mcVersion, serverProject, { onProgress });
+  if (cached) {
+    success(`Cache hit — ${serverProject} ${mcVersion}`);
+  } else {
+    success(`Downloaded ${serverProject} ${mcVersion}`);
+  }
+  info(`Path: ${join(serversCacheDir(mcVersion, serverProject), jar.jarName)}`);
+  return 0;
 }
 
 export async function runCacheStatus(): Promise<number> {

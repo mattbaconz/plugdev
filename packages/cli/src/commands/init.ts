@@ -16,9 +16,17 @@ build:
   task: build
   jarTask: {{jarTask}}
 
+client:
+  launcher: auto
+  instance: plugdev-{{version}}
+  offlineName: DevPlayer
+
+jvm:
+  memory: 1G
+
 dev:
   gamemode: creative
-  world: flat
+  world: void
   op: true
   peaceful: true
   onlineMode: false
@@ -26,7 +34,7 @@ dev:
 watch:
   paths:
     - src/
-  debounceMs: 500
+  debounceMs: 300
   reload:
     java: safe
 `;
@@ -103,6 +111,6 @@ export async function runInit(cwd: string, force = false): Promise<number> {
   await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
   success(`Updated ${pkgPath} scripts`);
 
-  info('Run: npm run dev');
+  info('Run: plugdev setup && npm run dev');
   return 0;
 }

@@ -2,16 +2,52 @@ import type { ResolvedConfig } from "../config/loader.js";
 import { copyToClipboard } from "./clipboard.js";
 import { defaultInstanceId } from "./detect.js";
 import { resolveAdapter } from "./adapters/registry.js";
-import { info, success, warn } from "../util/log.js";
+import { embeddedAdapter } from "./adapters/embedded.js";
+import { info, success, warn, phase } from "../util/log.js";
 import { waitForPortOpen } from "../util/port.js";
+import { isEmbeddedClientCached } from "./prefetch.js";
 
 import type { ClientLauncherMode } from "./adapters/types.js";
+import type { ClientAdapterContext, LauncherAdapter } from "./adapters/types.js";
 
 export interface LaunchClientOptions {
   config: ResolvedConfig;
   host?: string;
   launcher?: ClientLauncherMode;
   waitForServer?: boolean;
+}
+
+function clientPhaseLabel(
+  adapter: LauncherAdapter,
+  instanceId: string,
+  embeddedCached: boolean,
+): string {
+  if (adapter.id === "embedded") {
+    return embeddedCached
+      ? "Client: embedded (cached)"
+      : "Client: embedded";
+  }
+  if (adapter.id === "prism") return `Client: Prism ${instanceId}`;
+  if (adapter.id === "multimc") return `Client: MultiMC ${instanceId}`;
+  return `Client: ${adapter.id}`;
+}
+
+async function launchWithAdapter(
+  adapter: LauncherAdapter,
+  ctx: ClientAdapterContext,
+  instanceId: string,
+  mcVersion: string,
+  host: string,
+  port: number,
+  offlineName: string,
+): Promise<void> {
+  const detected = await adapter.detect(ctx);
+  if (!detected) {
+    throw new Error(`${adapter.id} adapter could not be detected`);
+  }
+
+  const instance = await adapter.ensureInstance(detected, mcVersion, instanceId);
+  await adapter.launch(instance, { host, port, offlineName });
 }
 
 export async function launchClient(opts: LaunchClientOptions): Promise<void> {
@@ -38,37 +74,64 @@ export async function launchClient(opts: LaunchClientOptions): Promise<void> {
   const adapter = await resolveAdapter(ctx, mode);
 
   if (!adapter) {
-    if (mode === "auto") {
-      await copyJoinAddress(address);
-      warn(
-        "No Prism/MultiMC found. Set client.executable in plugdev.yml or run: plugdev client detect",
-      );
-      return;
-    }
     await copyJoinAddress(address);
-    warn(`Launcher "${mode}" not found — run: plugdev client detect`);
+    warn(`Launcher "${mode}" not found — run: plugdev setup`);
     return;
   }
 
   const instanceId = client?.instance ?? defaultInstanceId(opts.config.version);
   const offlineName = client?.offlineName ?? "DevPlayer";
 
-  try {
-    const detected = await adapter.detect(ctx);
-    if (!detected) {
-      throw new Error(`${adapter.id} adapter could not be detected`);
-    }
-
-    const instance = await adapter.ensureInstance(
-      detected,
-      opts.config.version,
+  const labelFor = async (a: LauncherAdapter) =>
+    clientPhaseLabel(
+      a,
       instanceId,
+      a.id === "embedded" ? await isEmbeddedClientCached(opts.config.version) : false,
     );
 
-    await adapter.launch(instance, { host, port, offlineName });
+  phase(await labelFor(adapter), "active");
+
+  try {
+    await launchWithAdapter(
+      adapter,
+      ctx,
+      instanceId,
+      opts.config.version,
+      host,
+      port,
+      offlineName,
+    );
+    phase(await labelFor(adapter));
   } catch (err) {
     warn(`Client launch failed: ${err instanceof Error ? err.message : String(err)}`);
+
+    if (mode === "auto" && adapter.id !== "embedded") {
+      warn("Falling back to embedded client…");
+      try {
+        phase("Client: embedded", "active");
+        await launchWithAdapter(
+          embeddedAdapter,
+          ctx,
+          instanceId,
+          opts.config.version,
+          host,
+          port,
+          offlineName,
+        );
+        const cached = await isEmbeddedClientCached(opts.config.version);
+        phase(clientPhaseLabel(embeddedAdapter, instanceId, cached));
+        return;
+      } catch (embeddedErr) {
+        warn(
+          `Embedded client launch failed: ${embeddedErr instanceof Error ? embeddedErr.message : String(embeddedErr)}`,
+        );
+      }
+    }
+
     await copyJoinAddress(address);
+    if (mode === "auto") {
+      info("Tip: run plugdev setup to prefetch the embedded client");
+    }
   }
 }
 

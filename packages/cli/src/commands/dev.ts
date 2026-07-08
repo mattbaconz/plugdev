@@ -5,7 +5,11 @@ import { constants } from "node:fs";
 import type { ChildProcess } from "node:child_process";
 import { detectProject } from "../detect/project.js";
 import { loadConfig, type CliOverrides, type ResolvedConfig } from "../config/loader.js";
-import { ensureServerJar, resolveServerProject } from "../cache/server.js";
+import { ensureServerJar, resolveServerProject, isServerJarCached } from "../cache/server.js";
+import {
+  isEmbeddedClientCached,
+  prefetchEmbeddedClient,
+} from "../client/prefetch.js";
 import {
   prepareRunDirectory,
   copyPaperToRun,
@@ -22,11 +26,12 @@ import { installDeps } from "../deps/hangar.js";
 import { startPluginWatcher, startModWatchOrchestrator } from "../watch/watcher.js";
 import { launchClient } from "../client/launch.js";
 import { projectRunDir, bootstrapCacheDir } from "../paths.js";
-import { heading, info, step, error as logError } from "../util/log.js";
+import { banner, phase, info, error as logError, resetPhases } from "../util/log.js";
 import { CLI_VERSION } from "../constants.js";
-import { Errors, formatError, getExitCode, PlugDevError } from "../util/errors.js";
+import { Errors, formatError, formatErrorJson, getExitCode, PlugDevError } from "../util/errors.js";
 import { requireJava21 } from "../util/tools.js";
 import { isPortAvailable } from "../util/port.js";
+import { getLogMode, isJsonMode, emitJson } from "../util/output.js";
 import type { DetectedProject } from "../detect/project.js";
 
 async function resolveBootstrapJar(): Promise<string> {
@@ -72,25 +77,15 @@ function serverDisplayName(server: string): string {
   }
 }
 
-function printDetectionSummary(
-  project: DetectedProject,
-  config: ResolvedConfig,
-): void {
-  const buildLabel =
-    config.build.system === "maven" ? "Maven" : "Gradle";
-  const serverLabel = serverDisplayName(config.server);
-  info(`Detected: ${buildLabel} + ${serverLabel} plugin`);
-  info(`Minecraft: ${config.version}`);
-  info(`Build task: ${config.build.jarTask}`);
-  info(`Server: ${serverLabel}`);
-  if (project.pluginName) info(`Plugin: ${project.pluginName}`);
-}
-
 function shouldJoinClient(overrides: CliOverrides): boolean {
   return overrides.join === true;
 }
 
 function handleDevError(err: unknown, debug: boolean): number {
+  if (isJsonMode()) {
+    emitJson(formatErrorJson(err, debug));
+    return getExitCode(err) ?? (err instanceof PlugDevError ? 2 : 1);
+  }
   logError(formatError(err, debug));
   return getExitCode(err) ?? (err instanceof PlugDevError ? 2 : 1);
 }
@@ -102,6 +97,7 @@ export async function runDev(
   const debug = overrides.debug === true;
 
   try {
+    resetPhases();
     const project = await detectProject(cwd);
     const config = await loadConfig(cwd, project, overrides);
 
@@ -109,7 +105,7 @@ export async function runDev(
       throw Errors.unknownProject();
     }
 
-    heading(`PlugDev ${CLI_VERSION}\n`);
+    if (!isJsonMode()) banner(CLI_VERSION);
 
     if (config.type === "mod" || project.type === "mod") {
       return runModDev(cwd, config, project, overrides, debug);
@@ -120,6 +116,13 @@ export async function runDev(
     }
 
     await requireJava21();
+
+    const buildLabel = config.build.system === "maven" ? "Maven" : "Gradle";
+    const serverLabel = serverDisplayName(config.server);
+    phase(
+      `Detect project — ${buildLabel} + ${serverLabel}` +
+        (project.pluginName ? ` (${project.pluginName})` : ""),
+    );
 
     if (config.build.system === "maven" || project.buildSystem === "maven") {
       return runPluginDev(cwd, config, project, overrides, async () =>
@@ -142,8 +145,7 @@ async function runModDev(
   overrides: CliOverrides & { watch?: boolean },
   debug: boolean,
 ): Promise<number> {
-  info(`Detected: ${project.loader ?? "mod"} mod project`);
-  info(`Minecraft: ${config.version}`);
+  phase(`Detect mod project — ${project.loader ?? "mod"} · MC ${config.version}`);
 
   let closeWatcher: (() => void) | undefined;
 
@@ -169,25 +171,67 @@ async function runPluginDev(
   buildFn: () => Promise<{ jarPath: string; task: string }>,
 ): Promise<number> {
   const debug = overrides.debug === true;
-  printDetectionSummary(project, config);
-
+  const logMode = getLogMode();
   const serverLabel = serverDisplayName(config.server);
-
   const serverProject = resolveServerProject(config.server);
 
   if (!(await isPortAvailable(config.port))) {
     throw Errors.portInUse(config.port);
   }
 
-  const serverJarInfo = await ensureServerJar(config.version, serverProject);
-  info(`Cache: ${serverJarInfo.cacheHit ? "hit" : "downloaded"}`);
+  const prefetchClient = shouldJoinClient(overrides);
+  const serverCached = await isServerJarCached(config.version, serverProject);
+  const clientCached = prefetchClient
+    ? await isEmbeddedClientCached(config.version)
+    : true;
+  const needsParallelPrefetch = !serverCached || (prefetchClient && !clientCached);
+
+  const onDownloadProgress = (percent: number | undefined, label: string) => {
+    if (percent !== undefined) {
+      phase(`${label} ${percent}%`, "active");
+    } else {
+      phase(label, "active");
+    }
+  };
+
+  let serverJarInfo: Awaited<ReturnType<typeof ensureServerJar>>;
+
+  if (needsParallelPrefetch && prefetchClient && !serverCached && !clientCached) {
+    phase(`Resolve ${serverLabel} ${config.version}`, "active");
+    const [jar] = await Promise.all([
+      ensureServerJar(config.version, serverProject, { onProgress: onDownloadProgress }),
+      prefetchEmbeddedClient(config.version, { onProgress: onDownloadProgress }),
+    ]);
+    serverJarInfo = jar;
+    phase(`Downloaded ${serverLabel} ${config.version}`);
+    phase(`Downloaded Minecraft client ${config.version}`);
+  } else {
+    phase(`Resolve ${serverLabel} ${config.version}`, "active");
+    const tasks: Promise<unknown>[] = [
+      ensureServerJar(config.version, serverProject, { onProgress: onDownloadProgress }),
+    ];
+    if (prefetchClient && !clientCached) {
+      tasks.push(prefetchEmbeddedClient(config.version, { onProgress: onDownloadProgress }));
+    }
+    const results = await Promise.all(tasks);
+    serverJarInfo = results[0] as Awaited<ReturnType<typeof ensureServerJar>>;
+    phase(
+      serverJarInfo.cacheHit
+        ? `Cache hit — ${serverLabel} ${config.version}`
+        : `Downloaded ${serverLabel} ${config.version}`,
+    );
+    if (prefetchClient && !clientCached) {
+      phase(`Downloaded Minecraft client ${config.version}`);
+    } else if (prefetchClient && clientCached) {
+      phase(`Cache hit — Minecraft client ${config.version}`);
+    }
+  }
 
   const runDir = await prepareRunDirectory(cwd, config);
-  step("Preparing dev server...", "done");
+  phase("Prepare dev server (.plugdev/run)");
 
   const serverJar = await copyPaperToRun(runDir, serverJarInfo.jarPath);
   const pluginsDir = join(runDir, "plugins");
-
   const bootstrap = await resolveBootstrapJar();
 
   let currentProc: ChildProcess | undefined;
@@ -199,9 +243,9 @@ async function runPluginDev(
       currentProc = undefined;
     }
 
-    step("Building plugin...", "active");
+    phase("Build plugin", "active");
     const build = await buildFn();
-    step("Building plugin...", "done");
+    phase(`Build plugin (${build.task})`);
 
     const devJar = await deployPluginJar(
       build.jarPath,
@@ -215,25 +259,43 @@ async function runPluginDev(
     }
 
     await writeReloadTrigger(cwd, [devJar]);
-    step("Copying plugin JAR...", "done");
+    phase("Sync plugin JAR to server");
 
-    step(`Starting ${serverLabel}...`, "active");
+    phase(`Start ${serverLabel}`, "active");
     const { proc, waitForReady } = startPaperServer(
       runDir,
       serverJar,
       config.jvm.memory,
       config.jvm.debugPort > 0 ? config.jvm.debugPort : undefined,
       project.pluginName,
+      logMode,
     );
     currentProc = proc;
     attachShutdownHooks(proc);
 
     await waitForReady;
-    step(`Starting ${serverLabel}...`, "done");
-    printReadyBanner(config.port, project.pluginName);
+    phase(`Start ${serverLabel} — ready on port ${config.port}`);
+
+    if (isJsonMode()) {
+      emitJson({
+        ok: true,
+        data: {
+          event: "server_ready",
+          port: config.port,
+          version: config.version,
+          software: config.server,
+          pluginName: project.pluginName,
+          join: `localhost:${config.port}`,
+        },
+      });
+    } else {
+      printReadyBanner(config.port, project.pluginName);
+    }
 
     if (shouldJoinClient(overrides)) {
+      phase("Launch Minecraft client", "active");
       await launchClient({ config, waitForServer: false });
+      phase("Launch Minecraft client");
     }
 
     return proc;
@@ -243,6 +305,7 @@ async function runPluginDev(
     await bootServer(true);
 
     if (watchEnabled(overrides)) {
+      phase("Watch src/ for changes");
       closeWatcher = startPluginWatcher(
         cwd,
         config,
@@ -258,7 +321,7 @@ async function runPluginDev(
         },
         debug,
       );
-    } else {
+    } else if (!isJsonMode()) {
       info("Watch disabled (--no-watch or CI=true)");
     }
 

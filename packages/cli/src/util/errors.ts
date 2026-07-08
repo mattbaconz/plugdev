@@ -1,7 +1,10 @@
+import type { JsonResult } from "./output.js";
+
 export interface PlugDevErrorInfo {
   what: string;
   cause: string;
   fix: string;
+  hint?: string;
   code?: number;
 }
 
@@ -22,6 +25,7 @@ export function formatError(err: unknown, debug = false): string {
       `  Cause: ${err.info.cause}`,
       `  Fix: ${err.info.fix}`,
     ];
+    if (err.info.hint) lines.push(`  Hint: ${err.info.hint}`);
     if (debug && err.stack) {
       lines.push("", err.stack);
     }
@@ -34,6 +38,28 @@ export function formatError(err: unknown, debug = false): string {
   }
 
   return String(err);
+}
+
+export function formatErrorJson(err: unknown, debug = false): JsonResult {
+  if (err instanceof PlugDevError) {
+    return {
+      ok: false,
+      error: err.info.what,
+      code: err.info.code !== undefined ? String(err.info.code) : undefined,
+      cause: err.info.cause,
+      fix: err.info.fix,
+      hint: err.info.hint,
+      ...(debug && err.stack ? { data: { stack: err.stack } } : {}),
+    };
+  }
+  if (err instanceof Error) {
+    return {
+      ok: false,
+      error: err.message,
+      ...(debug && err.stack ? { data: { stack: err.stack } } : {}),
+    };
+  }
+  return { ok: false, error: String(err) };
 }
 
 export function getExitCode(err: unknown): number | undefined {
@@ -49,6 +75,7 @@ export const Errors = {
       what: "No plugin.yml or paper-plugin.yml found.",
       cause: "PlugDev could not find plugin metadata under src/main/resources/.",
       fix: "Add plugin.yml to src/main/resources/, or run plugdev init in a Paper plugin project.",
+      hint: "Run plugdev doctor to inspect detection.",
       code: 3,
     });
   },
@@ -85,6 +112,7 @@ export const Errors = {
       what: "Java not found.",
       cause: "The java command is not on PATH and JAVA_HOME may be unset.",
       fix: "Install Java 21+ and ensure java is available in your terminal.",
+      hint: "https://adoptium.net/",
       code: 2,
     });
   },
@@ -94,6 +122,7 @@ export const Errors = {
       what: `Unsupported Java version (${found}).`,
       cause: "Paper 1.21+ requires Java 21 or newer.",
       fix: "Install JDK 21+ and set JAVA_HOME to point at it.",
+      hint: "https://adoptium.net/",
       code: 2,
     });
   },
@@ -103,6 +132,7 @@ export const Errors = {
       what: `Port ${port} is already in use.`,
       cause: "Another process (often a Minecraft server) is listening on this port.",
       fix: `Stop the other server or run plugdev --port <number>.`,
+      hint: "Try: plugdev server stop",
       code: 2,
     });
   },
@@ -121,6 +151,7 @@ export const Errors = {
       what: "Bootstrap plugin JAR not found.",
       cause: "plugdev-bootstrap-paper.jar was not built or copied into packages/cli/bootstrap/.",
       fix: "From the plugdev repo root, run: npm run build",
+      hint: "Required for safe reload during dev.",
       code: 2,
     });
   },

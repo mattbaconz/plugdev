@@ -7,7 +7,9 @@ import { writeReloadTrigger } from "../cache/run-template.js";
 import { projectRunDir } from "../paths.js";
 import { join } from "node:path";
 import { info, success, warn, error } from "../util/log.js";
-import { formatError } from "../util/errors.js";
+import { formatError, formatErrorJson } from "../util/errors.js";
+import { isJsonMode, emitJson } from "../util/output.js";
+import { confirmReload } from "../util/reload-feedback.js";
 
 export interface PluginWatcherCallbacks {
   onSafeReload: (jarPath: string) => Promise<void>;
@@ -60,9 +62,13 @@ export function startPluginWatcher(
       const dest = await deployPluginJar(build.jarPath, pluginsDir, pluginName, true);
       await writeReloadTrigger(cwd, [dest]);
       await callbacks.onSafeReload(dest);
-      success("Reload triggered (bootstrap will apply safe reload)");
+      await confirmReload(cwd);
     } catch (e) {
-      error(formatError(e, debug));
+      if (isJsonMode()) {
+        emitJson(formatErrorJson(e, debug));
+      } else {
+        error(formatError(e, debug));
+      }
     }
   }, config.watch.debounceMs);
 

@@ -5,7 +5,12 @@ import { projectRunDir } from "../paths.js";
 import { ensurePaperDevTemplate, copyTemplateFiles, seedWorldCache } from "./templates.js";
 import type { ResolvedConfig } from "../config/loader.js";
 
-function buildServerProperties(config: ResolvedConfig): string {
+export interface RconConfig {
+  rconPort: number;
+  rconPassword: string;
+}
+
+function buildServerProperties(config: ResolvedConfig, rcon?: RconConfig): string {
   const dev = config.dev ?? {};
   const gamemode = dev.gamemode ?? "creative";
   const difficulty = dev.peaceful === false ? "easy" : "peaceful";
@@ -31,10 +36,18 @@ function buildServerProperties(config: ResolvedConfig): string {
     `difficulty=${difficulty}`,
     `level-type=${levelType}`,
     `spawn-protection=0`,
-    `max-players=20`,
+    `max-players=4`,
+    `view-distance=4`,
+    `simulation-distance=4`,
     `white-list=false`,
     `enable-command-block=true`,
   ];
+
+  if (rcon) {
+    lines.push(`enable-rcon=true`);
+    lines.push(`rcon.port=${rcon.rconPort}`);
+    lines.push(`rcon.password=${rcon.rconPassword}`);
+  }
 
   if (generatorSettings) {
     lines.splice(5, 0, `generator-settings=${generatorSettings}`);
@@ -46,13 +59,15 @@ function buildServerProperties(config: ResolvedConfig): string {
 export async function prepareRunDirectory(
   cwd: string,
   config: ResolvedConfig,
+  rcon?: RconConfig,
 ): Promise<string> {
-  return prepareRunDirectoryAt(projectRunDir(cwd), config);
+  return prepareRunDirectoryAt(projectRunDir(cwd), config, rcon);
 }
 
 export async function prepareRunDirectoryAt(
   runDir: string,
   config: ResolvedConfig,
+  rcon?: RconConfig,
 ): Promise<string> {
   const pluginsDir = join(runDir, "plugins");
   await mkdir(pluginsDir, { recursive: true });
@@ -70,7 +85,7 @@ export async function prepareRunDirectoryAt(
   }
 
   const propsPath = join(runDir, "server.properties");
-  await writeFile(propsPath, buildServerProperties(config));
+  await writeFile(propsPath, buildServerProperties(config, rcon));
 
   const bukkitPath = join(runDir, "bukkit.yml");
   try {
@@ -90,6 +105,22 @@ export async function prepareRunDirectoryAt(
     } catch {
       await writeFile(opsPath, "[]\n");
     }
+  }
+
+  const paperConfigDir = join(runDir, "config");
+  const paperGlobalPath = join(paperConfigDir, "paper-global.yml");
+  try {
+    await access(paperGlobalPath, constants.F_OK);
+  } catch {
+    await mkdir(paperConfigDir, { recursive: true });
+    await writeFile(
+      paperGlobalPath,
+      [
+        "chunk-loading-basic:",
+        "  player-max-concurrent-loads: 2",
+        "",
+      ].join("\n"),
+    );
   }
 
   return runDir;
