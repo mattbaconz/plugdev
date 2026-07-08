@@ -8,6 +8,7 @@ AGENTS.md
 TODO.md
 CHANGELOG.md
 templates/
+.github-support-cache-purge-request.txt
 packages/bootstrap-paper/build/
 packages/bootstrap-paper/.gradle/
 test/fixtures/**/.plugdev/
