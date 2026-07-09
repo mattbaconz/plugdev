@@ -11,5 +11,5 @@ test("package.json exposes plugdev and plug bins", async () => {
   ) as { bin: Record<string, string>; version: string };
   assert.equal(pkg.bin.plugdev, "dist/cli.js");
   assert.equal(pkg.bin.plug, "dist/cli.js");
-  assert.equal(pkg.version, "0.7.5");
+  assert.equal(pkg.version, "0.7.6");
 });

@@ -64,16 +64,15 @@ export const embeddedAdapter: LauncherAdapter = {
       await prefetchEmbeddedClient(instance.mcVersion);
     }
 
-    const { MinecraftFolder, launch } = await import("@xmcl/core");
-    const folder = MinecraftFolder.from(gamePath);
+    const { launch } = await import("@xmcl/core");
 
     const address = `${join.host}:${join.port}`;
     info(`Launching embedded client → ${address}`);
 
     const javaPath = await resolveJavaPath();
     const proc = await launch({
-      gamePath: folder.path,
-      resourcePath: folder.path,
+      gamePath,
+      resourcePath: gamePath,
       javaPath,
       version: instance.mcVersion,
       quickPlayMultiplayer: address,

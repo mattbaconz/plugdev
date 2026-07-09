@@ -22,11 +22,18 @@ test("DEP_ALIASES includes Via* presets", () => {
   assert.equal(DEP_ALIASES.via.slug, "ViaVersion");
 });
 
-test("DEFAULT_COMPAT_DEPS is ViaVersion trio", () => {
-  assert.equal(DEFAULT_COMPAT_DEPS.length, 3);
+test("DEFAULT_COMPAT_DEPS includes Via* plus Vault/Essentials/MineConomy", () => {
+  assert.equal(DEFAULT_COMPAT_DEPS.length, 6);
   assert.deepEqual(
     DEFAULT_COMPAT_DEPS.map((d) => d.slug),
-    ["ViaVersion", "ViaBackwards", "ViaRewind"],
+    [
+      "ViaVersion",
+      "ViaBackwards",
+      "ViaRewind",
+      "VaultUnlocked",
+      "EssentialsX",
+      "MineConomy",
+    ],
   );
 });
 

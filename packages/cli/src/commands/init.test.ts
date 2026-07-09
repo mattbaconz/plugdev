@@ -31,6 +31,9 @@ describe("runInit", () => {
       assert.match(yml, /ViaVersion/);
       assert.match(yml, /ViaBackwards/);
       assert.match(yml, /ViaRewind/);
+      assert.match(yml, /VaultUnlocked/);
+      assert.match(yml, /EssentialsX/);
+      assert.match(yml, /MineConomy/);
       assert.doesNotMatch(yml, /instance: plugdev-/);
       assert.match(yml, /cleanup: never/);
 

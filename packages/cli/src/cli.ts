@@ -29,6 +29,7 @@ import {
   runDepsRemove,
 } from "./commands/cache.js";
 import { runClean } from "./cache/run-cleanup.js";
+import { runAgentInstall } from "./commands/agent.js";
 
 const program = new Command();
 
@@ -134,6 +135,28 @@ program
       }),
     );
   });
+
+const agentCmd = program.command("agent").description("Wire PlugDev into AI coding tools");
+
+agentCmd
+  .command("install")
+  .description("Add Cursor / Claude Code / Codex project snippets")
+  .option("--cursor", "Write .cursor/rules/plugdev.mdc")
+  .option("--claude", "Append PlugDev section to CLAUDE.md")
+  .option("--codex", "Write or append AGENTS.md")
+  .option("--all", "Install all targets (default if none selected)")
+  .option("--force", "Overwrite existing snippets")
+  .action(
+    async (opts: {
+      cursor?: boolean;
+      claude?: boolean;
+      codex?: boolean;
+      all?: boolean;
+      force?: boolean;
+    }) => {
+      process.exit(await runAgentInstall(process.cwd(), opts));
+    },
+  );
 
 program
   .command("demo")

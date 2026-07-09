@@ -66,6 +66,9 @@ export const DEFAULT_COMPAT_DEPS: Array<{
   { name: "ViaVersion", source: "hangar", author: "ViaVersion", slug: "ViaVersion" },
   { name: "ViaBackwards", source: "hangar", author: "ViaVersion", slug: "ViaBackwards" },
   { name: "ViaRewind", source: "hangar", author: "ViaVersion", slug: "ViaRewind" },
+  { name: "VaultUnlocked", source: "hangar", author: "TNE", slug: "VaultUnlocked" },
+  { name: "EssentialsX", source: "hangar", author: "EssentialsX", slug: "EssentialsX" },
+  { name: "MineConomy", source: "hangar", author: "piyushkadam", slug: "MineConomy" },
 ];
 
 export const DEP_ALIASES: Record<string, { author: string; slug: string }> =

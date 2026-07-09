@@ -38,7 +38,8 @@ dev:
   peaceful: true
   onlineMode: false
 
-# Cross-version client join (newer MC → this Paper version)
+# Cross-version join (Via*) + common APIs (VaultUnlocked, EssentialsX, MineConomy).
+# Remove any with: plugdev deps remove <name>
 deps:
   - name: ViaVersion
     source: hangar
@@ -52,6 +53,18 @@ deps:
     source: hangar
     author: ViaVersion
     slug: ViaRewind
+  - name: VaultUnlocked
+    source: hangar
+    author: TNE
+    slug: VaultUnlocked
+  - name: EssentialsX
+    source: hangar
+    author: EssentialsX
+    slug: EssentialsX
+  - name: MineConomy
+    source: hangar
+    author: piyushkadam
+    slug: MineConomy
 
 watch:
   paths:
@@ -91,7 +104,8 @@ dev:
   peaceful: true
   onlineMode: false
 
-# Cross-version client join (newer MC → this Paper version)
+# Cross-version join (Via*) + common APIs (VaultUnlocked, EssentialsX, MineConomy).
+# Remove any with: plugdev deps remove <name>
 deps:
   - name: ViaVersion
     source: hangar
@@ -105,6 +119,18 @@ deps:
     source: hangar
     author: ViaVersion
     slug: ViaRewind
+  - name: VaultUnlocked
+    source: hangar
+    author: TNE
+    slug: VaultUnlocked
+  - name: EssentialsX
+    source: hangar
+    author: EssentialsX
+    slug: EssentialsX
+  - name: MineConomy
+    source: hangar
+    author: piyushkadam
+    slug: MineConomy
 
 watch:
   paths:

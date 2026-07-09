@@ -221,5 +221,6 @@ export function printReadyBanner(
   }
   info(`Join: localhost:${port}`);
   info("Tip: first boot remaps plugins (~10–30s); later boots are much faster.");
+  info("Type server commands below (e.g. op DevPlayer). Ctrl+C stops PlugDev.");
   info("Ctrl+C stops the server — closing Minecraft does not.");
 }

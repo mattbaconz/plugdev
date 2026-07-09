@@ -22,6 +22,7 @@ import {
   printReadyBanner,
   stopPaperServer,
 } from "../process/spawner.js";
+import { attachInteractiveConsole, type InteractiveConsole } from "../process/interactive-console.js";
 import { installDeps } from "../deps/hangar.js";
 import { startPluginWatcher, startModWatchOrchestrator } from "../watch/watcher.js";
 import { launchClient } from "../client/launch.js";
@@ -35,6 +36,13 @@ import { getLogMode, isJsonMode, emitJson } from "../util/output.js";
 import { resolveBootstrapJar } from "../util/bootstrap.js";
 import { detectFoliaSupport } from "../detect/project.js";
 import type { DetectedProject } from "../detect/project.js";
+import {
+  writeSession,
+  clearSession,
+  generateRconPassword,
+  type ServerSession,
+} from "../session.js";
+import { projectRunDir } from "../paths.js";
 
 function watchEnabled(overrides: CliOverrides & { watch?: boolean }): boolean {
   if (overrides.noWatch) return false;
@@ -231,7 +239,17 @@ async function runPluginDev(
     endDownloadProgress();
   }
 
-  const runDir = await prepareRunDirectory(cwd, config);
+  const rconPort = config.port + 10000;
+  if (!(await isPortAvailable(rconPort))) {
+    throw Errors.portInUse(rconPort);
+  }
+  const rconPassword = generateRconPassword();
+  const rconHost = "127.0.0.1";
+
+  const runDir = await prepareRunDirectory(cwd, config, {
+    rconPort,
+    rconPassword,
+  });
   phase("Prepare dev server (.plugdev/run)");
 
   await applyStartWorldCleanup(cwd, config.run.cleanup);
@@ -242,8 +260,11 @@ async function runPluginDev(
 
   let currentProc: ChildProcess | undefined;
   let closeWatcher: (() => void) | undefined;
+  let consoleHandle: InteractiveConsole | undefined;
 
   const bootServer = async (first = false): Promise<ChildProcess> => {
+    consoleHandle?.pause();
+
     if (currentProc) {
       await stopPaperServer(currentProc);
       currentProc = undefined;
@@ -262,9 +283,9 @@ async function runPluginDev(
 
     // Install missing deps on every boot (skip JARs already in plugins/)
     if (config.deps?.length) {
-      if (first) phase("Install compat deps (Via*)", "active");
+      if (first) phase("Install default deps", "active");
       await installDeps(pluginsDir, config.deps, config.server, config.version);
-      if (first) phase("Install compat deps (Via*)");
+      if (first) phase("Install default deps");
     }
 
     await writeReloadTrigger(cwd, [devJar]);
@@ -287,12 +308,30 @@ async function runPluginDev(
     await waitForReady;
     phase(`Start ${serverLabel} — ready on port ${config.port}`);
 
+    const session: ServerSession = {
+      pid: proc.pid!,
+      gamePort: config.port,
+      rconPort,
+      rconPassword,
+      rconHost,
+      runDir: projectRunDir(cwd),
+      version: config.version,
+      software: config.server,
+      pluginName: project.pluginName,
+      startedAt: new Date().toISOString(),
+    };
+    await writeSession(cwd, session);
+    proc.on("exit", () => {
+      void clearSession(cwd);
+    });
+
     if (isJsonMode()) {
       emitJson({
         ok: true,
         data: {
           event: "server_ready",
           port: config.port,
+          rconPort,
           version: config.version,
           software: config.server,
           pluginName: project.pluginName,
@@ -307,6 +346,16 @@ async function runPluginDev(
         onlineMode: config.dev?.onlineMode === true,
         op: config.dev?.op !== false,
       });
+    }
+
+    if (!consoleHandle) {
+      consoleHandle = attachInteractiveConsole({
+        host: rconHost,
+        port: rconPort,
+        password: rconPassword,
+      });
+    } else {
+      consoleHandle.resume();
     }
 
     if (shouldJoinClient(overrides, config)) {
@@ -346,11 +395,15 @@ async function runPluginDev(
       currentProc?.on("exit", () => resolve());
     });
     closeWatcher?.();
+    consoleHandle?.close();
+    await clearSession(cwd);
     await applyExitCleanup(cwd, config.run.cleanup);
     return 0;
   } catch (e) {
     closeWatcher?.();
+    consoleHandle?.close();
     if (currentProc) await stopPaperServer(currentProc);
+    await clearSession(cwd);
     await applyExitCleanup(cwd, config.run.cleanup);
     return handleDevError(e, debug);
   }

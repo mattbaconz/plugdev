@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.6 — 2026-07-09
+
+### Client fix, console, default stack
+
+- Fix embedded client launch (`gamePath` was `undefined` via `folder.path`)
+- Interactive server console on `plug run` via RCON readline (type `op DevPlayer`, `list`, …)
+- Default deps: Via* **plus** VaultUnlocked, EssentialsX, MineConomy (still modular)
+- `plugdev agent install [--cursor|--claude|--codex|--all]` for AI tool wiring
+
 ## 0.7.5 — 2026-07-09
 
 ### Dual bins + run lifecycle

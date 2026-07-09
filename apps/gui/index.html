@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PlugDev GUI (spike)</title>
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+  <body>
+    <main class="wrap">
+      <header>
+        <h1>PlugDev</h1>
+        <p class="lede">Experimental GUI spike — wraps <code>plug run</code></p>
+      </header>
+
+      <label class="field">
+        <span>Project folder</span>
+        <input id="project-dir" type="text" placeholder="C:\mcplugins\your-plugin" />
+      </label>
+
+      <div class="row">
+        <button id="btn-start" type="button">Start</button>
+        <button id="btn-stop" type="button" class="secondary">Stop</button>
+      </div>
+
+      <pre id="log" class="log" aria-live="polite"></pre>
+
+      <form id="cmd-form" class="row cmd">
+        <input id="cmd-input" type="text" placeholder="op DevPlayer" autocomplete="off" />
+        <button type="submit">Send</button>
+      </form>
+      <p id="cmd-result" class="result"></p>
+    </main>
+  </body>
+</html>
