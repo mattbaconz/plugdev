@@ -35,8 +35,12 @@ export async function resolveHangarDep(
       { headers: { "User-Agent": USER_AGENT } },
     );
     if (!latestRes.ok) throw new Error(`Hangar latest lookup failed for ${name}`);
-    const latest = (await latestRes.json()) as HangarVersion;
-    resolvedVersion = latest.name;
+    const latest = (await latestRes.json()) as HangarVersion | string;
+    resolvedVersion =
+      typeof latest === "string" ? latest : latest.name;
+    if (!resolvedVersion) {
+      throw new Error(`Hangar latest returned empty version for ${name}`);
+    }
   }
 
   return {
@@ -143,7 +147,7 @@ export async function prefetchDeps(
     let author = dep.author;
     let slug = dep.slug;
     let version = dep.version;
-    if (!author || !slug) {
+    if (!author || !slug || !version) {
       const resolved = await resolveHangarDep(dep.name, dep.version, {
         author: dep.author,
         slug: dep.slug,
@@ -197,7 +201,7 @@ export async function installDeps(
     let slug = dep.slug;
     let version = dep.version;
 
-    if (!author || !slug) {
+    if (!author || !slug || !version) {
       const resolved = await resolveHangarDep(dep.name, dep.version, {
         author: dep.author,
         slug: dep.slug,

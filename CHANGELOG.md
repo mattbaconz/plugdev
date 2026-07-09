@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.2 — 2026-07-09
+
+- Fix Hangar `/latest` parsing (API returns a string, not `{ name }`) so Via* downloads work
+- Always resolve Hangar version when `author`/`slug` are set without `version`
+
 ## 0.7.1 — 2026-07-09
 
 - `plugdev setup` skips embedded client download when Prism/MultiMC instance is already configured
