@@ -35,9 +35,14 @@ export async function resolveHangarDep(
       { headers: { "User-Agent": USER_AGENT } },
     );
     if (!latestRes.ok) throw new Error(`Hangar latest lookup failed for ${name}`);
-    const latest = (await latestRes.json()) as HangarVersion | string;
-    resolvedVersion =
-      typeof latest === "string" ? latest : latest.name;
+    // Hangar may return plain text `5.10.0` or JSON `"5.10.0"` / `{ "name": "..." }`
+    const raw = (await latestRes.text()).trim();
+    try {
+      const parsed = JSON.parse(raw) as HangarVersion | string;
+      resolvedVersion = typeof parsed === "string" ? parsed : parsed.name;
+    } catch {
+      resolvedVersion = raw.replace(/^"|"$/g, "");
+    }
     if (!resolvedVersion) {
       throw new Error(`Hangar latest returned empty version for ${name}`);
     }

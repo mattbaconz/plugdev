@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.3 — 2026-07-09
+
+- Hangar `/latest` may be plain text (`5.10.0`) — parse text/JSON robustly so Via* prefetch works
+
 ## 0.7.2 — 2026-07-09
 
 - Fix Hangar `/latest` parsing (API returns a string, not `{ name }`) so Via* downloads work
