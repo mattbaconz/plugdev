@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.1 — 2026-07-09
+
+- `plugdev setup` skips embedded client download when Prism/MultiMC instance is already configured
+- Embedded client download failures no longer abort setup (warn + continue)
+
 ## 0.7.0 — 2026-07-09
 
 ### Via* defaults + easy Prism client

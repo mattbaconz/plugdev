@@ -71,6 +71,15 @@ export async function runSetup(
 
   const serverCached = await isServerJarCached(config.version, serverProject);
   const clientCached = await isEmbeddedClientCached(config.version);
+  const launcherEarly = await detectLauncher("auto", config.client);
+  const configuredInstance =
+    opts.instance ?? config.client?.instance ?? defaultInstanceId(config.version);
+  const usingExternalClient =
+    (config.client?.launcher === "prism" ||
+      config.client?.launcher === "multimc" ||
+      Boolean(opts.instance)) &&
+    launcherEarly !== undefined &&
+    (await instanceExists(launcherEarly, configuredInstance));
 
   let serverJar: Awaited<ReturnType<typeof ensureServerJar>>;
 
@@ -91,7 +100,11 @@ export async function runSetup(
     phase(`Downloaded ${serverLabel} ${config.version}`);
   }
 
-  if (clientCached) {
+  if (usingExternalClient) {
+    phase(
+      `Skip embedded client — using ${launcherEarly!.type} "${configuredInstance}"`,
+    );
+  } else if (clientCached) {
     phase(`Cache hit — Minecraft client ${config.version}`);
   } else {
     const report = createDownloadProgress(
@@ -101,10 +114,15 @@ export async function runSetup(
       await prefetchEmbeddedClient(config.version, {
         onProgress: (percent, label) => report(percent, label),
       });
+      phase(`Downloaded Minecraft client ${config.version}`);
+    } catch (err) {
+      warn(
+        `Embedded client download failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      warn("OK if you use Prism — set client.instance or: plugdev setup --instance \"...\"");
     } finally {
       endDownloadProgress();
     }
-    phase(`Downloaded Minecraft client ${config.version}`);
   }
 
   // Prefetch Via* (and any configured deps) into ~/.plugdev/deps
@@ -121,9 +139,8 @@ export async function runSetup(
     warn("You can retry later with: plugdev deps add viaversion");
   }
 
-  const launcher = await detectLauncher("auto", config.client);
-  let resolvedInstance =
-    opts.instance ?? config.client?.instance ?? defaultInstanceId(config.version);
+  const launcher = launcherEarly;
+  let resolvedInstance = configuredInstance;
 
   if (launcher) {
     if (opts.instance) {
