@@ -6,14 +6,14 @@ import { ensureServerJar, resolveServerProject } from "../cache/server.js";
 import { prepareRunDirectory, copyPaperToRun } from "../cache/run-template.js";
 import {
   runGradleBuild,
-  runMavenBuild,
   deployPluginJar,
   deployBootstrapJar,
 } from "../build/gradle.js";
+import { runMavenBuild } from "../build/maven.js";
 import { startPaperServer } from "../process/spawner.js";
 import { sendRconCommand } from "../process/rcon.js";
 import { installDeps } from "../deps/hangar.js";
-import { projectRunDir, bootstrapCacheDir } from "../paths.js";
+import { projectRunDir } from "../paths.js";
 import {
   readSession,
   writeSession,
@@ -27,28 +27,7 @@ import { requireJava21 } from "../util/tools.js";
 import { heading, info, success } from "../util/log.js";
 import { isJsonMode, emitJson, getLogMode } from "../util/output.js";
 import { formatError, getExitCode, Errors } from "../util/errors.js";
-import { CLI_VERSION } from "../constants.js";
-import { access } from "node:fs/promises";
-import { constants } from "node:fs";
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-
-async function resolveBootstrapJar(): Promise<string> {
-  const cliRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-  const candidates = [
-    join(cliRoot, "bootstrap", "plugdev-bootstrap-paper.jar"),
-    join(bootstrapCacheDir(), `plugdev-bootstrap-paper-${CLI_VERSION}.jar`),
-  ];
-  for (const p of candidates) {
-    try {
-      await access(p, constants.F_OK);
-      return p;
-    } catch {
-      // try next
-    }
-  }
-  throw Errors.bootstrapMissing();
-}
+import { resolveBootstrapJar } from "../util/bootstrap.js";
 
 function serverSoftware(config: { server: string }): string {
   return config.server;
@@ -96,8 +75,8 @@ export async function runServerStart(
     const pluginsDir = join(runDir, "plugins");
 
     const build =
-      project.buildSystem === "maven"
-        ? await runMavenBuild(cwd)
+      project.buildSystem === "maven" || config.build.system === "maven"
+        ? await runMavenBuild(cwd, config)
         : await runGradleBuild(cwd, config, project);
     const devJar = await deployPluginJar(build.jarPath, pluginsDir, project.pluginName);
     const bootstrap = await resolveBootstrapJar();

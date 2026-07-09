@@ -1,6 +1,7 @@
-import { detectProject } from "../detect/project.js";
+import { detectProject, detectFoliaSupport } from "../detect/project.js";
 import { loadConfig } from "../config/loader.js";
 import { checkGradle, checkJava, checkMaven, parseJavaMajor } from "../util/tools.js";
+import { pomHasModules } from "../build/maven.js";
 import {
   detectLauncher,
   instanceExists,
@@ -9,6 +10,9 @@ import {
 } from "../client/detect.js";
 import { isServerJarCached, resolveServerProject } from "../cache/server.js";
 import { isEmbeddedClientCached } from "../client/prefetch.js";
+import { checkBootstrapJar } from "../util/bootstrap.js";
+import { serversCacheDir } from "../paths.js";
+import { join } from "node:path";
 import { banner, phase, info, warn } from "../util/log.js";
 import { isJsonMode, emitJson } from "../util/output.js";
 import pc from "picocolors";
@@ -81,12 +85,46 @@ export async function runDoctor(cwd: string): Promise<number> {
   const serverCached = await isServerJarCached(config.version, serverProject);
   const embeddedCached = await isEmbeddedClientCached(config.version);
   const client = await resolveClientTier(config);
+  const bootstrap = await checkBootstrapJar();
+  const foliaSupport =
+    config.server === "folia" ? await detectFoliaSupport(cwd) : undefined;
+
+  const spigotJarPath =
+    config.server === "spigot"
+      ? join(serversCacheDir(config.version, "spigot"), `spigot-${config.version}.jar`)
+      : undefined;
+  const spigotMissing = config.server === "spigot" && !serverCached;
+
+  const jarTaskHint =
+    project.buildSystem === "gradle" &&
+    project.hasShadowJar &&
+    config.build.jarTask !== "shadowJar" &&
+    !config.build.jarTask.includes("shadow")
+      ? `Project looks like shadowJar but jarTask is "${config.build.jarTask}"`
+      : project.buildSystem === "maven" &&
+          project.hasShadowJar &&
+          !config.build.jarPattern
+        ? `maven-shade-plugin detected — set build.jarPattern (e.g. target/*-shaded.jar)`
+        : undefined;
+
+  const runPaperHint = project.hasRunPaperMaven
+    ? "run-paper-maven-plugin detected — PlugDev uses its own watch/reload loop (IDE hotswap still optional)"
+    : undefined;
+
+  const multiModule =
+    project.buildSystem === "maven" && (await pomHasModules(cwd));
+  const multiModuleHint =
+    multiModule && !config.build.module
+      ? 'Multi-module pom detected — set build.module (e.g. "plugin-module") for mvn -pl … -am'
+      : undefined;
 
   const toolchainReady =
     project.type !== "unknown" &&
     javaOk &&
     (project.buildSystem !== "gradle" || gradleOk) &&
-    (project.buildSystem !== "maven" || mavenOk);
+    (project.buildSystem !== "maven" || mavenOk) &&
+    bootstrap.ok &&
+    !spigotMissing;
 
   const clientReady = embeddedCached || client.ready;
   const setupReady = serverCached && clientReady;
@@ -100,10 +138,40 @@ export async function runDoctor(cwd: string): Promise<number> {
         pluginName: project.pluginName,
         loader: project.loader,
         minecraftVersion: config.version,
+        server: config.server,
         jarTask: config.build.jarTask,
+        jarPattern: config.build.jarPattern,
+        module: config.build.module,
+        hasShadowJar: project.hasShadowJar,
+        hasRunPaperMaven: project.hasRunPaperMaven,
+        jarTaskHint,
+        runPaperHint,
+        multiModuleHint,
         java: { ok: java.ok, version: javaVersion, meetsPaper21: javaOk },
         gradle: gradleOk,
         maven: mavenOk,
+        bootstrap: {
+          ok: bootstrap.ok,
+          path: bootstrap.path,
+        },
+        folia: foliaSupport
+          ? {
+              support: foliaSupport,
+              warning:
+                foliaSupport !== "declared"
+                  ? "Folia: plugin metadata does not declare Folia support; prefer watch.reloadJava: restart"
+                  : "Folia: safe reload may still be unsafe — prefer restart after code changes",
+            }
+          : undefined,
+        spigot: spigotJarPath
+          ? {
+              jarPath: spigotJarPath,
+              cached: serverCached,
+              hint: spigotMissing
+                ? `Run BuildTools for ${config.version} and copy spigot-${config.version}.jar to ${spigotJarPath}`
+                : undefined,
+            }
+          : undefined,
         cache: {
           server: serverCached ? "cached" : "not cached",
           embeddedClient: embeddedCached ? "cached" : "not cached",
@@ -115,11 +183,15 @@ export async function runDoctor(cwd: string): Promise<number> {
         },
         toolchainReady,
         setupReady,
-        hint: !javaOk
-          ? "Install JDK 21+ from https://adoptium.net/"
-          : !setupReady
-            ? "Run: plugdev setup"
-            : undefined,
+        hint: !bootstrap.ok
+          ? "Bootstrap JAR missing — run npm run build:bootstrap from the plugdev monorepo"
+          : spigotMissing
+            ? `Spigot jar missing — place at ${spigotJarPath}`
+            : !javaOk
+              ? "Install JDK 21+ from https://adoptium.net/"
+              : !setupReady
+                ? "Run: plugdev setup"
+                : undefined,
       },
     });
     if (!toolchainReady) return 3;
@@ -134,7 +206,20 @@ export async function runDoctor(cwd: string): Promise<number> {
   if (project.pluginName) info(`Plugin name: ${project.pluginName}`);
   if (project.loader) info(`Mod loader: ${project.loader}`);
   info(`Minecraft version: ${config.version}`);
+  info(`Server software: ${serverLabel}`);
   info(`Config jar task: ${config.build.jarTask}`);
+  if (config.build.jarPattern) info(`JAR pattern: ${config.build.jarPattern}`);
+  if (config.build.module) info(`Maven module: ${config.build.module}`);
+  if (project.hasShadowJar) {
+    info(
+      project.buildSystem === "maven"
+        ? "Shade JAR: maven-shade-plugin detected"
+        : "Shadow JAR: detected in build.gradle",
+    );
+  }
+  if (jarTaskHint) warn(jarTaskHint);
+  if (runPaperHint) info(runPaperHint);
+  if (multiModuleHint) warn(multiModuleHint);
 
   if (java.ok) {
     const major = java.major ?? parseJavaMajor(java.version);
@@ -154,13 +239,39 @@ export async function runDoctor(cwd: string): Promise<number> {
   }
 
   if (project.buildSystem === "maven") {
-    if (mavenOk) phase("Maven");
-    else warn("Maven not found");
+    if (mavenOk) phase("Maven (mvnw or mvn)");
+    else warn("Maven not found — install Maven or add mvnw wrapper");
   }
 
   if (project.type === "unknown") {
     warn("Could not detect plugin or mod project");
     return 3;
+  }
+
+  if (bootstrap.ok) {
+    phase(`Bootstrap JAR: ${bootstrap.path}`);
+  } else {
+    warn("Bootstrap JAR not found — safe reload will fail");
+    info("Hint: npm run build:bootstrap (from plugdev monorepo)");
+  }
+
+  if (config.server === "folia") {
+    if (foliaSupport === "declared") {
+      warn(
+        "Folia: metadata declares support, but safe reload may still be unsafe — prefer restart",
+      );
+    } else {
+      warn(
+        "Folia: plugin metadata does not declare Folia support — prefer watch.reloadJava: restart",
+      );
+    }
+  }
+
+  if (spigotMissing && spigotJarPath) {
+    warn(`Spigot jar missing at ${spigotJarPath}`);
+    info(
+      `Hint: Run BuildTools for ${config.version} and copy spigot-${config.version}.jar there`,
+    );
   }
 
   if (serverCached) {

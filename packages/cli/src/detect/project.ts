@@ -14,7 +14,38 @@ export interface DetectedProject {
   loader?: "fabric" | "neoforge" | "quilt" | "forge";
   gradleSubproject?: string;
   hasShadowJar: boolean;
+  /** True when blue.lhf:run-paper-maven-plugin is present in pom.xml. */
+  hasRunPaperMaven?: boolean;
+  /** True when paper-plugin.yml / plugin.yml declares Folia support. */
+  foliaSupported?: boolean;
   configPath?: string;
+}
+
+export type FoliaSupport = "declared" | "unknown" | "absent";
+
+/**
+ * Best-effort Folia support signal from plugin metadata.
+ * Does not prove the plugin is Folia-safe — only whether authors declared support.
+ */
+export async function detectFoliaSupport(cwd: string): Promise<FoliaSupport> {
+  const paths = [
+    join(cwd, "src", "main", "resources", "paper-plugin.yml"),
+    join(cwd, "src", "main", "resources", "plugin.yml"),
+  ];
+  let sawMetadata = false;
+  for (const p of paths) {
+    const content = await readText(p);
+    if (!content) continue;
+    sawMetadata = true;
+    if (
+      /folia-supported:\s*true/i.test(content) ||
+      /folia:\s*true/i.test(content) ||
+      /supports-folia:\s*true/i.test(content)
+    ) {
+      return "declared";
+    }
+  }
+  return sawMetadata ? "absent" : "unknown";
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -39,6 +70,18 @@ function parsePluginYml(content: string): { name?: string; apiVersion?: string; 
   const apiVersion = content.match(/^api-version:\s*['"]?(.+?)['"]?\s*$/m)?.[1];
   const main = content.match(/^main:\s*['"]?(.+?)['"]?\s*$/m)?.[1];
   return { name, apiVersion, main };
+}
+
+function parsePaperApiVersionFromPom(pom: string): string | undefined {
+  // <artifactId>paper-api</artifactId> ... <version>1.21.4-R0.1-SNAPSHOT</version>
+  const block = pom.match(
+    /<artifactId>\s*paper-api\s*<\/artifactId>[\s\S]*?<version>\s*([^<]+?)\s*<\/version>/i,
+  );
+  if (!block?.[1]) return undefined;
+  const raw = block[1].trim();
+  // Strip Maven classifier suffix like -R0.1-SNAPSHOT → 1.21.4
+  const mc = raw.match(/^(\d+\.\d+(?:\.\d+)?)/);
+  return mc?.[1];
 }
 
 function parseGradleProperties(content: string): Record<string, string> {
@@ -72,19 +115,31 @@ export async function detectProject(cwd: string): Promise<DetectedProject> {
   const hasGradlew =
     (await exists(join(cwd, "gradlew"))) ||
     (await exists(join(cwd, "gradlew.bat")));
+  const hasMvnw =
+    (await exists(join(cwd, "mvnw"))) ||
+    (await exists(join(cwd, "mvnw.cmd")));
 
   if (hasGradle || hasGradlew) result.buildSystem = "gradle";
-  else if (hasMaven) result.buildSystem = "maven";
+  else if (hasMaven || hasMvnw) result.buildSystem = "maven";
 
   const gradleContent =
     (await readText(join(cwd, "build.gradle.kts"))) ??
     (await readText(join(cwd, "build.gradle"))) ??
     "";
 
+  const pomContent = hasMaven
+    ? ((await readText(join(cwd, "pom.xml"))) ?? "")
+    : "";
+
   result.hasShadowJar =
     gradleContent.includes("shadow") ||
     gradleContent.includes("com.github.johnrengelman.shadow") ||
-    gradleContent.includes("com.gradleup.shadow");
+    gradleContent.includes("com.gradleup.shadow") ||
+    pomContent.includes("maven-shade-plugin");
+
+  if (pomContent.includes("run-paper-maven-plugin")) {
+    result.hasRunPaperMaven = true;
+  }
 
   // Mod detection
   const fabricModJson = await readText(
@@ -129,6 +184,10 @@ export async function detectProject(cwd: string): Promise<DetectedProject> {
       result.pluginName = parsed.name;
       result.mainClass = parsed.main;
       result.minecraftVersion = parsed.apiVersion;
+      result.foliaSupported =
+        /folia-supported:\s*true/i.test(content) ||
+        /folia:\s*true/i.test(content) ||
+        /supports-folia:\s*true/i.test(content);
       break;
     }
   }
@@ -140,12 +199,19 @@ export async function detectProject(cwd: string): Promise<DetectedProject> {
     result.minecraftVersion = props.minecraftVersion ?? props.paperVersion;
   }
 
-  // Maven plugin
-  if (result.type === "unknown" && hasMaven) {
-    const pom = (await readText(join(cwd, "pom.xml"))) ?? "";
+  if (result.type === "plugin" && !result.minecraftVersion && pomContent) {
+    result.minecraftVersion = parsePaperApiVersionFromPom(pomContent);
+  }
+
+  // Maven plugin (no plugin.yml yet, but paper-api in pom)
+  if (result.type === "unknown" && (hasMaven || hasMvnw)) {
+    const pom = pomContent || ((await readText(join(cwd, "pom.xml"))) ?? "");
     if (pom.includes("paper-api")) {
       result.type = "plugin";
       result.buildSystem = "maven";
+      result.minecraftVersion = parsePaperApiVersionFromPom(pom);
+      if (pom.includes("maven-shade-plugin")) result.hasShadowJar = true;
+      if (pom.includes("run-paper-maven-plugin")) result.hasRunPaperMaven = true;
     }
   }
 

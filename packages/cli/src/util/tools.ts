@@ -45,6 +45,23 @@ export async function checkGradle(cwd: string): Promise<boolean> {
 }
 
 export async function checkMaven(cwd: string): Promise<boolean> {
+  const wrappers =
+    process.platform === "win32"
+      ? [join(cwd, "mvnw.cmd"), join(cwd, "mvnw")]
+      : [join(cwd, "mvnw")];
+
+  for (const wrapper of wrappers) {
+    try {
+      const result = await execa(wrapper, ["--version"], {
+        cwd,
+        reject: false,
+      });
+      if (result.exitCode === 0) return true;
+    } catch {
+      // try next
+    }
+  }
+
   try {
     const result = await execa("mvn", ["--version"], { cwd, reject: false });
     return result.exitCode === 0;

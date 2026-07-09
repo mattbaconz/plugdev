@@ -4,11 +4,13 @@ import { projectRunDir } from "../paths.js";
 import { phase, success } from "./log.js";
 import { isJsonMode } from "./output.js";
 
+/** Prefer stable bootstrap markers; fall back to broader PlugDev reload lines. */
 const RELOAD_PATTERNS = [
-  /reload/i,
-  /PlugDev/i,
-  /ReloadWatcher/i,
-  /reloaded/i,
+  /\[PlugDev\] Loaded dev plugin:/i,
+  /\[PlugDev\] Reload complete/i,
+  /\[PlugDev\] Auto-reloaded dev plugin/i,
+  /Loaded dev plugin:/i,
+  /Auto-reloaded dev plugin/i,
 ];
 
 function logMatchesReload(text: string): boolean {

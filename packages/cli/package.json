@@ -1,6 +1,6 @@
 {
   "name": "@plugdev/cli",
-  "version": "0.4.4",
+  "version": "0.6.1",
   "description": "npm run dev for Minecraft plugins and mods",
   "author": "PLUG Labs",
   "homepage": "https://github.com/mattbaconz/plugdev#readme",
@@ -18,7 +18,8 @@
     "plugin",
     "dev-server",
     "cli",
-    "gradle"
+    "gradle",
+    "maven"
   ],
   "type": "module",
   "bin": {
@@ -39,6 +40,7 @@
     "prepare": "npm run build",
     "start": "node dist/cli.js",
     "test": "node --import tsx --test src/**/*.test.ts",
+    "smoke:reload": "node scripts/smoke-reload.mjs",
     "prepublishOnly": "cd ../.. && npm run build"
   },
   "dependencies": {

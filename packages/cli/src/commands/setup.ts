@@ -16,7 +16,7 @@ import {
 } from "../client/prefetch.js";
 import { banner, phase, info, success, warn } from "../util/log.js";
 import { createDownloadProgress, endDownloadProgress } from "../util/progress.js";
-import { requireJava21, checkGradle } from "../util/tools.js";
+import { requireJava21, checkGradle, checkMaven } from "../util/tools.js";
 import { isJsonMode, emitJson } from "../util/output.js";
 
 function serverDisplayName(server: string): string {
@@ -54,6 +54,12 @@ export async function runSetup(cwd: string): Promise<number> {
     const gradleOk = await checkGradle(cwd);
     if (gradleOk) phase("Gradle wrapper");
     else warn("Gradle wrapper not found — build may fail");
+  }
+
+  if (project.buildSystem === "maven") {
+    const mavenOk = await checkMaven(cwd);
+    if (mavenOk) phase("Maven (mvnw or mvn)");
+    else warn("Maven not found — install Maven or add mvnw wrapper");
   }
 
   const serverCached = await isServerJarCached(config.version, serverProject);

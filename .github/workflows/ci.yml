@@ -19,6 +19,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+          cache: maven
 
       - name: Install dependencies
         run: npm install
@@ -51,12 +52,30 @@ jobs:
         working-directory: test/fixtures/paper-plugin
         run: |
           node ../../../packages/cli/dist/cli.js doctor --json > doctor.json
-          node -e "const d=require('./doctor.json'); if(!d.data.toolchainReady) process.exit(3); console.log('toolchainReady ok');"
+          node -e "const d=require('./doctor.json'); if(!d.data.toolchainReady) process.exit(3); if(!d.data.bootstrap?.ok) process.exit(4); console.log('toolchainReady + bootstrap ok');"
+
+      - name: Maven fixture doctor + build
+        working-directory: test/fixtures/maven-plugin
+        run: |
+          node ../../../packages/cli/dist/cli.js doctor --json > doctor.json
+          node -e "const d=require('./doctor.json'); if(d.data.projectType!=='plugin') process.exit(3); if(d.data.buildSystem!=='maven') process.exit(4); console.log('maven fixture detect ok');"
+          node ../../../packages/cli/dist/cli.js build --json
 
       - name: MCP smoke
         run: npm run smoke -w @plugdev/mcp
         env:
           PLUGDEV_SMOKE_PORT: "25566"
+
+      - name: Reload smoke (Gradle)
+        run: npm run smoke:reload -w @plugdev/cli
+        env:
+          PLUGDEV_RELOAD_SMOKE_PORT: "25567"
+
+      - name: Reload smoke (Maven)
+        run: npm run smoke:reload -w @plugdev/cli
+        env:
+          PLUGDEV_RELOAD_SMOKE_PORT: "25568"
+          PLUGDEV_RELOAD_SMOKE_FIXTURE: maven-plugin
 
       - name: Server boot smoke
         working-directory: test/fixtures/paper-plugin

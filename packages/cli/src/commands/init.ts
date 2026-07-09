@@ -4,9 +4,11 @@ import { constants } from "node:fs";
 import { detectProject } from "../detect/project.js";
 import { loadConfig } from "../config/loader.js";
 import { CLI_VERSION } from "../constants.js";
-import { heading, success, info } from "../util/log.js";
+import { heading, success, info, warn } from "../util/log.js";
+import { formatNextSteps, initNextSteps } from "../util/shell-hints.js";
+import { runSetup } from "./setup.js";
 
-const PLUGIN_TEMPLATE = `# PlugDev configuration — auto-generated
+const PLUGIN_GRADLE_TEMPLATE = `# PlugDev configuration — auto-generated
 type: plugin
 server: paper
 version: "{{version}}"
@@ -16,6 +18,40 @@ build:
   system: gradle
   task: build
   jarTask: {{jarTask}}
+
+client:
+  launcher: auto
+  instance: plugdev-{{version}}
+  offlineName: DevPlayer
+
+jvm:
+  memory: 1G
+
+dev:
+  gamemode: creative
+  world: void
+  op: true
+  peaceful: true
+  onlineMode: false
+
+watch:
+  paths:
+    - src/
+  debounceMs: 300
+  reload:
+    java: safe
+`;
+
+const PLUGIN_MAVEN_TEMPLATE = `# PlugDev configuration — auto-generated
+type: plugin
+server: paper
+version: "{{version}}"
+port: 25565
+
+build:
+  system: maven
+  task: package
+  jarPattern: "target/*.jar"
 
 client:
   launcher: auto
@@ -68,7 +104,11 @@ const DEFAULT_SCRIPTS: Record<string, string> = {
   "dev:watch": "plugdev watch",
 };
 
-export async function runInit(cwd: string, force = false): Promise<number> {
+export async function runInit(
+  cwd: string,
+  force = false,
+  opts: { setup?: boolean } = {},
+): Promise<number> {
   heading("PlugDev Init\n");
 
   const project = await detectProject(cwd);
@@ -94,8 +134,10 @@ export async function runInit(cwd: string, force = false): Promise<number> {
       "{{version}}",
       config.version,
     );
+  } else if (project.buildSystem === "maven") {
+    content = PLUGIN_MAVEN_TEMPLATE.replaceAll("{{version}}", config.version);
   } else {
-    content = PLUGIN_TEMPLATE.replaceAll("{{version}}", config.version).replace(
+    content = PLUGIN_GRADLE_TEMPLATE.replaceAll("{{version}}", config.version).replace(
       "{{jarTask}}",
       jarTask,
     );
@@ -134,7 +176,25 @@ export async function runInit(cwd: string, force = false): Promise<number> {
   await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
   success(pkgExists ? `Updated ${pkgPath}` : `Created ${pkgPath}`);
 
-  info("Run: npm install && npm run setup && npm run dev");
-  info("Or without installing: npx @plugdev/cli setup && npx @plugdev/cli run");
+  if (opts.setup) {
+    info("");
+    const setupCode = await runSetup(cwd);
+    if (setupCode !== 0) {
+      warn("Setup did not finish cleanly — fix the issues above, then run: npm run setup");
+      return setupCode;
+    }
+    info("");
+    info("Next:");
+    info(formatNextSteps(["npm run dev"]));
+    info("(PowerShell tip: run each command on its own line — do not use &&)");
+    return 0;
+  }
+
+  info("");
+  info("Next (run each line separately — PowerShell does not need &&):");
+  info(formatNextSteps(initNextSteps()));
+  info("Or with npx only:");
+  info(formatNextSteps(initNextSteps({ usedNpx: true })));
+  info("Faster: npx @plugdev/cli init --setup");
   return 0;
 }

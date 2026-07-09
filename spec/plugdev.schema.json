@@ -148,7 +148,11 @@
             "system": { "type": "string", "enum": ["gradle", "maven"], "default": "gradle" },
             "task": { "type": "string", "default": "build" },
             "jarTask": { "type": "string", "default": "shadowJar" },
-            "jarPattern": { "type": "string", "description": "Glob for built JAR, e.g. build/libs/*.jar" }
+            "jarPattern": { "type": "string", "description": "Glob for built JAR, e.g. build/libs/*.jar or plugin-module/target/*.jar" },
+            "module": {
+              "type": "string",
+              "description": "Maven reactor module for multi-module builds (passed as -pl <module> -am)"
+            }
           },
           "additionalProperties": false
         },

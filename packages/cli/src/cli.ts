@@ -96,8 +96,11 @@ program
   .command("init")
   .description("Scaffold plugdev.yml and package.json scripts")
   .option("--force", "Overwrite existing plugdev.yml")
-  .action(async (opts: { force?: boolean }) => {
-    process.exit(await runInit(process.cwd(), opts.force));
+  .option("--setup", "Also run plugdev setup (prefetch Paper + client)")
+  .action(async (opts: { force?: boolean; setup?: boolean }) => {
+    process.exit(
+      await runInit(process.cwd(), opts.force, { setup: opts.setup }),
+    );
   });
 
 program

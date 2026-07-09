@@ -6,6 +6,16 @@ PlugDev boots a dev server with your plugin loaded, installs preset test depende
 
 ## Quick start
 
+Run each command on its own line (Windows PowerShell 5.1 does not support `&&`):
+
+```bash
+npx @plugdev/cli init --setup
+npm install
+npm run dev
+```
+
+Or step by step:
+
 ```bash
 npx @plugdev/cli init
 npm install
@@ -33,22 +43,25 @@ node ../../../packages/cli/dist/cli.js run --quiet --join
 ### From npm
 
 ```bash
-npx @plugdev/cli init
+npx @plugdev/cli init --setup
 npm install
-npm run setup
-npm run dev            # or: npx @plugdev/cli run
+npm run dev
 ```
 
-`plugdev setup` downloads Paper and the embedded Minecraft client to `~/.plugdev/` so first `plugdev run` is fast. No Prism required — `client.launcher: auto` falls back to the embedded client.
+`plugdev setup` (or `init --setup`) downloads Paper and the embedded Minecraft client to `~/.plugdev/` so first `plugdev run` is fast. No Prism required — `client.launcher: auto` falls back to the embedded client.
 
 ## The magical demo
 
-1. Open a Paper Gradle plugin project (with `plugin.yml` and `gradlew`).
+1. Open a Paper plugin project (Gradle with `gradlew`, or Maven with `pom.xml` / `mvnw`).
 2. Run `plugdev run` (or `plugdev demo --quiet` for recordings).
 3. PlugDev detects the project, downloads/caches Paper, builds your JAR, starts a local server at `.plugdev/run`, and opens Minecraft to join `localhost:25565`.
 4. Edit Java source under `src/` and save — PlugDev rebuilds and triggers a safe reload via the bootstrap plugin.
 
 No manual JAR copying. No manual Direct Connect.
+
+Maven projects: `plugdev init` writes `build.system: maven` and `jarPattern: "target/*.jar"`.
+
+Multi-module reactors: set `build.module` in `plugdev.yml` (runs `mvn -pl <module> -am`). See [docs/plugins/maven.md](docs/plugins/maven.md) when nested locally.
 
 ## Commands
 
@@ -118,6 +131,6 @@ npm org: **`@plugdev`** (`@plugdev/cli`, `@plugdev/mcp`).
 
 ## Status
 
-**v0.4.4** — Trust & Demo: honest doctor, cross-platform Prism detect, offline cache checks, safer init/cache clear, CI green with unit tests + MCP smoke.
+**v0.5.0** — Trust & Reliability: hardened safe reload, Folia warnings, doctor bootstrap/Spigot/Folia checks, CI reload smoke + Maven fixture coverage.
 
 Previous: **v0.4.3** — in-place download progress. **v0.4.2** — init adds local CLI dep. **v0.4.1** — Easy Setup.

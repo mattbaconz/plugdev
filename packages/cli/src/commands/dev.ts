@@ -1,7 +1,4 @@
-import { access } from "node:fs/promises";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { constants } from "node:fs";
+import { join } from "node:path";
 import type { ChildProcess } from "node:child_process";
 import { detectProject } from "../detect/project.js";
 import { loadConfig, type CliOverrides, type ResolvedConfig } from "../config/loader.js";
@@ -15,7 +12,8 @@ import {
   copyPaperToRun,
   writeReloadTrigger,
 } from "../cache/run-template.js";
-import { runGradleBuild, runMavenBuild, deployPluginJar, deployBootstrapJar, runModGradle } from "../build/gradle.js";
+import { runGradleBuild, deployPluginJar, deployBootstrapJar, runModGradle } from "../build/gradle.js";
+import { runMavenBuild } from "../build/maven.js";
 import {
   startPaperServer,
   attachShutdownHooks,
@@ -25,37 +23,16 @@ import {
 import { installDeps } from "../deps/hangar.js";
 import { startPluginWatcher, startModWatchOrchestrator } from "../watch/watcher.js";
 import { launchClient } from "../client/launch.js";
-import { projectRunDir, bootstrapCacheDir } from "../paths.js";
-import { banner, phase, info, error as logError, resetPhases } from "../util/log.js";
+import { banner, phase, info, warn, error as logError, resetPhases } from "../util/log.js";
 import { createDownloadProgress, endDownloadProgress } from "../util/progress.js";
 import { CLI_VERSION } from "../constants.js";
 import { Errors, formatError, formatErrorJson, getExitCode, PlugDevError } from "../util/errors.js";
 import { requireJava21 } from "../util/tools.js";
 import { isPortAvailable } from "../util/port.js";
 import { getLogMode, isJsonMode, emitJson } from "../util/output.js";
+import { resolveBootstrapJar } from "../util/bootstrap.js";
+import { detectFoliaSupport } from "../detect/project.js";
 import type { DetectedProject } from "../detect/project.js";
-
-async function resolveBootstrapJar(): Promise<string> {
-  const cliRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-  const candidates = [
-    join(cliRoot, "bootstrap", "plugdev-bootstrap-paper.jar"),
-    join(cliRoot, "bootstrap", `plugdev-bootstrap-paper-${CLI_VERSION}.jar`),
-    join(cliRoot, "..", "bootstrap-paper", "build", "libs", "plugdev-bootstrap-paper.jar"),
-    join(cliRoot, "..", "bootstrap-paper", "build", "libs", `plugdev-bootstrap-paper-${CLI_VERSION}.jar`),
-    join(bootstrapCacheDir(), `plugdev-bootstrap-paper-${CLI_VERSION}.jar`),
-  ];
-
-  for (const p of candidates) {
-    try {
-      await access(p, constants.F_OK);
-      return p;
-    } catch {
-      // try next
-    }
-  }
-
-  throw Errors.bootstrapMissing();
-}
 
 function watchEnabled(overrides: CliOverrides & { watch?: boolean }): boolean {
   if (overrides.noWatch) return false;
@@ -132,7 +109,7 @@ export async function runDev(
 
     if (config.build.system === "maven" || project.buildSystem === "maven") {
       return runPluginDev(cwd, config, project, overrides, async () =>
-        runMavenBuild(cwd),
+        runMavenBuild(cwd, config),
       );
     }
 
@@ -183,6 +160,19 @@ async function runPluginDev(
 
   if (!(await isPortAvailable(config.port))) {
     throw Errors.portInUse(config.port);
+  }
+
+  if (config.server === "folia") {
+    const folia = await detectFoliaSupport(cwd);
+    if (folia !== "declared") {
+      warn(
+        "Folia: plugin metadata does not declare Folia support — prefer watch.reloadJava: restart",
+      );
+    } else {
+      warn(
+        "Folia: safe plugin reload may be unsafe on regionized servers — prefer full restart after code changes",
+      );
+    }
   }
 
   const prefetchClient = shouldJoinClient(overrides, config);

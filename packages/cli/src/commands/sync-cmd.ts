@@ -6,10 +6,10 @@ import { detectProject } from "../detect/project.js";
 import { loadConfig } from "../config/loader.js";
 import {
   runGradleBuild,
-  runMavenBuild,
   deployPluginJar,
   deployBootstrapJar,
 } from "../build/gradle.js";
+import { runMavenBuild } from "../build/maven.js";
 import { projectRunDir, bootstrapCacheDir } from "../paths.js";
 import { prepareRunDirectory, writeReloadTrigger } from "../cache/run-template.js";
 import { heading, info, success } from "../util/log.js";
@@ -46,8 +46,8 @@ export async function runSync(cwd: string, jarPath?: string): Promise<number> {
     let builtJar = jarPath;
     if (!builtJar) {
       const build =
-        project.buildSystem === "maven"
-          ? await runMavenBuild(cwd)
+        project.buildSystem === "maven" || config.build.system === "maven"
+          ? await runMavenBuild(cwd, config)
           : await runGradleBuild(cwd, config, project);
       builtJar = build.jarPath;
     }

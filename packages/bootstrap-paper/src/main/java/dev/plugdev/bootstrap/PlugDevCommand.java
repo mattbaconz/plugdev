@@ -32,13 +32,17 @@ public final class PlugDevCommand implements CommandExecutor, TabCompleter {
 
         switch (args[0].toLowerCase()) {
             case "reload" -> {
+                if (bootstrap.isFoliaServer()) {
+                    sender.sendMessage(ChatColor.YELLOW
+                            + "[PlugDev] Folia: safe reload may be unsafe. Prefer restarting the server.");
+                }
                 bootstrap.getServer().getScheduler().runTask(bootstrap, () -> {
                     try {
                         bootstrap.getReloader().reloadDevPlugins();
-                        sender.sendMessage(ChatColor.GREEN + "Dev plugin(s) reloaded.");
+                        sender.sendMessage(ChatColor.GREEN + "[PlugDev] Dev plugin(s) reloaded.");
                     } catch (Exception e) {
-                        sender.sendMessage(ChatColor.RED + "Reload failed: " + e.getMessage());
-                        bootstrap.getLogger().severe("Reload failed");
+                        sender.sendMessage(ChatColor.RED + "[PlugDev] Reload failed: " + e.getMessage());
+                        bootstrap.getLogger().severe("[PlugDev] Reload failed");
                         e.printStackTrace();
                     }
                 });
@@ -47,6 +51,9 @@ public final class PlugDevCommand implements CommandExecutor, TabCompleter {
             case "info" -> {
                 sender.sendMessage(ChatColor.AQUA + "PlugDev bootstrap " + bootstrap.getDescription().getVersion());
                 sender.sendMessage(ChatColor.GRAY + "Dev plugin: " + bootstrap.getDevPluginName());
+                if (bootstrap.isFoliaServer()) {
+                    sender.sendMessage(ChatColor.YELLOW + "Server: Folia (prefer restart over reload)");
+                }
                 return true;
             }
             case "tp" -> {

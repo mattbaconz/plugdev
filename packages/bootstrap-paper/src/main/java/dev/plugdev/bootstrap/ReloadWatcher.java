@@ -17,6 +17,12 @@ public final class ReloadWatcher {
     }
 
     public void start() {
+        if (bootstrap.isFoliaServer()) {
+            bootstrap.getLogger().warning(
+                    "[PlugDev] Folia detected — file-watch safe reload may be unsafe. "
+                            + "Prefer full server restart (watch.reloadJava: restart) for Folia plugins.");
+        }
+
         task = new BukkitRunnable() {
             @Override
             public void run() {
@@ -27,10 +33,12 @@ public final class ReloadWatcher {
                     long ts = Long.parseLong(content);
                     if (ts <= lastTrigger) return;
                     lastTrigger = ts;
+                    bootstrap.getLogger().info("[PlugDev] Watch trigger detected — reloading…");
                     bootstrap.getReloader().reloadDevPlugins();
-                    bootstrap.getLogger().info("Auto-reloaded dev plugin from watch trigger");
+                    bootstrap.getLogger().info("[PlugDev] Auto-reloaded dev plugin from watch trigger");
                 } catch (Exception e) {
-                    bootstrap.getLogger().warning("Watch reload failed: " + e.getMessage());
+                    bootstrap.getLogger().warning("[PlugDev] Watch reload failed: " + e.getMessage());
+                    e.printStackTrace();
                 }
             }
         };

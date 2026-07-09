@@ -52,3 +52,29 @@ test("loadConfig defaults watch reload to safe", async () => {
   const config = await loadConfig("/tmp", baseProject, {});
   assert.equal(config.watch.reloadJava, "safe");
 });
+
+test("loadConfig maven module defaults jarPattern to module/target", async () => {
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "plugdev-cfg-mod-"));
+  try {
+    const yml = join(dir, "plugdev.yml");
+    await writeFile(
+      yml,
+      `type: plugin\nserver: paper\nversion: "1.21.4"\nbuild:\n  system: maven\n  module: plugin-module\n`,
+    );
+    const project: DetectedProject = {
+      type: "plugin",
+      buildSystem: "maven",
+      hasShadowJar: false,
+      configPath: yml,
+    };
+    const config = await loadConfig(dir, project, {});
+    assert.equal(config.build.module, "plugin-module");
+    assert.equal(config.build.jarPattern, "plugin-module/target/*.jar");
+    assert.equal(config.build.task, "package");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

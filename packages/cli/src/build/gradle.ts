@@ -1,15 +1,14 @@
 import { execa } from "execa";
-import { copyFile, mkdir, readdir } from "node:fs/promises";
+import { copyFile, mkdir } from "node:fs/promises";
 import { join, basename } from "node:path";
 import type { ResolvedConfig } from "../config/loader.js";
 import type { DetectedProject } from "../detect/project.js";
 import { info } from "../util/log.js";
 import { Errors } from "../util/errors.js";
+import { findJarByPattern } from "./jars.js";
+import type { BuildResult } from "./types.js";
 
-export interface BuildResult {
-  jarPath: string;
-  task: string;
-}
+export type { BuildResult } from "./types.js";
 
 function gradlewCommand(cwd: string): string {
   return join(cwd, process.platform === "win32" ? "gradlew.bat" : "gradlew");
@@ -86,51 +85,8 @@ export async function runGradleBuild(
   );
 }
 
-export async function runMavenBuild(cwd: string): Promise<BuildResult> {
-  try {
-    await execa("mvn", ["package", "-DskipTests", "-q"], { cwd, stdio: "inherit" });
-  } catch (e) {
-    throw Errors.buildFailed(
-      "package",
-      e instanceof Error ? e.message : String(e),
-    );
-  }
-  const jarPath = await findMavenJar(cwd);
-  return { jarPath, task: "package" };
-}
-
-function matchGlob(name: string, pattern: string): boolean {
-  const regex = new RegExp(
-    "^" + pattern.replace(/\./g, "\\.").replace(/\*/g, ".*") + "$",
-  );
-  return regex.test(name);
-}
-
-async function findJarByPattern(
-  cwd: string,
-  pattern: string,
-  task: string,
-): Promise<string> {
-  const normalized = pattern.replace(/\\/g, "/");
-  const dirPart = normalized.includes("/")
-    ? join(cwd, normalized.slice(0, normalized.lastIndexOf("/")))
-    : cwd;
-  const globPart = normalized.includes("/")
-    ? normalized.slice(normalized.lastIndexOf("/") + 1)
-    : normalized;
-
-  const files = await readdir(dirPart);
-  const jars = files.filter(
-    (f) =>
-      f.endsWith(".jar") &&
-      !f.includes("-sources") &&
-      !f.includes("-javadoc") &&
-      matchGlob(f, globPart),
-  );
-  if (jars.length === 0) throw Errors.noJarFound(task);
-  const chosen = jars.sort().pop()!;
-  return join(dirPart, chosen);
-}
+/** @deprecated Import from `./maven.js` — re-exported for callers. */
+export { runMavenBuild } from "./maven.js";
 
 async function findBuiltJar(
   cwd: string,
@@ -148,20 +104,10 @@ async function findBuiltJar(
   }
 }
 
-async function findMavenJar(cwd: string): Promise<string> {
-  const targetDir = join(cwd, "target");
-  const files = await readdir(targetDir);
-  const jar = files.find(
-    (f) => f.endsWith(".jar") && !f.includes("sources") && !f.includes("javadoc"),
-  );
-  if (!jar) throw Errors.noJarFound("package");
-  return join(targetDir, jar);
-}
-
 export async function deployPluginJar(
   jarPath: string,
   pluginsDir: string,
-  devPluginName?: string,
+  _devPluginName?: string,
   forReload = false,
 ): Promise<string> {
   await mkdir(pluginsDir, { recursive: true });

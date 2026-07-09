@@ -6,11 +6,13 @@ public final class PlugDevBootstrap extends JavaPlugin {
 
     private ReloadWatcher reloadWatcher;
     private String devPluginName;
+    private PluginReloader reloader;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
         devPluginName = getConfig().getString("dev-plugin-name", "");
+        reloader = new PluginReloader(this);
 
         var reloadCommand = getCommand("plugdev");
         if (reloadCommand != null) {
@@ -22,7 +24,12 @@ public final class PlugDevBootstrap extends JavaPlugin {
         reloadWatcher = new ReloadWatcher(this);
         reloadWatcher.start();
 
-        getLogger().info("PlugDev bootstrap enabled");
+        getLogger().info("[PlugDev] bootstrap enabled");
+        if (isFoliaServer()) {
+            getLogger().warning(
+                    "[PlugDev] Running on Folia — /plugdev reload uses the global scheduler and may be unsafe. "
+                            + "Prefer restarting the dev server after code changes.");
+        }
     }
 
     @Override
@@ -43,6 +50,16 @@ public final class PlugDevBootstrap extends JavaPlugin {
     }
 
     public PluginReloader getReloader() {
-        return new PluginReloader(this);
+        return reloader;
+    }
+
+    /** Best-effort Folia detection without a hard Folia API dependency. */
+    public boolean isFoliaServer() {
+        try {
+            Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
     }
 }

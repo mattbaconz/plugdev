@@ -2,7 +2,8 @@ import chokidar from "chokidar";
 import { debounce } from "../util/debounce.js";
 import type { ResolvedConfig } from "../config/loader.js";
 import type { DetectedProject } from "../detect/project.js";
-import { runGradleBuild, runMavenBuild, deployPluginJar, runGradleTask } from "../build/gradle.js";
+import { runGradleBuild, deployPluginJar, runGradleTask } from "../build/gradle.js";
+import { runMavenBuild } from "../build/maven.js";
 import { writeReloadTrigger } from "../cache/run-template.js";
 import { projectRunDir } from "../paths.js";
 import { join } from "node:path";
@@ -49,7 +50,7 @@ export function startPluginWatcher(
       info(`[watch] ${changedPath.replace(cwd, ".")}`);
       const build =
         config.build.system === "maven"
-          ? await runMavenBuild(cwd)
+          ? await runMavenBuild(cwd, config)
           : await runGradleBuild(cwd, config, project);
 
       if (reloadMode === "restart") {

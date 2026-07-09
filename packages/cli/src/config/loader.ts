@@ -32,6 +32,8 @@ export interface PlugDevConfig {
     task?: string;
     jarTask?: string;
     jarPattern?: string;
+    /** Maven reactor module for `-pl <module> -am` (multi-module). */
+    module?: string;
   };
   dev?: {
     mode?: "client" | "server" | "datagen";
@@ -84,6 +86,7 @@ export interface ResolvedConfig {
     task: string;
     jarTask: string;
     jarPattern?: string;
+    module?: string;
   };
   watch: {
     paths: string[];
@@ -229,10 +232,24 @@ export async function loadConfig(
       system:
         raw.build?.system ??
         (project.buildSystem === "maven" ? "maven" : "gradle"),
-      task: raw.build?.task ?? "build",
+      task:
+        raw.build?.task ??
+        (project.buildSystem === "maven" || raw.build?.system === "maven"
+          ? "package"
+          : "build"),
       jarTask:
         raw.build?.jarTask ?? (project.hasShadowJar ? "shadowJar" : "jar"),
-      jarPattern: raw.build?.jarPattern,
+      module: raw.build?.module,
+      jarPattern: (() => {
+        if (raw.build?.jarPattern) return raw.build.jarPattern;
+        const isMaven =
+          project.buildSystem === "maven" || raw.build?.system === "maven";
+        if (!isMaven) return undefined;
+        if (raw.build?.module) {
+          return `${raw.build.module.replace(/\\/g, "/").replace(/\/$/, "")}/target/*.jar`;
+        }
+        return "target/*.jar";
+      })(),
     },
     watch: {
       paths: raw.watch?.paths ?? ["src/"],

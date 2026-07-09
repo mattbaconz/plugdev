@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.6.1 — 2026-07-09
+
+### Multi-module Maven + UX
+
+- `build.module` → `mvn -pl <module> -am` (wrapper-aware); default `jarPattern` to `<module>/target/*.jar`
+- Doctor warns when reactor `<modules>` present without `build.module`
+- Schema: `build.module` field
+- Includes 0.6.0 Maven Paper parity + PowerShell-safe `init --setup` (see below)
+
+## 0.6.0 — 2026-07-09
+
+### Maven Paper parity
+
+- Config-aware Maven builds: honor `build.task` / `build.jarPattern`, prefer `mvnw` over system `mvn`
+- Robust `target/` JAR selection (exclude sources/javadoc/original; prefer shaded)
+- `plugdev init` writes `system: maven` for `pom.xml` projects
+- `setup` / `doctor` check Maven wrapper or `mvn`; shade + run-paper-maven hints
+- Detection: `mvnw`, `paper-api` version, `maven-shade-plugin`, `run-paper-maven-plugin` signal
+- CI: Maven reload smoke alongside Gradle
+
+### Easier setup (Windows)
+
+- `plugdev init --setup` runs prefetch in one step
+- Next-step hints print one command per line (PowerShell 5.1-safe; no `&&`)
+
+## 0.5.0 — 2026-07-09
+
+### Trust & Reliability
+
+- Bootstrap reload hardening: stable `reload.list` path, prefer stored dev plugin name for timestamped JARs, clearer `[PlugDev]` log markers for CLI/CI
+- Folia warnings in bootstrap, doctor, and `plugdev` boot (prefer restart over safe reload)
+- `plugdev doctor` checks bootstrap JAR presence; Spigot missing-JAR path + BuildTools hint; Folia support signal; shadowJar vs jarTask mismatch hint
+- Shared `resolveBootstrapJar()` for CLI + doctor + server commands
+- CI: Maven fixture doctor/build; watch→reload smoke (`npm run smoke:reload`)
+- Reload feedback matches `[PlugDev] Loaded dev plugin:` markers (fewer false positives)
+
 ## 0.4.4 — 2026-07-09
 
 ### Trust & Demo
@@ -58,10 +94,3 @@
 - `--quiet` / `--verbose` phased terminal output
 - `plugdev demo` for recordings
 - `plugdev server start|stop|status|command|logs` for headless/agent use
-- RCON console commands
-- `@plugdev/mcp` package (MCP server for agents)
-- `doctor --json`, structured error hints
-
-## 0.3.1 and earlier
-
-See git history.
