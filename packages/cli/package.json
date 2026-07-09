@@ -1,7 +1,7 @@
 {
   "name": "@plugdev/cli",
-  "version": "0.7.4",
-  "description": "npm run dev for Minecraft plugins and mods",
+  "version": "0.7.5",
+  "description": "plug / plugdev — npm run dev for Minecraft plugins",
   "author": "PLUG Labs",
   "homepage": "https://github.com/mattbaconz/plugdev#readme",
   "repository": {
@@ -23,7 +23,8 @@
   ],
   "type": "module",
   "bin": {
-    "plugdev": "dist/cli.js"
+    "plugdev": "dist/cli.js",
+    "plug": "dist/cli.js"
   },
   "main": "./dist/cli.js",
   "publishConfig": {

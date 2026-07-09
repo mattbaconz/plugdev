@@ -4,19 +4,26 @@ export function isWindowsShell(): boolean {
   return process.platform === "win32";
 }
 
-/** Print-ready steps after init (no shell `&&` — broken in Windows PowerShell 5.1). */
-export function initNextSteps(opts?: { usedNpx?: boolean }): string[] {
+/**
+ * Print-ready steps after init.
+ * Prefer global `plug` / `plugdev` bins; fall back to npx when requested.
+ */
+export function initNextSteps(opts?: {
+  usedNpx?: boolean;
+  globalPreferred?: boolean;
+}): string[] {
   if (opts?.usedNpx) {
+    return ["npx @plugdev/cli@latest setup", "npx @plugdev/cli@latest run"];
+  }
+  // Global install is the primary UX (plug + plugdev bins)
+  if (opts?.globalPreferred !== false) {
     return [
-      "npx @plugdev/cli setup",
-      "npx @plugdev/cli run",
+      "npm install -g @plugdev/cli",
+      "plugdev init --setup",
+      "plug run",
     ];
   }
-  return [
-    "npm install",
-    "npm run setup",
-    "npm run dev",
-  ];
+  return ["npm install", "npm run setup", "npm run dev"];
 }
 
 export function formatNextSteps(steps: string[]): string {

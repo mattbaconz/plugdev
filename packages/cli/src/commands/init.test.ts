@@ -32,6 +32,7 @@ describe("runInit", () => {
       assert.match(yml, /ViaBackwards/);
       assert.match(yml, /ViaRewind/);
       assert.doesNotMatch(yml, /instance: plugdev-/);
+      assert.match(yml, /cleanup: never/);
 
       const pkg = JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as {
         scripts: Record<string, string>;

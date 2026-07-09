@@ -1,17 +1,19 @@
 # @plugdev/cli
 
-**npm run dev for Minecraft plugins.**
+**`plug run` / `plugdev run` for Minecraft plugins.**
 
 ```powershell
-npx @plugdev/cli@latest init --setup
-npm install
-npm run dev
+npm install -g @plugdev/cli
+cd your-plugin
+plugdev init --setup
+plug run
 ```
 
-- Boots Paper with your plugin + Via* (cross-version joins)
-- Void world with a solid platform (no falling into nothing)
-- Embedded vanilla client matching your server MC version (fast default)
-- Watches `src/` and safe-reloads via bootstrap plugin
-- Optional Prism: `plugdev setup --instance "YourInstance"` uses your Microsoft account
+Both `plug` and `plugdev` are installed. Same commands either way.
+
+- Paper + Via* + embedded client matching your MC version
+- Void world with a solid platform
+- Safe reload on `src/` save
+- `plug clean` / `run.cleanup` for disk lifecycle
 
 Full docs: [github.com/mattbaconz/plugdev](https://github.com/mattbaconz/plugdev)

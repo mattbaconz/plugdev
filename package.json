@@ -1,7 +1,7 @@
 {
   "name": "plugdev",
   "private": true,
-  "version": "0.7.4",
+  "version": "0.7.5",
   "description": "npm run dev for Minecraft plugins, mods, and test servers",
   "workspaces": [
     "packages/cli",

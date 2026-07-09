@@ -27,6 +27,10 @@ client:
 jvm:
   memory: 1G
 
+# Keep .plugdev/run between sessions (fast). Options: never | on-exit | worlds
+run:
+  cleanup: never
+
 dev:
   gamemode: creative
   world: void
@@ -75,6 +79,10 @@ client:
 
 jvm:
   memory: 1G
+
+# Keep .plugdev/run between sessions (fast). Options: never | on-exit | worlds
+run:
+  cleanup: never
 
 dev:
   gamemode: creative
@@ -210,21 +218,22 @@ export async function runInit(
     info("");
     const setupCode = await runSetup(cwd);
     if (setupCode !== 0) {
-      warn("Setup did not finish cleanly — fix the issues above, then run: npm run setup");
+      warn("Setup did not finish cleanly — fix the issues above, then run: plug setup");
       return setupCode;
     }
     info("");
     info("Next:");
-    info(formatNextSteps(["npm run dev"]));
+    info(formatNextSteps(["plug run"]));
+    info("Same as: plugdev run");
     info("(PowerShell tip: run each command on its own line — do not use &&)");
     return 0;
   }
 
   info("");
-  info("Next (run each line separately — PowerShell does not need &&):");
+  info("Next (global install — recommended):");
   info(formatNextSteps(initNextSteps()));
   info("Or with npx only:");
   info(formatNextSteps(initNextSteps({ usedNpx: true })));
-  info("Faster: npx @plugdev/cli init --setup");
+  info("Faster one-shot: npx @plugdev/cli@latest init --setup");
   return 0;
 }

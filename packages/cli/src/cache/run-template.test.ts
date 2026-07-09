@@ -19,6 +19,7 @@ function baseConfig(world: "void" | "flat" | "default"): ResolvedConfig {
     build: { system: "gradle", task: "build", jarTask: "jar" },
     watch: { paths: ["src/"], debounceMs: 300, reloadJava: "safe" },
     jvm: { memory: "1G", debugPort: 0 },
+    run: { cleanup: "never" },
     dev: { world, gamemode: "creative", peaceful: true, op: true },
     deps: [],
     raw: {},

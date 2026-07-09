@@ -28,8 +28,14 @@ import {
   runDepsList,
   runDepsRemove,
 } from "./commands/cache.js";
+import { runClean } from "./cache/run-cleanup.js";
 
 const program = new Command();
+
+function invokedAsPlug(): boolean {
+  const base = (process.argv[1] ?? "").replace(/\\/g, "/").split("/").pop() ?? "";
+  return base === "plug" || base === "plug.js" || base.startsWith("plug.");
+}
 
 function devOptions() {
   return {
@@ -72,8 +78,8 @@ function parseDevOpts(opts: ReturnType<typeof devOptions>) {
 }
 
 program
-  .name("plugdev")
-  .description("npm run dev for Minecraft plugins and mods")
+  .name(invokedAsPlug() ? "plug" : "plugdev")
+  .description("Dev loop for Minecraft plugins — plug run / plugdev run")
   .version(CLI_VERSION, "-V")
   .option("--json", "emit structured JSON output")
   .option("--quiet", "suppress server logs; show PlugDev steps only")
@@ -109,6 +115,24 @@ program
   .option("--instance <id>", "Prism/MultiMC instance folder name (writes plugdev.yml)")
   .action(async (opts: { instance?: string }) => {
     process.exit(await runSetup(process.cwd(), opts));
+  });
+
+program
+  .command("clean")
+  .description("Remove .plugdev/run worlds or the whole run folder")
+  .option("--worlds", "Remove world folders only (default)")
+  .option("--all", "Remove entire .plugdev/run (keeps ~/.plugdev cache)")
+  .option("--force", "Clean even if port/session looks busy")
+  .option("--port <n>", "Game port to check", (v) => parseInt(v, 10))
+  .action(async (opts: { worlds?: boolean; all?: boolean; force?: boolean; port?: number }) => {
+    process.exit(
+      await runClean(process.cwd(), {
+        worlds: opts.worlds ?? !opts.all,
+        all: opts.all,
+        force: opts.force,
+        port: opts.port,
+      }),
+    );
   });
 
 program

@@ -76,6 +76,11 @@ export interface PlugDevConfig {
     args?: string[];
     debugPort?: number;
   };
+  /** Dev server folder lifecycle under .plugdev/run */
+  run?: {
+    /** never (default) | on-exit | worlds */
+    cleanup?: "never" | "on-exit" | "worlds";
+  };
 }
 
 export interface ResolvedConfig {
@@ -96,6 +101,7 @@ export interface ResolvedConfig {
     reloadJava: "safe" | "restart" | "hotswap";
   };
   jvm: { memory: string; debugPort: number; args?: string[] };
+  run: { cleanup: "never" | "on-exit" | "worlds" };
   dev: PlugDevConfig["dev"];
   deps: PlugDevConfig["deps"];
   client?: PlugDevConfig["client"];
@@ -262,6 +268,12 @@ export async function loadConfig(
       memory: raw.jvm?.memory ?? "1G",
       debugPort,
       args: raw.jvm?.args,
+    },
+    run: {
+      cleanup:
+        raw.run?.cleanup === "on-exit" || raw.run?.cleanup === "worlds"
+          ? raw.run.cleanup
+          : "never",
     },
     dev: raw.dev,
     deps: (raw.deps ?? []).filter((d) => d.enabled !== false),

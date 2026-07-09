@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.5 — 2026-07-09
+
+### Dual bins + run lifecycle
+
+- Global bins: **`plug`** and **`plugdev`** (same CLI)
+- Install UX: `npm i -g @plugdev/cli` then `plug run`
+- `run.cleanup`: `never` (default) | `on-exit` | `worlds`
+- `plug clean` / `plugdev clean` (`--worlds`, `--all`, `--force`)
+- Init/setup hints prefer global `plug` commands over `npm run dev`
+
 ## 0.7.4 — 2026-07-09
 
 ### Spawn, auth, speed, install

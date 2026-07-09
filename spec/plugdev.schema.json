@@ -133,6 +133,18 @@
       },
       "additionalProperties": false
     },
+    "runConfig": {
+      "type": "object",
+      "properties": {
+        "cleanup": {
+          "type": "string",
+          "enum": ["never", "on-exit", "worlds"],
+          "default": "never",
+          "description": "never=keep .plugdev/run (fast restarts). on-exit=delete run dir on stop. worlds=wipe world folders each start/exit."
+        }
+      },
+      "additionalProperties": false
+    },
     "pluginConfig": {
       "type": "object",
       "required": ["type"],
@@ -169,7 +181,8 @@
           "items": { "$ref": "#/$defs/dependency" }
         },
         "client": { "$ref": "#/$defs/clientConfig" },
-        "jvm": { "$ref": "#/$defs/jvmConfig" }
+        "jvm": { "$ref": "#/$defs/jvmConfig" },
+        "run": { "$ref": "#/$defs/runConfig" }
       },
       "additionalProperties": false
     },

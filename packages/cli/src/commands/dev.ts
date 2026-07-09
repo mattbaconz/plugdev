@@ -13,6 +13,7 @@ import {
   writeReloadTrigger,
   resolveWorldType,
 } from "../cache/run-template.js";
+import { applyExitCleanup, applyStartWorldCleanup } from "../cache/run-cleanup.js";
 import { runGradleBuild, deployPluginJar, deployBootstrapJar, runModGradle } from "../build/gradle.js";
 import { runMavenBuild } from "../build/maven.js";
 import {
@@ -233,6 +234,8 @@ async function runPluginDev(
   const runDir = await prepareRunDirectory(cwd, config);
   phase("Prepare dev server (.plugdev/run)");
 
+  await applyStartWorldCleanup(cwd, config.run.cleanup);
+
   const serverJar = await copyPaperToRun(runDir, serverJarInfo.jarPath);
   const pluginsDir = join(runDir, "plugins");
   const bootstrap = await resolveBootstrapJar();
@@ -343,10 +346,12 @@ async function runPluginDev(
       currentProc?.on("exit", () => resolve());
     });
     closeWatcher?.();
+    await applyExitCleanup(cwd, config.run.cleanup);
     return 0;
   } catch (e) {
     closeWatcher?.();
     if (currentProc) await stopPaperServer(currentProc);
+    await applyExitCleanup(cwd, config.run.cleanup);
     return handleDevError(e, debug);
   }
 }

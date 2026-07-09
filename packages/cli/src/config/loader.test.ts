@@ -48,9 +48,26 @@ test("loadConfig filters disabled deps", async () => {
   assert.deepEqual(config.deps, []);
 });
 
-test("loadConfig defaults watch reload to safe", async () => {
+test("loadConfig defaults run.cleanup to never", async () => {
   const config = await loadConfig("/tmp", baseProject, {});
-  assert.equal(config.watch.reloadJava, "safe");
+  assert.equal(config.run.cleanup, "never");
+});
+
+test("loadConfig reads run.cleanup on-exit", async () => {
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "plugdev-cfg-run-"));
+  try {
+    await writeFile(
+      join(dir, "plugdev.yml"),
+      `type: plugin\nserver: paper\nversion: "1.21.4"\nrun:\n  cleanup: on-exit\n`,
+    );
+    const config = await loadConfig(dir, baseProject, {});
+    assert.equal(config.run.cleanup, "on-exit");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("loadConfig maven module defaults jarPattern to module/target", async () => {
