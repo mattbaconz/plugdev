@@ -48,13 +48,32 @@ npm install
 npm run dev
 ```
 
-`plugdev setup` (or `init --setup`) downloads Paper and the embedded Minecraft client to `~/.plugdev/` so first `plugdev run` is fast. No Prism required — `client.launcher: auto` falls back to the embedded client.
+`plugdev setup` (or `init --setup`) downloads Paper, the embedded Minecraft client, and **ViaVersion / ViaBackwards / ViaRewind** to `~/.plugdev/` so first `plugdev run` is fast. New projects get those Via* deps in `plugdev.yml` by default — newer clients (e.g. Prism FO 26.1.2) can join an older Paper server.
+
+### Use your existing Prism instance
+
+```bash
+plugdev client list
+plugdev setup --instance "FO 26.1.2"
+npm run dev
+```
+
+Or set in `plugdev.yml`:
+
+```yaml
+client:
+  launcher: prism
+  instance: "FO 26.1.2"   # folder name under Prism instances/
+  offlineName: DevPlayer
+```
+
+With Via* installed, version mismatch is expected and allowed. No Prism required — `client.launcher: auto` falls back to the embedded client when no launcher is found.
 
 ## The magical demo
 
 1. Open a Paper plugin project (Gradle with `gradlew`, or Maven with `pom.xml` / `mvnw`).
 2. Run `plugdev run` (or `plugdev demo --quiet` for recordings).
-3. PlugDev detects the project, downloads/caches Paper, builds your JAR, starts a local server at `.plugdev/run`, and opens Minecraft to join `localhost:25565`.
+3. PlugDev detects the project, downloads/caches Paper + Via*, builds your JAR, starts a local server at `.plugdev/run`, and opens Minecraft to join `localhost:25565`.
 4. Edit Java source under `src/` and save — PlugDev rebuilds and triggers a safe reload via the bootstrap plugin.
 
 No manual JAR copying. No manual Direct Connect.
@@ -79,11 +98,12 @@ Multi-module reactors: set `build.module` in `plugdev.yml` (runs `mvn -pl <modul
 | `plugdev server logs` | Tail `latest.log` |
 | `plugdev doctor` | Detect project + toolchain |
 | `plugdev init` | Create `plugdev.yml` + `package.json` scripts |
-| `plugdev setup` | Prefetch Paper + Minecraft client; provision Prism if found |
+| `plugdev setup` | Prefetch Paper + Via* + client; `--instance` picks Prism |
+| `plugdev client list` | List Prism/MultiMC instances (folder id + MC version) |
 | `plugdev open --client` | Launch MC client |
 | `plugdev cache status` | Show `~/.plugdev/` sizes |
 | `plugdev cache prefetch` | Warm server or client cache (`--client`, `--version`) |
-| `plugdev deps add essentials` | Install preset test dependency |
+| `plugdev deps add viaversion` | Install preset (also writes `plugdev.yml`) |
 
 ### Global flags
 
@@ -131,6 +151,6 @@ npm org: **`@plugdev`** (`@plugdev/cli`, `@plugdev/mcp`).
 
 ## Status
 
-**v0.5.0** — Trust & Reliability: hardened safe reload, Folia warnings, doctor bootstrap/Spigot/Folia checks, CI reload smoke + Maven fixture coverage.
+**v0.7.0** — Via* by default + Prism instance picker (`client list`, `setup --instance`, Via-aware auto launch).
 
-Previous: **v0.4.3** — in-place download progress. **v0.4.2** — init adds local CLI dep. **v0.4.1** — Easy Setup.
+Previous: **v0.6.1** — Maven multi-module + Windows UX. **v0.5.0** — Trust & Reliability.

@@ -9,7 +9,7 @@ import { runSetup } from "./commands/setup.js";
 import { runDev } from "./commands/dev.js";
 import { runDemo } from "./commands/demo.js";
 import { runOpen } from "./commands/open.js";
-import { runClientSetup, runClientDetect } from "./commands/client.js";
+import { runClientSetup, runClientDetect, runClientList } from "./commands/client.js";
 import { runNetwork } from "./commands/network.js";
 import { runBuild } from "./commands/build-cmd.js";
 import { runSync } from "./commands/sync-cmd.js";
@@ -105,9 +105,10 @@ program
 
 program
   .command("setup")
-  .description("Prefetch server + client and provision Prism instance")
-  .action(async () => {
-    process.exit(await runSetup(process.cwd()));
+  .description("Prefetch server + Via* + client; optionally pick Prism instance")
+  .option("--instance <id>", "Prism/MultiMC instance folder name (writes plugdev.yml)")
+  .action(async (opts: { instance?: string }) => {
+    process.exit(await runSetup(process.cwd(), opts));
   });
 
 program
@@ -164,11 +165,19 @@ clientCmd
   });
 
 clientCmd
+  .command("list")
+  .description("List Prism/MultiMC instances (folder id + MC version)")
+  .action(async () => {
+    process.exit(await runClientList(process.cwd()));
+  });
+
+clientCmd
   .command("setup")
   .description("Provision and validate Prism instance for this MC version")
   .option("--force", "Reprovision instance mmc-pack.json")
   .option("--download", "Hint to launch instance in Prism for asset download")
-  .action(async (opts: { force?: boolean; download?: boolean }) => {
+  .option("--instance <id>", "Use this instance and write plugdev.yml")
+  .action(async (opts: { force?: boolean; download?: boolean; instance?: string }) => {
     process.exit(await runClientSetup(process.cwd(), opts));
   });
 

@@ -178,6 +178,23 @@ export async function runDepsAdd(
 
   await copyFile(jar, join(pluginsDir, jar.split(/[/\\]/).pop()!));
   success(`Installed ${label}`);
+
+  const { appendDepToYml } = await import("../deps/config-write.js");
+  const entry =
+    source === "url"
+      ? { name, source: "url" as const, url: opts.url }
+      : source === "modrinth"
+        ? { name, source: "modrinth" as const, slug: name, version: opts.version }
+        : {
+            name,
+            source: "hangar" as const,
+            version: opts.version,
+          };
+  const wrote = await appendDepToYml(cwd, entry);
+  if (wrote) {
+    info("Added to plugdev.yml deps");
+  }
+
   return 0;
 }
 

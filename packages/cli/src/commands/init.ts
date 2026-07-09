@@ -34,6 +34,21 @@ dev:
   peaceful: true
   onlineMode: false
 
+# Cross-version client join (newer MC → this Paper version)
+deps:
+  - name: ViaVersion
+    source: hangar
+    author: ViaVersion
+    slug: ViaVersion
+  - name: ViaBackwards
+    source: hangar
+    author: ViaVersion
+    slug: ViaBackwards
+  - name: ViaRewind
+    source: hangar
+    author: ViaVersion
+    slug: ViaRewind
+
 watch:
   paths:
     - src/
@@ -67,6 +82,21 @@ dev:
   op: true
   peaceful: true
   onlineMode: false
+
+# Cross-version client join (newer MC → this Paper version)
+deps:
+  - name: ViaVersion
+    source: hangar
+    author: ViaVersion
+    slug: ViaVersion
+  - name: ViaBackwards
+    source: hangar
+    author: ViaVersion
+    slug: ViaBackwards
+  - name: ViaRewind
+    source: hangar
+    author: ViaVersion
+    slug: ViaRewind
 
 watch:
   paths:

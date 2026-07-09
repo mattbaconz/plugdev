@@ -114,7 +114,9 @@ export async function ensureInstance(
     warn(
       `Instance "${instanceId}" is Minecraft ${instanceMcVersion}, but server uses ${mcVersion}.`,
     );
-    warn(`Run: plugdev client setup --force  (or recreate instance in Prism)`);
+    warn(
+      `With Via* deps this is OK. To match versions: plugdev client setup --force (overwrites instance).`,
+    );
   }
 
   const manifest = await readManifest();

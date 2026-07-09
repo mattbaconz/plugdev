@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.0 — 2026-07-09
+
+### Via* defaults + easy Prism client
+
+- `plugdev init` writes ViaVersion / ViaBackwards / ViaRewind into `deps:`
+- `plugdev setup` prefetches Via* into `~/.plugdev/deps/` (and Paper + client)
+- Boot installs missing deps every time (not first-boot-only)
+- Presets: `viaversion`, `viabackwards`, `viarewind`
+- `plugdev deps add` appends to `plugdev.yml`
+- `plugdev client list` — Prism/MultiMC instances (folder id, MC version, last launch)
+- `plugdev setup --instance "FO 26.1.2"` / `client setup --instance` writes `client.*` to yml
+- Via*-aware `auto` launch: mismatched Prism instances (e.g. 26.1.2 → Paper 1.20.6) are allowed
+- Recently-played Prism instance used when `client.instance` unset and Via* present
+
 ## 0.6.1 — 2026-07-09
 
 ### Multi-module Maven + UX

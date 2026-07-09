@@ -1,11 +1,13 @@
 import type { ResolvedConfig } from "../config/loader.js";
 import { copyToClipboard } from "./clipboard.js";
-import { defaultInstanceId } from "./detect.js";
-import { resolveAdapter } from "./adapters/registry.js";
+import { defaultInstanceId, detectLauncher } from "./detect.js";
+import { resolveAdapter, resolveInstanceId } from "./adapters/registry.js";
 import { embeddedAdapter } from "./adapters/embedded.js";
 import { info, success, warn, phase } from "../util/log.js";
 import { waitForPortOpen } from "../util/port.js";
 import { isEmbeddedClientCached } from "./prefetch.js";
+import { hasViaCompatDeps } from "../deps/presets.js";
+import { readInstanceMcVersion } from "./detect.js";
 
 import type { ClientLauncherMode } from "./adapters/types.js";
 import type { ClientAdapterContext, LauncherAdapter } from "./adapters/types.js";
@@ -79,7 +81,28 @@ export async function launchClient(opts: LaunchClientOptions): Promise<void> {
     return;
   }
 
-  const instanceId = client?.instance ?? defaultInstanceId(opts.config.version);
+  let instanceId = client?.instance ?? defaultInstanceId(opts.config.version);
+  if (adapter.id === "prism" || adapter.id === "multimc") {
+    const prefer =
+      mode === "prism" || mode === "multimc" ? mode : ("auto" as const);
+    const legacy = await detectLauncher(prefer, client);
+    if (legacy) {
+      instanceId = await resolveInstanceId(ctx, legacy);
+      const mc = await readInstanceMcVersion(legacy, instanceId);
+      if (mc && mc !== opts.config.version) {
+        if (hasViaCompatDeps(opts.config.deps)) {
+          warn(
+            `Client MC ${mc} ≠ server ${opts.config.version} — joining via ViaVersion`,
+          );
+        } else {
+          warn(
+            `Client MC ${mc} ≠ server ${opts.config.version} — add Via* deps or match versions`,
+          );
+        }
+      }
+    }
+  }
+
   const offlineName = client?.offlineName ?? "DevPlayer";
 
   const labelFor = async (a: LauncherAdapter) =>

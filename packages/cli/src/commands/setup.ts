@@ -9,11 +9,15 @@ import {
   instanceExists,
 } from "../client/detect.js";
 import { ensureInstance } from "../client/instance.js";
+import { listLauncherInstances, findRecentlyPlayedInstance } from "../client/instances-list.js";
 import {
   embeddedClientDir,
   isEmbeddedClientCached,
   prefetchEmbeddedClient,
 } from "../client/prefetch.js";
+import { DEFAULT_COMPAT_DEPS } from "../deps/presets.js";
+import { prefetchDeps } from "../deps/hangar.js";
+import { writeClientInstanceToYml } from "../deps/config-write.js";
 import { banner, phase, info, success, warn } from "../util/log.js";
 import { createDownloadProgress, endDownloadProgress } from "../util/progress.js";
 import { requireJava21, checkGradle, checkMaven } from "../util/tools.js";
@@ -34,7 +38,10 @@ function serverDisplayName(server: string): string {
   }
 }
 
-export async function runSetup(cwd: string): Promise<number> {
+export async function runSetup(
+  cwd: string,
+  opts: { instance?: string } = {},
+): Promise<number> {
   banner("setup");
 
   const project = await detectProject(cwd);
@@ -100,16 +107,61 @@ export async function runSetup(cwd: string): Promise<number> {
     phase(`Downloaded Minecraft client ${config.version}`);
   }
 
+  // Prefetch Via* (and any configured deps) into ~/.plugdev/deps
+  const depsToPrefetch =
+    config.deps && config.deps.length > 0 ? config.deps : DEFAULT_COMPAT_DEPS;
+  phase("Prefetch Via* compat plugins", "active");
+  try {
+    await prefetchDeps(depsToPrefetch, config.server, config.version);
+    phase("Prefetch Via* compat plugins");
+  } catch (err) {
+    warn(
+      `Via* prefetch failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    warn("You can retry later with: plugdev deps add viaversion");
+  }
+
   const launcher = await detectLauncher("auto", config.client);
+  let resolvedInstance =
+    opts.instance ?? config.client?.instance ?? defaultInstanceId(config.version);
+
   if (launcher) {
-    const instanceId =
-      config.client?.instance ?? defaultInstanceId(config.version);
-    if (!(await instanceExists(launcher, instanceId))) {
-      phase(`Provision ${launcher.type} instance ${instanceId}`, "active");
-      await ensureInstance(launcher, config.version, instanceId);
-      phase(`Provision ${launcher.type} instance ${instanceId}`);
+    if (opts.instance) {
+      const wrote = await writeClientInstanceToYml(cwd, {
+        launcher: launcher.type,
+        instance: opts.instance,
+      });
+      if (wrote) {
+        success(`Wrote client.instance: "${opts.instance}" to plugdev.yml`);
+      }
+      resolvedInstance = opts.instance;
+    } else if (!config.client?.instance) {
+      const recent = await findRecentlyPlayedInstance(launcher);
+      const list = await listLauncherInstances(launcher);
+      if (list.length > 0) {
+        info("");
+        info("Prism instances (use --instance to pick):");
+        for (const inst of list.slice(0, 8)) {
+          const tag = recent?.id === inst.id ? " (recent)" : "";
+          info(`  - "${inst.id}"  MC ${inst.mcVersion ?? "?"}${tag}`);
+        }
+        info(`Example: plugdev setup --instance "${list[0].id}"`);
+        info("Or: plugdev client list");
+      }
+    }
+
+    if (!(await instanceExists(launcher, resolvedInstance))) {
+      // Only auto-provision plugdev-* defaults, not user FO instances
+      if (resolvedInstance.startsWith("plugdev-")) {
+        phase(`Provision ${launcher.type} instance ${resolvedInstance}`, "active");
+        await ensureInstance(launcher, config.version, resolvedInstance);
+        phase(`Provision ${launcher.type} instance ${resolvedInstance}`);
+      } else {
+        warn(`Instance "${resolvedInstance}" not found under ${launcher.dataDir}/instances`);
+        info("Run: plugdev client list");
+      }
     } else {
-      phase(`${launcher.type} instance ${instanceId} ready`);
+      phase(`${launcher.type} instance ${resolvedInstance} ready`);
     }
   } else {
     phase("Client: embedded (no Prism/MultiMC)");
@@ -130,6 +182,7 @@ export async function runSetup(cwd: string): Promise<number> {
         serverJar: join(serversCacheDir(config.version, serverProject), serverJar.jarName),
         clientCache: embeddedClientDir(),
         launcher: launcher?.type ?? "embedded",
+        instance: resolvedInstance,
       },
     });
   }

@@ -100,9 +100,60 @@ export async function downloadUrlPlugin(url: string, name: string): Promise<stri
   return dest;
 }
 
-async function installJarToPlugins(jar: string, pluginsDir: string): Promise<void> {
+async function installJarToPlugins(jar: string, pluginsDir: string): Promise<boolean> {
   const fileName = jar.split(/[/\\]/).pop()!;
-  await copyFile(jar, join(pluginsDir, fileName));
+  const dest = join(pluginsDir, fileName);
+  try {
+    await access(dest, constants.F_OK);
+    return false; // already present
+  } catch {
+    await copyFile(jar, dest);
+    return true;
+  }
+}
+
+/** Prefetch Hangar deps into ~/.plugdev/deps (no plugins/ copy). */
+export async function prefetchDeps(
+  deps: Array<{
+    name: string;
+    enabled?: boolean;
+    source?: "hangar" | "modrinth" | "url";
+    version?: string;
+    url?: string;
+    author?: string;
+    slug?: string;
+  }>,
+  server = "paper",
+  mcVersion = "1.21.4",
+): Promise<void> {
+  const platform = hangarPlatform(server);
+  for (const dep of deps) {
+    if (dep.enabled === false) continue;
+    const source = dep.source ?? "hangar";
+    if (source === "url") {
+      if (!dep.url) continue;
+      await downloadUrlPlugin(dep.url, dep.name);
+      continue;
+    }
+    if (source === "modrinth") {
+      const slug = dep.slug ?? dep.name;
+      await downloadModrinthPlugin(slug, mcVersion, dep.version, server);
+      continue;
+    }
+    let author = dep.author;
+    let slug = dep.slug;
+    let version = dep.version;
+    if (!author || !slug) {
+      const resolved = await resolveHangarDep(dep.name, dep.version, {
+        author: dep.author,
+        slug: dep.slug,
+      });
+      author = resolved.author;
+      slug = resolved.slug;
+      version = resolved.version;
+    }
+    await downloadHangarPlugin(author!, slug!, version!, platform);
+  }
 }
 
 export async function installDeps(
@@ -120,6 +171,7 @@ export async function installDeps(
   mcVersion = "1.21.4",
 ): Promise<void> {
   const platform = hangarPlatform(server);
+  await mkdir(pluginsDir, { recursive: true });
 
   for (const dep of deps) {
     if (dep.enabled === false) continue;

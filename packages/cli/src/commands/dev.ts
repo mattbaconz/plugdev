@@ -256,8 +256,11 @@ async function runPluginDev(
     );
     await deployBootstrapJar(bootstrap, pluginsDir);
 
-    if (first && config.deps?.length) {
+    // Install missing deps on every boot (skip JARs already in plugins/)
+    if (config.deps?.length) {
+      if (first) phase("Install compat deps (Via*)", "active");
       await installDeps(pluginsDir, config.deps, config.server, config.version);
+      if (first) phase("Install compat deps (Via*)");
     }
 
     await writeReloadTrigger(cwd, [devJar]);
