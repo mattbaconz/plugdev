@@ -21,7 +21,7 @@ build:
 
 client:
   launcher: auto
-  instance: plugdev-{{version}}
+  offline: false
   offlineName: DevPlayer
 
 jvm:
@@ -70,7 +70,7 @@ build:
 
 client:
   launcher: auto
-  instance: plugdev-{{version}}
+  offline: false
   offlineName: DevPlayer
 
 jvm:

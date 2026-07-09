@@ -13,6 +13,9 @@ export interface JavaProcessOptions {
   debugPort?: number;
   pluginName?: string;
   readyPattern?: RegExp;
+  /** Extra JVM flags (before -jar), from plugdev.yml jvm.args */
+  jvmArgs?: string[];
+  /** Args after the server JAR (default: nogui) */
   args?: string[];
   logMode?: LogMode;
   background?: boolean;
@@ -42,7 +45,10 @@ export function startJavaProcess(
 ): ServerProcess {
   const logMode = opts.logMode ?? "verbose";
   const logRing: string[] = [];
-  const args = [`-Xmx${memory}`, "-jar", serverJar, ...(opts.args ?? ["nogui"])];
+  // JVM flags first, then -jar, then server args (nogui)
+  const jvmExtra = opts.jvmArgs ?? [];
+  const serverArgs = opts.args ?? ["nogui"];
+  const args = [`-Xmx${memory}`, ...jvmExtra, "-jar", serverJar, ...serverArgs];
   if (opts.debugPort) {
     args.unshift(
       `-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:${opts.debugPort}`,
@@ -139,12 +145,14 @@ export function startPaperServer(
   pluginName?: string,
   logMode: LogMode = "verbose",
   background = false,
+  jvmArgs?: string[],
 ): ServerProcess {
   return startJavaProcess(runDir, serverJar, memory, {
     debugPort,
     pluginName,
     logMode,
     background,
+    jvmArgs,
     readyPattern: /Done \(|Timings Reset/,
     args: ["nogui"],
   });
@@ -187,10 +195,31 @@ export function attachMultiShutdown(procs: ChildProcess[]): void {
   process.on("SIGTERM", shutdown);
 }
 
-export function printReadyBanner(port: number, pluginName?: string): void {
+export function printReadyBanner(
+  port: number,
+  pluginName?: string,
+  opts?: {
+    worldType?: string;
+    gamemode?: string;
+    peaceful?: boolean;
+    onlineMode?: boolean;
+    op?: boolean;
+  },
+): void {
   success("Server ready");
   if (pluginName) success(`Plugin loaded: ${pluginName}`);
-  success("World: flat, creative, peaceful");
-  success("You are op (offline mode)");
+  const world = opts?.worldType ?? "flat";
+  const gamemode = opts?.gamemode ?? "creative";
+  const difficulty = opts?.peaceful === false ? "easy" : "peaceful";
+  success(`World: ${world}, ${gamemode}, ${difficulty}`);
+  if (opts?.op !== false) {
+    success(
+      opts?.onlineMode
+        ? "You are op (online mode)"
+        : "You are op (offline mode)",
+    );
+  }
   info(`Join: localhost:${port}`);
+  info("Tip: first boot remaps plugins (~10–30s); later boots are much faster.");
+  info("Ctrl+C stops the server — closing Minecraft does not.");
 }

@@ -9,7 +9,6 @@ import {
   instanceExists,
 } from "../client/detect.js";
 import { ensureInstance } from "../client/instance.js";
-import { listLauncherInstances, findRecentlyPlayedInstance } from "../client/instances-list.js";
 import {
   embeddedClientDir,
   isEmbeddedClientCached,
@@ -72,14 +71,21 @@ export async function runSetup(
   const serverCached = await isServerJarCached(config.version, serverProject);
   const clientCached = await isEmbeddedClientCached(config.version);
   const launcherEarly = await detectLauncher("auto", config.client);
+  const wantsExternal =
+    Boolean(opts.instance) ||
+    Boolean(config.client?.instance) ||
+    config.client?.launcher === "prism" ||
+    config.client?.launcher === "multimc";
   const configuredInstance =
-    opts.instance ?? config.client?.instance ?? defaultInstanceId(config.version);
+    opts.instance ??
+    config.client?.instance ??
+    defaultInstanceId(config.version);
   const usingExternalClient =
-    (config.client?.launcher === "prism" ||
-      config.client?.launcher === "multimc" ||
-      Boolean(opts.instance)) &&
+    wantsExternal &&
     launcherEarly !== undefined &&
-    (await instanceExists(launcherEarly, configuredInstance));
+    (Boolean(opts.instance) ||
+      Boolean(config.client?.instance) ||
+      (await instanceExists(launcherEarly, configuredInstance)));
 
   let serverJar: Awaited<ReturnType<typeof ensureServerJar>>;
 
@@ -119,7 +125,9 @@ export async function runSetup(
       warn(
         `Embedded client download failed: ${err instanceof Error ? err.message : String(err)}`,
       );
-      warn("OK if you use Prism — set client.instance or: plugdev setup --instance \"...\"");
+      warn(
+        'OK if you use Prism — plugdev setup --instance "YourInstance"',
+      );
     } finally {
       endDownloadProgress();
     }
@@ -142,7 +150,7 @@ export async function runSetup(
   const launcher = launcherEarly;
   let resolvedInstance = configuredInstance;
 
-  if (launcher) {
+  if (wantsExternal && launcher) {
     if (opts.instance) {
       const wrote = await writeClientInstanceToYml(cwd, {
         launcher: launcher.type,
@@ -152,36 +160,29 @@ export async function runSetup(
         success(`Wrote client.instance: "${opts.instance}" to plugdev.yml`);
       }
       resolvedInstance = opts.instance;
-    } else if (!config.client?.instance) {
-      const recent = await findRecentlyPlayedInstance(launcher);
-      const list = await listLauncherInstances(launcher);
-      if (list.length > 0) {
-        info("");
-        info("Prism instances (use --instance to pick):");
-        for (const inst of list.slice(0, 8)) {
-          const tag = recent?.id === inst.id ? " (recent)" : "";
-          info(`  - "${inst.id}"  MC ${inst.mcVersion ?? "?"}${tag}`);
-        }
-        info(`Example: plugdev setup --instance "${list[0].id}"`);
-        info("Or: plugdev client list");
-      }
     }
 
     if (!(await instanceExists(launcher, resolvedInstance))) {
-      // Only auto-provision plugdev-* defaults, not user FO instances
       if (resolvedInstance.startsWith("plugdev-")) {
         phase(`Provision ${launcher.type} instance ${resolvedInstance}`, "active");
         await ensureInstance(launcher, config.version, resolvedInstance);
         phase(`Provision ${launcher.type} instance ${resolvedInstance}`);
       } else {
-        warn(`Instance "${resolvedInstance}" not found under ${launcher.dataDir}/instances`);
+        warn(
+          `Instance "${resolvedInstance}" not found under ${launcher.dataDir}/instances`,
+        );
         info("Run: plugdev client list");
       }
     } else {
       phase(`${launcher.type} instance ${resolvedInstance} ready`);
     }
   } else {
-    phase("Client: embedded (no Prism/MultiMC)");
+    phase("Client: embedded (matches server MC version)");
+    if (launcher) {
+      info(
+        'Optional Prism: plugdev setup --instance "FO 26.1.2" (uses Microsoft account)',
+      );
+    }
   }
 
   info("");

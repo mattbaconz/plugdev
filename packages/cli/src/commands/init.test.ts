@@ -24,12 +24,14 @@ describe("runInit", () => {
       assert.equal(code, 0);
 
       const yml = await readFile(join(dir, "plugdev.yml"), "utf8");
-      assert.match(yml, /instance: plugdev-1\.21\.4/);
+      assert.match(yml, /launcher: auto/);
+      assert.match(yml, /offline: false/);
       assert.doesNotMatch(yml, /\{\{version\}\}/);
       assert.match(yml, /world: void/);
       assert.match(yml, /ViaVersion/);
       assert.match(yml, /ViaBackwards/);
       assert.match(yml, /ViaRewind/);
+      assert.doesNotMatch(yml, /instance: plugdev-/);
 
       const pkg = JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as {
         scripts: Record<string, string>;

@@ -97,9 +97,15 @@
           "type": "string",
           "description": "Prism/MultiMC instance folder name, e.g. plugdev-1.21.4"
         },
+        "offline": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, Prism/MultiMC uses --offline offlineName. Default false uses the signed-in Microsoft account."
+        },
         "offlineName": {
           "type": "string",
-          "default": "DevPlayer"
+          "default": "DevPlayer",
+          "description": "Offline username when client.offline is true (also used by embedded client)"
         },
         "joinOnReady": {
           "type": "boolean",

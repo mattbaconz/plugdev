@@ -1,6 +1,6 @@
 {
   "name": "@plugdev/cli",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "description": "npm run dev for Minecraft plugins and mods",
   "author": "PLUG Labs",
   "homepage": "https://github.com/mattbaconz/plugdev#readme",

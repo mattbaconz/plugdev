@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.4 — 2026-07-09
+
+### Spawn, auth, speed, install
+
+- Void worlds include a solid platform (no "fell out of the world"); regenerate worlds when `dev.world` changes
+- Bootstrap `api-version: 1.20` — loads on Paper 1.20.x and 1.21+
+- Default client is **embedded** matching server MC (`launcher: auto`); Prism FO is opt-in via `--instance`
+- Prism/MultiMC uses Microsoft account by default (`client.offline: false`); `--offline` only when `offline: true`
+- Wire `jvm.args` from `plugdev.yml` into the Paper process
+- Ready banner shows real world type; tips for first-boot remap + Ctrl+C
+- Clearer install path: `npx @plugdev/cli@latest init --setup`
+
 ## 0.7.3 — 2026-07-09
 
 - Hangar `/latest` may be plain text (`5.10.0`) — parse text/JSON robustly so Via* prefetch works

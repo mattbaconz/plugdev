@@ -11,6 +11,7 @@ import {
   prepareRunDirectory,
   copyPaperToRun,
   writeReloadTrigger,
+  resolveWorldType,
 } from "../cache/run-template.js";
 import { runGradleBuild, deployPluginJar, deployBootstrapJar, runModGradle } from "../build/gradle.js";
 import { runMavenBuild } from "../build/maven.js";
@@ -274,6 +275,8 @@ async function runPluginDev(
       config.jvm.debugPort > 0 ? config.jvm.debugPort : undefined,
       project.pluginName,
       logMode,
+      false,
+      config.jvm.args,
     );
     currentProc = proc;
     attachShutdownHooks(proc);
@@ -294,7 +297,13 @@ async function runPluginDev(
         },
       });
     } else {
-      printReadyBanner(config.port, project.pluginName);
+      printReadyBanner(config.port, project.pluginName, {
+        worldType: resolveWorldType(config),
+        gamemode: config.dev?.gamemode ?? "creative",
+        peaceful: config.dev?.peaceful !== false,
+        onlineMode: config.dev?.onlineMode === true,
+        op: config.dev?.op !== false,
+      });
     }
 
     if (shouldJoinClient(overrides, config)) {

@@ -1,13 +1,24 @@
-import { mkdir, writeFile, access, symlink, cp } from "node:fs/promises";
+import { mkdir, writeFile, access, symlink, cp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { constants } from "node:fs";
 import { projectRunDir } from "../paths.js";
 import { ensurePaperDevTemplate, copyTemplateFiles, seedWorldCache } from "./templates.js";
 import type { ResolvedConfig } from "../config/loader.js";
+import { info } from "../util/log.js";
 
 export interface RconConfig {
   rconPort: number;
   rconPassword: string;
+}
+
+const WORLD_TYPE_MARKER = ".plugdev-world-type";
+
+/** Normalized world type used for marker + banner. */
+export function resolveWorldType(config: ResolvedConfig): "void" | "flat" | "default" {
+  const w = config.dev?.world;
+  if (w === "void") return "void";
+  if (w === "default") return "default";
+  return "flat";
 }
 
 function buildServerProperties(config: ResolvedConfig, rcon?: RconConfig): string {
@@ -17,6 +28,7 @@ function buildServerProperties(config: ResolvedConfig, rcon?: RconConfig): strin
   const onlineMode = dev.onlineMode === true ? "true" : "false";
 
   let levelType = "minecraft\\:flat";
+  // Default flat: solid plains platform
   let generatorSettings =
     '{"biome":"minecraft:plains","layers":[{"block":"minecraft:bedrock","height":1},{"block":"minecraft:dirt","height":2},{"block":"minecraft:grass_block","height":1}],"structures":{"structures":{}}}';
 
@@ -24,9 +36,10 @@ function buildServerProperties(config: ResolvedConfig, rcon?: RconConfig): strin
     levelType = "minecraft\\:normal";
     generatorSettings = "";
   } else if (dev.world === "void") {
+    // Void biome + thin solid platform so players do not fall out of the world
     levelType = "minecraft\\:flat";
     generatorSettings =
-      '{"biome":"minecraft:the_void","layers":[{"block":"minecraft:air","height":1}],"structures":{"structures":{}}}';
+      '{"biome":"minecraft:the_void","layers":[{"block":"minecraft:bedrock","height":1},{"block":"minecraft:stone","height":3},{"block":"minecraft:smooth_stone","height":1}],"structures":{"structures":{}}}';
   }
 
   const lines = [
@@ -56,6 +69,43 @@ function buildServerProperties(config: ResolvedConfig, rcon?: RconConfig): strin
   return lines.join("\n") + "\n";
 }
 
+async function regenerateWorldsIfTypeChanged(
+  runDir: string,
+  worldType: string,
+): Promise<void> {
+  const markerPath = join(runDir, WORLD_TYPE_MARKER);
+  let previous: string | undefined;
+  try {
+    previous = (await readFile(markerPath, "utf8")).trim();
+  } catch {
+    // no marker yet
+  }
+
+  if (previous !== undefined && previous !== worldType) {
+    info(`World type changed (${previous} → ${worldType}) — regenerating worlds`);
+    for (const name of ["world", "world_nether", "world_the_end"]) {
+      await rm(join(runDir, name), { recursive: true, force: true });
+    }
+  }
+
+  // First boot with void after air-only void: if marker missing but world exists
+  // and we're now void-with-platform, force regen once by writing marker after wipe
+  // when previous was missing and world folder exists from old air void.
+  if (previous === undefined && worldType === "void") {
+    try {
+      await access(join(runDir, "world"), constants.F_OK);
+      info("Regenerating void world with solid platform");
+      for (const name of ["world", "world_nether", "world_the_end"]) {
+        await rm(join(runDir, name), { recursive: true, force: true });
+      }
+    } catch {
+      // no existing world
+    }
+  }
+
+  await writeFile(markerPath, worldType + "\n");
+}
+
 export async function prepareRunDirectory(
   cwd: string,
   config: ResolvedConfig,
@@ -72,8 +122,11 @@ export async function prepareRunDirectoryAt(
   const pluginsDir = join(runDir, "plugins");
   await mkdir(pluginsDir, { recursive: true });
 
-  const worldType = config.dev?.world === "void" ? "void" : "flat-creative";
-  await seedWorldCache(worldType);
+  const worldType = resolveWorldType(config);
+  await regenerateWorldsIfTypeChanged(runDir, worldType);
+
+  const cacheKey = worldType === "void" ? "void" : "flat-creative";
+  await seedWorldCache(cacheKey);
   const templateDir = await ensurePaperDevTemplate();
   await copyTemplateFiles(templateDir, runDir);
 

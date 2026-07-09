@@ -41,7 +41,7 @@ async function launchWithAdapter(
   mcVersion: string,
   host: string,
   port: number,
-  offlineName: string,
+  join: { offlineName?: string; useOffline: boolean },
 ): Promise<void> {
   const detected = await adapter.detect(ctx);
   if (!detected) {
@@ -49,7 +49,11 @@ async function launchWithAdapter(
   }
 
   const instance = await adapter.ensureInstance(detected, mcVersion, instanceId);
-  await adapter.launch(instance, { host, port, offlineName });
+  await adapter.launch(instance, {
+    host,
+    port,
+    offlineName: join.useOffline ? join.offlineName : undefined,
+  });
 }
 
 export async function launchClient(opts: LaunchClientOptions): Promise<void> {
@@ -103,12 +107,16 @@ export async function launchClient(opts: LaunchClientOptions): Promise<void> {
     }
   }
 
+  // Prism/MultiMC: Microsoft account by default. Offline only when client.offline: true.
+  // Embedded always uses offlineName (no MS auth in xmcl path yet).
+  const useOffline =
+    adapter.id === "embedded" || client?.offline === true;
   const offlineName = client?.offlineName ?? "DevPlayer";
 
   const labelFor = async (a: LauncherAdapter) =>
     clientPhaseLabel(
       a,
-      instanceId,
+      a.id === "embedded" ? opts.config.version : instanceId,
       a.id === "embedded" ? await isEmbeddedClientCached(opts.config.version) : false,
     );
 
@@ -122,7 +130,7 @@ export async function launchClient(opts: LaunchClientOptions): Promise<void> {
       opts.config.version,
       host,
       port,
-      offlineName,
+      { offlineName, useOffline },
     );
     phase(await labelFor(adapter));
   } catch (err) {
@@ -139,10 +147,10 @@ export async function launchClient(opts: LaunchClientOptions): Promise<void> {
           opts.config.version,
           host,
           port,
-          offlineName,
+          { offlineName, useOffline: true },
         );
         const cached = await isEmbeddedClientCached(opts.config.version);
-        phase(clientPhaseLabel(embeddedAdapter, instanceId, cached));
+        phase(clientPhaseLabel(embeddedAdapter, opts.config.version, cached));
         return;
       } catch (embeddedErr) {
         warn(

@@ -63,6 +63,7 @@ export function createExternalAdapter(
       if (join.profile) {
         args.push("--profile", join.profile);
       } else if (join.offlineName) {
+        // Only when caller opts into offline (client.offline: true)
         args.push("--offline", join.offlineName);
       }
 

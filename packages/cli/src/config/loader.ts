@@ -66,6 +66,8 @@ export interface PlugDevConfig {
     launcher?: "auto" | "prism" | "multimc" | "embedded" | "none";
     executable?: string;
     instance?: string;
+    /** When true, Prism/MultiMC launches with --offline offlineName. Default false (Microsoft account). */
+    offline?: boolean;
     offlineName?: string;
     joinOnReady?: boolean;
   };
@@ -93,7 +95,7 @@ export interface ResolvedConfig {
     debounceMs: number;
     reloadJava: "safe" | "restart" | "hotswap";
   };
-  jvm: { memory: string; debugPort: number };
+  jvm: { memory: string; debugPort: number; args?: string[] };
   dev: PlugDevConfig["dev"];
   deps: PlugDevConfig["deps"];
   client?: PlugDevConfig["client"];
@@ -259,6 +261,7 @@ export async function loadConfig(
     jvm: {
       memory: raw.jvm?.memory ?? "1G",
       debugPort,
+      args: raw.jvm?.args,
     },
     dev: raw.dev,
     deps: (raw.deps ?? []).filter((d) => d.enabled !== false),

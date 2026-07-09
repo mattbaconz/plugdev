@@ -1,7 +1,7 @@
 name: PlugDev-Bootstrap
 version: ${version}
 main: dev.plugdev.bootstrap.PlugDevBootstrap
-api-version: '1.21'
+api-version: '1.20'
 load: STARTUP
 folia-supported: true
 description: Internal PlugDev development bootstrap plugin

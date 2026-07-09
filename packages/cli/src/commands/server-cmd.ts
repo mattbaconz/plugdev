@@ -94,6 +94,7 @@ export async function runServerStart(
       project.pluginName,
       getLogMode(),
       overrides.detach !== false,
+      config.jvm.args,
     );
 
     await waitForReady;

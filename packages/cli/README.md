@@ -2,15 +2,16 @@
 
 **npm run dev for Minecraft plugins.**
 
-```bash
-npx @plugdev/cli init
+```powershell
+npx @plugdev/cli@latest init --setup
 npm install
-npm run setup
 npm run dev
 ```
 
-- Boots Paper (or Folia/Purpur) with your plugin loaded
+- Boots Paper with your plugin + Via* (cross-version joins)
+- Void world with a solid platform (no falling into nothing)
+- Embedded vanilla client matching your server MC version (fast default)
 - Watches `src/` and safe-reloads via bootstrap plugin
-- Auto-joins Minecraft — embedded client, no Prism required
+- Optional Prism: `plugdev setup --instance "YourInstance"` uses your Microsoft account
 
 Full docs: [github.com/mattbaconz/plugdev](https://github.com/mattbaconz/plugdev)

@@ -43,7 +43,7 @@ async function instanceVersionMatches(
 }
 
 /**
- * Resolve which instance id to launch.
+ * Resolve which instance id to launch for external launchers.
  * Prefer explicit config; else recently played when Via* allows mismatch;
  * else default plugdev-{version}.
  */
@@ -64,9 +64,23 @@ export async function resolveInstanceId(
   return defaultInstanceId(ctx.config.version);
 }
 
+/**
+ * auto → embedded (matching server MC) unless user opted into Prism/MultiMC
+ * via launcher: prism|multimc or client.instance.
+ */
 async function resolveAutoAdapter(
   ctx: ClientAdapterContext,
 ): Promise<LauncherAdapter> {
+  const client = ctx.config.client;
+  const wantsExternal =
+    Boolean(client?.instance) ||
+    client?.launcher === "prism" ||
+    client?.launcher === "multimc";
+
+  if (!wantsExternal) {
+    return embeddedAdapter;
+  }
+
   const viaOk = hasViaCompatDeps(ctx.config.deps);
 
   // Pass 1: external launcher with matching instance + MC version
@@ -80,7 +94,7 @@ async function resolveAutoAdapter(
       return adapter;
     }
 
-    // Via* present: allow mismatched existing instance (e.g. FO 26.1.2 → Paper 1.20.6)
+    // Via* present: allow mismatched existing instance (e.g. FO → older Paper)
     if (viaOk && (await instanceExists(legacy, instanceId))) {
       return adapter;
     }

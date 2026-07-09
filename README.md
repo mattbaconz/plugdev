@@ -1,86 +1,86 @@
 # PlugDev
 
-**Run any test server for your plugin in seconds.**
+**npm run dev for Minecraft plugins.**
 
-PlugDev boots a dev server with your plugin loaded, installs preset test dependencies, applies sane defaults (creative, void world, offline mode), watches your source for safe JAR reload, and optionally opens Minecraft to join automatically.
+Boots Paper with your plugin, Via* for cross-version joins, a safe void platform world, watches `src/` for reload, and opens a light embedded Minecraft client matching your server version.
 
-## Quick start
+## Install (easiest)
 
 Run each command on its own line (Windows PowerShell 5.1 does not support `&&`):
 
-```bash
-npx @plugdev/cli init --setup
+```powershell
+cd your-plugin
+npx @plugdev/cli@latest init --setup
 npm install
 npm run dev
 ```
 
-Or step by step:
+**What happens:** Paper + ViaVersion/ViaBackwards/ViaRewind are cached under `~/.plugdev/`. An embedded vanilla client matching your MC version joins `localhost:25565`. Edit Java under `src/` → save → safe reload.
 
-```bash
-npx @plugdev/cli init
+First boot remaps plugins (~10–30s). Later boots are much faster. **Ctrl+C** stops the server; closing Minecraft does not.
+
+### Step by step
+
+```powershell
+npx @plugdev/cli@latest init
 npm install
-npm run setup          # prefetch Paper + Minecraft client (~one-time)
-npm run dev            # or: npx @plugdev/cli run
+npm run setup
+npm run dev
 ```
 
 ### From this repo (development)
 
-```bash
+```powershell
 cd plugdev
 npm install
-npm run build          # builds CLI + bootstrap plugin (required once)
+npm run build
 
-# Record-ready demo (quiet terminal + auto-join)
 node packages/cli/dist/cli.js demo --quiet
-
-# Or from fixture
-cd test/fixtures/paper-plugin
-node ../../../packages/cli/dist/cli.js run --quiet --join
 ```
 
 > Do not use `npx @plugdev/cli` from the monorepo root — use `node packages/cli/dist/cli.js` after `npm run build`.
 
-### From npm
+## Client options
 
-```bash
-npx @plugdev/cli init --setup
-npm install
-npm run dev
-```
+**Default (`launcher: auto`):** embedded client = server MC version (fast, light).
 
-`plugdev setup` (or `init --setup`) downloads Paper, the embedded Minecraft client, and **ViaVersion / ViaBackwards / ViaRewind** to `~/.plugdev/` so first `plugdev run` is fast. New projects get those Via* deps in `plugdev.yml` by default — newer clients (e.g. Prism FO 26.1.2) can join an older Paper server.
+**Prism with your Microsoft account** (no offline DevPlayer):
 
-### Use your existing Prism instance
-
-```bash
+```powershell
 plugdev client list
 plugdev setup --instance "FO 26.1.2"
 npm run dev
 ```
 
-Or set in `plugdev.yml`:
+```yaml
+client:
+  launcher: prism
+  instance: "FO 26.1.2"
+  offline: false          # use signed-in Microsoft account
+```
+
+Force offline username on Prism:
 
 ```yaml
 client:
   launcher: prism
-  instance: "FO 26.1.2"   # folder name under Prism instances/
+  instance: "FO 26.1.2"
+  offline: true
   offlineName: DevPlayer
 ```
 
-With Via* installed, version mismatch is expected and allowed. No Prism required — `client.launcher: auto` falls back to the embedded client when no launcher is found.
+With Via* installed, a newer Prism client can join an older Paper server.
 
 ## The magical demo
 
 1. Open a Paper plugin project (Gradle with `gradlew`, or Maven with `pom.xml` / `mvnw`).
 2. Run `plugdev run` (or `plugdev demo --quiet` for recordings).
-3. PlugDev detects the project, downloads/caches Paper + Via*, builds your JAR, starts a local server at `.plugdev/run`, and opens Minecraft to join `localhost:25565`.
-4. Edit Java source under `src/` and save — PlugDev rebuilds and triggers a safe reload via the bootstrap plugin.
+3. PlugDev builds your JAR, starts `.plugdev/run`, installs Via*, opens the embedded client.
+4. Edit `src/` and save — safe reload via the bootstrap plugin.
 
 No manual JAR copying. No manual Direct Connect.
 
-Maven projects: `plugdev init` writes `build.system: maven` and `jarPattern: "target/*.jar"`.
-
-Multi-module reactors: set `build.module` in `plugdev.yml` (runs `mvn -pl <module> -am`). See [docs/plugins/maven.md](docs/plugins/maven.md) when nested locally.
+Maven: `plugdev init` writes `build.system: maven`. Multi-module: set `build.module` (runs `mvn -pl <module> -am`).
 
 ## Commands
 
@@ -90,7 +90,7 @@ Multi-module reactors: set `build.module` in `plugdev.yml` (runs `mvn -pl <modul
 | `plugdev run` | Full loop: server + watch + auto-join client |
 | `plugdev` | Build plugin, boot server, watch `src/` (no client) |
 | `plugdev build` | Build plugin JAR only |
-| `plugdev sync` | Build + sync JAR to `.plugdev/run/plugins` |
+| `plugdev sync` | Build + sync plugin JAR to `.plugdev/run/plugins` |
 | `plugdev server start` | Headless server (for agents/MCP) |
 | `plugdev server stop` | Stop running dev server |
 | `plugdev server status` | Check if server is running |
@@ -98,18 +98,17 @@ Multi-module reactors: set `build.module` in `plugdev.yml` (runs `mvn -pl <modul
 | `plugdev server logs` | Tail `latest.log` |
 | `plugdev doctor` | Detect project + toolchain |
 | `plugdev init` | Create `plugdev.yml` + `package.json` scripts |
-| `plugdev setup` | Prefetch Paper + Via* + client; `--instance` picks Prism |
-| `plugdev client list` | List Prism/MultiMC instances (folder id + MC version) |
+| `plugdev setup` | Prefetch Paper + Via* + embedded client; `--instance` picks Prism |
+| `plugdev client list` | List Prism/MultiMC instances |
 | `plugdev open --client` | Launch MC client |
 | `plugdev cache status` | Show `~/.plugdev/` sizes |
-| `plugdev cache prefetch` | Warm server or client cache (`--client`, `--version`) |
 | `plugdev deps add viaversion` | Install preset (also writes `plugdev.yml`) |
 
 ### Global flags
 
 | Flag | Description |
 |------|-------------|
-| `--quiet` | Suppress Paper logs; show PlugDev steps + reload events only |
+| `--quiet` | Suppress server logs; show PlugDev steps + reload events only |
 | `--verbose` | Full server output (default) |
 | `--json` | Structured JSON output (for MCP/agents) |
 | `--join` | Auto-join Minecraft client |
@@ -151,6 +150,6 @@ npm org: **`@plugdev`** (`@plugdev/cli`, `@plugdev/mcp`).
 
 ## Status
 
-**v0.7.0** — Via* by default + Prism instance picker (`client list`, `setup --instance`, Via-aware auto launch).
+**v0.7.4** — Void platform spawn, bootstrap on Paper 1.20+, embedded default client, Prism Microsoft account (`offline: false`).
 
-Previous: **v0.6.1** — Maven multi-module + Windows UX. **v0.5.0** — Trust & Reliability.
+Previous: **v0.7.3** — Hangar Via* prefetch. **v0.6.1** — Maven multi-module + Windows UX.

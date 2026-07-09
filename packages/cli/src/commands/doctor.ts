@@ -37,6 +37,20 @@ function serverDisplayName(server: string): string {
 async function resolveClientTier(
   config: Awaited<ReturnType<typeof loadConfig>>,
 ): Promise<{ tier: ClientTier; instanceId: string; ready: boolean }> {
+  const wantsExternal =
+    Boolean(config.client?.instance) ||
+    config.client?.launcher === "prism" ||
+    config.client?.launcher === "multimc";
+
+  if (!wantsExternal) {
+    const embeddedReady = await isEmbeddedClientCached(config.version);
+    return {
+      tier: embeddedReady ? "embedded" : "needs-setup",
+      instanceId: `embedded-${config.version}`,
+      ready: embeddedReady,
+    };
+  }
+
   const instanceId = config.client?.instance ?? defaultInstanceId(config.version);
   const launcher = await detectLauncher("auto", config.client);
 
