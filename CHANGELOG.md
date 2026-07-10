@@ -2,154 +2,159 @@
 
 ## 0.7.6 — 2026-07-09
 
-### Client fix, console, default stack
+### [fixed]
+- Embedded client launch (`gamePath` via `folder.path`)
 
-- Fix embedded client launch (`gamePath` was `undefined` via `folder.path`)
-- Interactive server console on `plug run` via RCON readline (type `op DevPlayer`, `list`, …)
-- Default deps: Via* **plus** VaultUnlocked, EssentialsX, MineConomy (still modular)
-- `plugdev agent install [--cursor|--claude|--codex|--all]` for AI tool wiring
+### [added]
+- Interactive server console on `plug run` (RCON readline)
+- Default deps: Via* + VaultUnlocked, EssentialsX, MineConomy
+- `plugdev agent install [--cursor|--claude|--codex|--all]`
 
 ## 0.7.5 — 2026-07-09
 
-### Dual bins + run lifecycle
-
-- Global bins: **`plug`** and **`plugdev`** (same CLI)
+### [added]
+- Global bins: `plug` and `plugdev` (same CLI)
 - Install UX: `npm i -g @plugdev/cli` then `plug run`
 - `run.cleanup`: `never` (default) | `on-exit` | `worlds`
 - `plug clean` / `plugdev clean` (`--worlds`, `--all`, `--force`)
-- Init/setup hints prefer global `plug` commands over `npm run dev`
+
+### [changed]
+- Init/setup hints prefer global `plug` over `npm run dev`
 
 ## 0.7.4 — 2026-07-09
 
-### Spawn, auth, speed, install
+### [added]
+- Void worlds include a solid platform; regenerate when `dev.world` changes
+- Bootstrap `api-version: 1.20` (Paper 1.20.x and 1.21+)
+- Default embedded client matching server MC (`launcher: auto`)
+- Wire `jvm.args` from `plugdev.yml` into Paper
+- Ready banner shows real world type; first-boot remap + Ctrl+C tips
 
-- Void worlds include a solid platform (no "fell out of the world"); regenerate worlds when `dev.world` changes
-- Bootstrap `api-version: 1.20` — loads on Paper 1.20.x and 1.21+
-- Default client is **embedded** matching server MC (`launcher: auto`); Prism FO is opt-in via `--instance`
-- Prism/MultiMC uses Microsoft account by default (`client.offline: false`); `--offline` only when `offline: true`
-- Wire `jvm.args` from `plugdev.yml` into the Paper process
-- Ready banner shows real world type; tips for first-boot remap + Ctrl+C
+### [changed]
+- Prism FO is opt-in via `--instance`
+- Prism/MultiMC uses Microsoft account by default (`client.offline: false`)
 - Clearer install path: `npx @plugdev/cli@latest init --setup`
 
 ## 0.7.3 — 2026-07-09
 
-- Hangar `/latest` may be plain text (`5.10.0`) — parse text/JSON robustly so Via* prefetch works
+### [fixed]
+- Hangar `/latest` plain-text responses so Via* prefetch works
 
 ## 0.7.2 — 2026-07-09
 
-- Fix Hangar `/latest` parsing (API returns a string, not `{ name }`) so Via* downloads work
-- Always resolve Hangar version when `author`/`slug` are set without `version`
+### [fixed]
+- Hangar `/latest` parsing (API returns a string, not `{ name }`)
+- Always resolve Hangar version when `author`/`slug` set without `version`
 
 ## 0.7.1 — 2026-07-09
 
-- `plugdev setup` skips embedded client download when Prism/MultiMC instance is already configured
+### [fixed]
+- `plugdev setup` skips embedded client download when Prism/MultiMC is configured
 - Embedded client download failures no longer abort setup (warn + continue)
 
 ## 0.7.0 — 2026-07-09
 
-### Via* defaults + easy Prism client
-
+### [added]
 - `plugdev init` writes ViaVersion / ViaBackwards / ViaRewind into `deps:`
-- `plugdev setup` prefetches Via* into `~/.plugdev/deps/` (and Paper + client)
-- Boot installs missing deps every time (not first-boot-only)
+- `plugdev setup` prefetches Via* into `~/.plugdev/deps/`
+- Boot installs missing deps every time
 - Presets: `viaversion`, `viabackwards`, `viarewind`
 - `plugdev deps add` appends to `plugdev.yml`
-- `plugdev client list` — Prism/MultiMC instances (folder id, MC version, last launch)
-- `plugdev setup --instance "FO 26.1.2"` / `client setup --instance` writes `client.*` to yml
-- Via*-aware `auto` launch: mismatched Prism instances (e.g. 26.1.2 → Paper 1.20.6) are allowed
-- Recently-played Prism instance used when `client.instance` unset and Via* present
+- `plugdev client list` — Prism/MultiMC instances
+- `plugdev setup --instance` / `client setup --instance` writes `client.*` to yml
+- Via*-aware `auto` launch for mismatched Prism instances
+- Recently-played Prism instance when `client.instance` unset and Via* present
 
 ## 0.6.1 — 2026-07-09
 
-### Multi-module Maven + UX
-
-- `build.module` → `mvn -pl <module> -am` (wrapper-aware); default `jarPattern` to `<module>/target/*.jar`
+### [added]
+- `build.module` → `mvn -pl <module> -am` (wrapper-aware)
+- Default `jarPattern` to `<module>/target/*.jar`
 - Doctor warns when reactor `<modules>` present without `build.module`
 - Schema: `build.module` field
-- Includes 0.6.0 Maven Paper parity + PowerShell-safe `init --setup` (see below)
+
+### [changed]
+- Includes 0.6.0 Maven Paper parity + PowerShell-safe `init --setup`
 
 ## 0.6.0 — 2026-07-09
 
-### Maven Paper parity
-
-- Config-aware Maven builds: honor `build.task` / `build.jarPattern`, prefer `mvnw` over system `mvn`
-- Robust `target/` JAR selection (exclude sources/javadoc/original; prefer shaded)
+### [added]
+- Config-aware Maven builds (`build.task` / `build.jarPattern`, prefer `mvnw`)
+- Robust `target/` JAR selection (prefer shaded; exclude sources/javadoc/original)
 - `plugdev init` writes `system: maven` for `pom.xml` projects
-- `setup` / `doctor` check Maven wrapper or `mvn`; shade + run-paper-maven hints
-- Detection: `mvnw`, `paper-api` version, `maven-shade-plugin`, `run-paper-maven-plugin` signal
+- `setup` / `doctor` Maven wrapper checks + shade / run-paper-maven hints
+- Detection: `mvnw`, `paper-api`, `maven-shade-plugin`, `run-paper-maven-plugin`
 - CI: Maven reload smoke alongside Gradle
-
-### Easier setup (Windows)
-
 - `plugdev init --setup` runs prefetch in one step
-- Next-step hints print one command per line (PowerShell 5.1-safe; no `&&`)
+
+### [changed]
+- Next-step hints print one command per line (PowerShell 5.1-safe)
 
 ## 0.5.0 — 2026-07-09
 
-### Trust & Reliability
+### [fixed]
+- Bootstrap reload hardening (stable `reload.list`, timestamped JAR names, clearer markers)
+- Reload feedback matches `[PlugDev] Loaded dev plugin:` (fewer false positives)
 
-- Bootstrap reload hardening: stable `reload.list` path, prefer stored dev plugin name for timestamped JARs, clearer `[PlugDev]` log markers for CLI/CI
-- Folia warnings in bootstrap, doctor, and `plugdev` boot (prefer restart over safe reload)
-- `plugdev doctor` checks bootstrap JAR presence; Spigot missing-JAR path + BuildTools hint; Folia support signal; shadowJar vs jarTask mismatch hint
-- Shared `resolveBootstrapJar()` for CLI + doctor + server commands
-- CI: Maven fixture doctor/build; watch→reload smoke (`npm run smoke:reload`)
-- Reload feedback matches `[PlugDev] Loaded dev plugin:` markers (fewer false positives)
+### [added]
+- Folia warnings in bootstrap, doctor, and boot
+- `plugdev doctor` bootstrap JAR / Spigot / Folia / shadowJar hints
+- Shared `resolveBootstrapJar()` for CLI + doctor + server
+- CI: Maven fixture doctor/build; watch→reload smoke
 
 ## 0.4.4 — 2026-07-09
 
-### Trust & Demo
-
+### [fixed]
 - `checkGradle` / `checkMaven` respect process exit codes
 - `plugdev doctor` only prints "Ready" when toolchain + setup are ready
 - `plugdev client setup --force` actually reprovisions instances
-- Cross-platform Prism/MultiMC detection (Windows, macOS, Linux/Flatpak)
 - `client.executable` uses correct launcher data dir (Prism vs MultiMC)
+- `init` no longer overwrites package.json scripts without `--force`
+- Schema no longer emits `format: uri` warnings
+
+### [added]
+- Cross-platform Prism/MultiMC detection (Windows, macOS, Linux/Flatpak)
 - Offline-friendly Paper cache checks via local `meta.json`
 - Parallel prefetch shows Minecraft client download feedback
-- `init` no longer overwrites existing package.json scripts without `--force`
-- `client.joinOnReady` wired for bare `plugdev` runs
+- `client.joinOnReady` for bare `plugdev` runs
 - `cache clear` requires `--servers`, `--deps`, or `--all`
 - `cache status` reports embedded client cache size
-- Schema no longer emits `format: uri` warnings
-- MCP: `plugdev_doctor`, `plugdev_setup`; hardened JSON parsing; `@plugdev/mcp@0.1.1`
+- MCP: `plugdev_doctor`, `plugdev_setup`; `@plugdev/mcp@0.1.1`
 - CI: prefetch + unit tests + MCP smoke
 
 ## 0.4.3 — 2026-07-09
 
-### Fixes
-
-- Setup/download progress updates in place (no hundreds of duplicate lines)
+### [fixed]
+- Setup/download progress updates in place
 - Parallel prefetch no longer spams two progress streams on one line
 - `plugdev init` replaces `{{version}}` in client instance name
 
 ## 0.4.2 — 2026-07-08
 
-### Fixes
-
-- `plugdev init` adds `@plugdev/cli` to devDependencies and `setup` npm script
+### [fixed]
+- `plugdev init` adds `@plugdev/cli` to devDependencies and `setup` script
 - Init no longer overwrites existing `plugdev.yml` without `--force`
-- Quick start docs use `npm install && npm run setup` (fixes `plugdev` not on PATH after npx)
+- Quick start docs use `npm install && npm run setup`
 
 ## 0.4.1 — 2026-07-08
 
-### Easy Setup
-
-- `plugdev setup` — prefetch Paper + embedded Minecraft client in one command
-- `plugdev cache prefetch` — warm server or client cache for CI/recording
-- `client.launcher: auto` — Prism/MultiMC → embedded `@xmcl` fallback (with retry on launch failure)
+### [added]
+- `plugdev setup` — prefetch Paper + embedded client
+- `plugdev cache prefetch` — warm server or client cache
+- `client.launcher: auto` — Prism/MultiMC → embedded `@xmcl` fallback
 - Lighter dev defaults: void world, 1G JVM, view-distance 4
 - Parallel server + client prefetch on first `plugdev run --join`
 - Download progress for Paper JAR fetches
 - `plugdev doctor` reports cache + client readiness
 
-### Fixes
-
+### [fixed]
 - Auto launcher skips version-mismatched Prism instances
 - Server cache checks work for Purpur/Pufferfish/Spigot
 - Doctor exit codes reflect setup readiness
 
 ## 0.4.0 — 2026-07-08
 
+### [added]
 - `--quiet` / `--verbose` phased terminal output
 - `plugdev demo` for recordings
 - `plugdev server start|stop|status|command|logs` for headless/agent use

@@ -1,10 +1,16 @@
 # PlugDev
 
-**`plug run` / `plugdev run` — npm run dev for Minecraft plugins.**
+[![npm](https://img.shields.io/npm/v/@plugdev/cli.svg)](https://www.npmjs.com/package/@plugdev/cli)
+[![license](https://img.shields.io/npm/l/@plugdev/cli.svg)](https://github.com/mattbaconz/plugdev/blob/main/LICENSE)
+[![site](https://img.shields.io/badge/site-pluglabs.app%2Fplugdev-0ea5e9)](https://pluglabs.app/plugdev)
 
-Boots Paper with your plugin, Via* for cross-version joins, a safe void platform world, watches `src/` for reload, and opens a light embedded Minecraft client matching your server version.
+**`npm run dev` for Minecraft plugins.**
 
-## Install (global — recommended)
+Boot Paper with your plugin, watch `src/` for reload, and auto-join with an embedded client — in one command.
+
+**Product page:** [pluglabs.app/plugdev](https://pluglabs.app/plugdev)
+
+## Quick start
 
 ```powershell
 npm install -g @plugdev/cli
@@ -13,24 +19,46 @@ plugdev init --setup
 plug run
 ```
 
-`plug` and `plugdev` are the same CLI. Use whichever you prefer:
+`plug` and `plugdev` are the same CLI. Use whichever you prefer.
 
-| Command | Same as |
+| Prefer… | Same as |
 |---------|---------|
 | `plug run` | `plugdev run` |
 | `plug setup` | `plugdev setup` |
 | `plug doctor` | `plugdev doctor` |
 | `plug clean` | `plugdev clean` |
 
-**Without global install:** `npx @plugdev/cli@latest init --setup` then `npx @plugdev/cli@latest run`.
+**Without a global install:** `npx @plugdev/cli@latest init --setup` then `npx @plugdev/cli@latest run`.
 
-Optional npm scripts (`npm run dev`) still work if you keep them in `package.json` — they just call `plugdev run`.
+Optional `npm run dev` scripts still work — they just call `plugdev run`.
 
 ### What happens
 
-Paper + ViaVersion/ViaBackwards/ViaRewind cache under `~/.plugdev/`. Project server lives in `.plugdev/run/` (kept by default for fast restarts). Embedded vanilla client matching your MC version joins `localhost:25565`. Edit `src/` → save → safe reload.
+Paper + Via* cache under `~/.plugdev/`. Your project server lives in `.plugdev/run/` (kept by default for fast restarts). An embedded client matching your MC version joins `localhost:25565`. Edit `src/` → save → safe reload.
 
 First boot remaps plugins (~10–30s). Later boots are much faster. **Ctrl+C** stops the server; closing Minecraft does not.
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `plug run` / `plugdev run` | Full loop: server + watch + auto-join |
+| `plug setup` | Prefetch Paper + Via* + client |
+| `plug clean` | Remove worlds or `.plugdev/run` |
+| `plug doctor` | Detect project + toolchain |
+| `plug init` | Create `plugdev.yml` + scripts |
+| `plugdev demo` | Built-in demo fixture |
+| `plugdev server start` | Headless server (agents/MCP) |
+| `plugdev deps add viaversion` | Install preset dep |
+
+### Global flags
+
+| Flag | Description |
+|------|-------------|
+| `--quiet` | Suppress server logs |
+| `--json` | Structured JSON output |
+| `--join` | Auto-join client |
+| `--no-watch` | One-shot boot |
 
 ## Dev server on disk
 
@@ -70,28 +98,6 @@ client:
   offline: false
 ```
 
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `plug run` / `plugdev run` | Full loop: server + watch + auto-join |
-| `plug setup` | Prefetch Paper + Via* + client |
-| `plug clean` | Remove worlds or `.plugdev/run` |
-| `plug doctor` | Detect project + toolchain |
-| `plug init` | Create `plugdev.yml` + scripts |
-| `plugdev demo` | Built-in demo fixture |
-| `plugdev server start` | Headless server (agents/MCP) |
-| `plugdev deps add viaversion` | Install preset dep |
-
-### Global flags
-
-| Flag | Description |
-|------|-------------|
-| `--quiet` | Suppress server logs |
-| `--json` | Structured JSON output |
-| `--join` | Auto-join client |
-| `--no-watch` | One-shot boot |
-
 ## PlugDev MCP
 
 ```json
@@ -108,6 +114,6 @@ client:
 
 ## Status
 
-**v0.7.5** — Dual bins `plug` + `plugdev`; global install UX; `run.cleanup` + `plug clean`.
+**v0.7.6** — see [CHANGELOG.md](CHANGELOG.md).
 
-Previous: **v0.7.4** — Void platform, bootstrap 1.20, embedded default.
+Site: [pluglabs.app/plugdev](https://pluglabs.app/plugdev) · npm: [`@plugdev/cli`](https://www.npmjs.com/package/@plugdev/cli)

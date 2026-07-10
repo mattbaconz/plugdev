@@ -3,7 +3,7 @@
   "version": "0.7.6",
   "description": "plug / plugdev — npm run dev for Minecraft plugins",
   "author": "PLUG Labs",
-  "homepage": "https://github.com/mattbaconz/plugdev#readme",
+  "homepage": "https://pluglabs.app/plugdev",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mattbaconz/plugdev.git"
