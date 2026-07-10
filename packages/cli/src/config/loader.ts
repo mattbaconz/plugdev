@@ -69,6 +69,8 @@ export interface PlugDevConfig {
     /** When true, Prism/MultiMC launches with --offline offlineName. Default false (Microsoft account). */
     offline?: boolean;
     offlineName?: string;
+    /** Extra offline players launched after the primary client on plug run. */
+    players?: Array<{ name: string }>;
     joinOnReady?: boolean;
   };
   jvm?: {
@@ -123,6 +125,10 @@ export interface CliOverrides {
   join?: boolean;
   debug?: boolean;
   server?: boolean;
+  /** Run datagen Gradle task (mods). */
+  datagen?: boolean;
+  /** Alias for server mode / headless test (mods). */
+  test?: boolean;
   loader?: string;
   configPath?: string;
   detach?: boolean;
@@ -279,8 +285,33 @@ export async function loadConfig(
     deps: (raw.deps ?? []).filter((d) => d.enabled !== false),
     client: raw.client,
     loader: overrides.loader ?? raw.loader ?? project.loader,
-    devMode: overrides.server ? "server" : (raw.dev?.mode ?? "client"),
-    gradleSubproject: raw.dev?.subproject ?? project.gradleSubproject,
+    devMode: (() => {
+      if (overrides.datagen) return "datagen";
+      if (overrides.server || overrides.test) return "server";
+      return raw.dev?.mode ?? "client";
+    })(),
+    gradleSubproject: (() => {
+      if (raw.dev?.subproject) return raw.dev.subproject;
+      const loader = (overrides.loader ?? raw.loader ?? project.loader)?.toLowerCase();
+      if (loader === "fabric" || loader === "quilt") {
+        return project.gradleSubproject?.includes("fabric")
+          ? project.gradleSubproject
+          : ":fabric";
+      }
+      if (loader === "neoforge") {
+        return project.gradleSubproject?.includes("neoforge")
+          ? project.gradleSubproject
+          : ":neoforge";
+      }
+      if (loader === "forge") {
+        return project.gradleSubproject ?? undefined;
+      }
+      // When --loader is set but no known mapping, still prefer detected subproject
+      if (overrides.loader && !project.gradleSubproject) {
+        return `:${overrides.loader.replace(/^:/, "")}`;
+      }
+      return project.gradleSubproject;
+    })(),
     raw,
   };
 }

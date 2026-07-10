@@ -4,8 +4,8 @@ import { execa } from "execa";
 import { info } from "../../util/log.js";
 import {
   embeddedClientDir,
-  isEmbeddedClientCached,
-  prefetchEmbeddedClient,
+  ensureEmbeddedClient,
+  isEmbeddedClientReady,
 } from "../prefetch.js";
 import type {
   ClientAdapterContext,
@@ -59,10 +59,11 @@ export const embeddedAdapter: LauncherAdapter = {
     const gamePath = embeddedClientDir();
     await mkdir(gamePath, { recursive: true });
 
-    if (!(await isEmbeddedClientCached(instance.mcVersion))) {
-      info("Installing Minecraft client (first run may take a while)...");
-      await prefetchEmbeddedClient(instance.mcVersion);
+    const ready = await isEmbeddedClientReady(instance.mcVersion);
+    if (!ready) {
+      info("Ensuring Minecraft client is complete (may repair libraries)…");
     }
+    await ensureEmbeddedClient(instance.mcVersion);
 
     const { launch } = await import("@xmcl/core");
 

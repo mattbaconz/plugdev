@@ -6,6 +6,14 @@ import type { PlugDevConfig } from "../config/loader.js";
 
 export type DepEntry = NonNullable<PlugDevConfig["deps"]>[number];
 
+export type DeepPartial<T> = {
+  [K in keyof T]?: T[K] extends (infer U)[]
+    ? U[]
+    : T[K] extends object | undefined
+      ? DeepPartial<NonNullable<T[K]>>
+      : T[K];
+};
+
 async function configPath(cwd: string): Promise<string | undefined> {
   const candidates = [join(cwd, "plugdev.yml"), join(cwd, ".plugdev", "plugdev.yml")];
   for (const p of candidates) {
@@ -19,6 +27,28 @@ async function configPath(cwd: string): Promise<string | undefined> {
   return undefined;
 }
 
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/** Deep-merge patch into base (arrays replaced, not concatenated). */
+export function deepMerge<T extends Record<string, unknown>>(
+  base: T,
+  patch: DeepPartial<T>,
+): T {
+  const out: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) continue;
+    const prev = out[key];
+    if (isPlainObject(value) && isPlainObject(prev)) {
+      out[key] = deepMerge(prev, value as DeepPartial<Record<string, unknown>>);
+    } else {
+      out[key] = value;
+    }
+  }
+  return out as T;
+}
+
 export async function readPlugdevYml(cwd: string): Promise<{
   path: string;
   raw: PlugDevConfig;
@@ -28,6 +58,26 @@ export async function readPlugdevYml(cwd: string): Promise<{
   const text = await readFile(path, "utf8");
   const raw = parseYaml(text) as PlugDevConfig;
   return { path, raw: raw ?? {} };
+}
+
+/**
+ * Merge a partial config into plugdev.yml and write it back.
+ * Note: YAML comments are not preserved (stringify round-trip).
+ */
+export async function updatePlugdevYml(
+  cwd: string,
+  patch: DeepPartial<PlugDevConfig>,
+): Promise<{ ok: true; path: string } | { ok: false; reason: string }> {
+  const loaded = await readPlugdevYml(cwd);
+  if (!loaded) {
+    return { ok: false, reason: "No plugdev.yml found — run plugdev init first" };
+  }
+  const merged = deepMerge(
+    loaded.raw as Record<string, unknown>,
+    patch as DeepPartial<Record<string, unknown>>,
+  ) as PlugDevConfig;
+  await writeFile(loaded.path, stringifyYaml(merged, { lineWidth: 0 }));
+  return { ok: true, path: loaded.path };
 }
 
 /** Append a dep to plugdev.yml if not already present (by name/slug). */
@@ -56,15 +106,11 @@ export async function writeClientInstanceToYml(
   cwd: string,
   opts: { launcher: "prism" | "multimc" | "auto"; instance: string },
 ): Promise<boolean> {
-  const loaded = await readPlugdevYml(cwd);
-  if (!loaded) return false;
-
-  loaded.raw.client = {
-    ...(loaded.raw.client ?? {}),
-    launcher: opts.launcher,
-    instance: opts.instance,
-    offlineName: loaded.raw.client?.offlineName ?? "DevPlayer",
-  };
-  await writeFile(loaded.path, stringifyYaml(loaded.raw, { lineWidth: 0 }));
-  return true;
+  const result = await updatePlugdevYml(cwd, {
+    client: {
+      launcher: opts.launcher,
+      instance: opts.instance,
+    },
+  });
+  return result.ok;
 }

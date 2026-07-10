@@ -167,7 +167,33 @@ export async function detectProject(cwd: string): Promise<DetectedProject> {
       (await readText(join(cwd, "gradle.properties"))) ?? "",
     );
     result.minecraftVersion = props.minecraft_version ?? props.minecraftVersion;
+    if (gradleContent.includes(":neoforge")) result.gradleSubproject = ":neoforge";
     return result;
+  }
+
+  // Legacy Forge (ForgeGradle / mods.toml without NeoForge)
+  const modsToml =
+    (await readText(join(cwd, "src", "main", "resources", "META-INF", "mods.toml"))) ||
+    (await readText(join(cwd, "src", "main", "resources", "META-INF", "neoforge.mods.toml")));
+  if (
+    modsToml ||
+    gradleContent.includes("net.minecraftforge.gradle") ||
+    gradleContent.includes("ForgeGradle") ||
+    gradleContent.includes("fg.deobf")
+  ) {
+    const isNeo =
+      gradleContent.includes("net.neoforged") ||
+      (modsToml?.includes("neoforge") ?? false);
+    if (!isNeo) {
+      result.type = "mod";
+      result.loader = "forge";
+      const props = parseGradleProperties(
+        (await readText(join(cwd, "gradle.properties"))) ?? "",
+      );
+      result.minecraftVersion =
+        props.minecraft_version ?? props.minecraftVersion ?? props.mc_version;
+      return result;
+    }
   }
 
   // Plugin detection

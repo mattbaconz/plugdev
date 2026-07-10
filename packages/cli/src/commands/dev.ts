@@ -4,8 +4,8 @@ import { detectProject } from "../detect/project.js";
 import { loadConfig, type CliOverrides, type ResolvedConfig } from "../config/loader.js";
 import { ensureServerJar, resolveServerProject, isServerJarCached } from "../cache/server.js";
 import {
-  isEmbeddedClientCached,
-  prefetchEmbeddedClient,
+  ensureEmbeddedClient,
+  isEmbeddedClientReady,
 } from "../client/prefetch.js";
 import {
   prepareRunDirectory,
@@ -26,6 +26,7 @@ import { attachInteractiveConsole, type InteractiveConsole } from "../process/in
 import { installDeps } from "../deps/hangar.js";
 import { startPluginWatcher, startModWatchOrchestrator } from "../watch/watcher.js";
 import { launchClient } from "../client/launch.js";
+import { launchPlayers } from "../client/players.js";
 import { banner, phase, info, warn, error as logError, resetPhases } from "../util/log.js";
 import { createDownloadProgress, endDownloadProgress } from "../util/progress.js";
 import { CLI_VERSION } from "../constants.js";
@@ -187,10 +188,10 @@ async function runPluginDev(
 
   const prefetchClient = shouldJoinClient(overrides, config);
   const serverCached = await isServerJarCached(config.version, serverProject);
-  const clientCached = prefetchClient
-    ? await isEmbeddedClientCached(config.version)
+  const clientReady = prefetchClient
+    ? await isEmbeddedClientReady(config.version)
     : true;
-  const needsParallelPrefetch = !serverCached || (prefetchClient && !clientCached);
+  const needsParallelPrefetch = !serverCached || (prefetchClient && !clientReady);
 
   const onDownloadProgress = createDownloadProgress(
     `Downloading ${serverLabel} ${config.version}…`,
@@ -199,18 +200,18 @@ async function runPluginDev(
   let serverJarInfo: Awaited<ReturnType<typeof ensureServerJar>>;
 
   try {
-    if (needsParallelPrefetch && prefetchClient && !serverCached && !clientCached) {
+    if (needsParallelPrefetch && prefetchClient && !serverCached && !clientReady) {
       phase(`Resolve ${serverLabel} ${config.version}`, "active");
-      phase("Downloading Minecraft client…", "active");
+      phase("Ensuring Minecraft client…", "active");
       const [jar] = await Promise.all([
         ensureServerJar(config.version, serverProject, {
           onProgress: (percent, label) => onDownloadProgress(percent, label),
         }),
-        prefetchEmbeddedClient(config.version),
+        ensureEmbeddedClient(config.version),
       ]);
       serverJarInfo = jar;
       phase(`Downloaded ${serverLabel} ${config.version}`);
-      phase(`Downloaded Minecraft client ${config.version}`);
+      phase(`Minecraft client ${config.version} ready`);
     } else {
       phase(`Resolve ${serverLabel} ${config.version}`, "active");
       const tasks: Promise<unknown>[] = [
@@ -218,9 +219,9 @@ async function runPluginDev(
           onProgress: (percent, label) => onDownloadProgress(percent, label),
         }),
       ];
-      if (prefetchClient && !clientCached) {
-        phase("Downloading Minecraft client…", "active");
-        tasks.push(prefetchEmbeddedClient(config.version));
+      if (prefetchClient && !clientReady) {
+        phase("Ensuring Minecraft client…", "active");
+        tasks.push(ensureEmbeddedClient(config.version));
       }
       const results = await Promise.all(tasks);
       serverJarInfo = results[0] as Awaited<ReturnType<typeof ensureServerJar>>;
@@ -229,9 +230,9 @@ async function runPluginDev(
           ? `Cache hit — ${serverLabel} ${config.version}`
           : `Downloaded ${serverLabel} ${config.version}`,
       );
-      if (prefetchClient && !clientCached) {
-        phase(`Downloaded Minecraft client ${config.version}`);
-      } else if (prefetchClient && clientCached) {
+      if (prefetchClient && !clientReady) {
+        phase(`Minecraft client ${config.version} ready`);
+      } else if (prefetchClient && clientReady) {
         phase(`Cache hit — Minecraft client ${config.version}`);
       }
     }
@@ -360,7 +361,7 @@ async function runPluginDev(
 
     if (shouldJoinClient(overrides, config)) {
       phase("Launch Minecraft client", "active");
-      await launchClient({ config, waitForServer: false });
+      await launchPlayers({ config, waitForServer: false });
       phase("Launch Minecraft client");
     }
 

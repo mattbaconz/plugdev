@@ -30,6 +30,13 @@ import {
 } from "./commands/cache.js";
 import { runClean } from "./cache/run-cleanup.js";
 import { runAgentInstall } from "./commands/agent.js";
+import {
+  runTui,
+  handoffRun,
+  isInteractiveTty,
+  printNonTtyHelp,
+} from "./commands/tui.js";
+import { isJsonMode } from "./util/output.js";
 
 const program = new Command();
 
@@ -49,6 +56,8 @@ function devOptions() {
     spigot: false,
     join: false,
     server: false,
+    datagen: false,
+    test: false,
     loader: undefined as string | undefined,
     noWatch: false,
     configPath: undefined as string | undefined,
@@ -69,6 +78,8 @@ function parseDevOpts(opts: ReturnType<typeof devOptions>) {
     spigot: opts.spigot,
     join: opts.join,
     server: opts.server,
+    datagen: opts.datagen,
+    test: opts.test,
     loader: opts.loader,
     noWatch: opts.noWatch,
     configPath: opts.configPath,
@@ -80,7 +91,7 @@ function parseDevOpts(opts: ReturnType<typeof devOptions>) {
 
 program
   .name(invokedAsPlug() ? "plug" : "plugdev")
-  .description("Dev loop for Minecraft plugins — plug run / plugdev run")
+  .description("Dev loop for Minecraft plugins — plugdev opens TUI; plugdev run starts the loop")
   .version(CLI_VERSION, "-V")
   .option("--json", "emit structured JSON output")
   .option("--quiet", "suppress server logs; show PlugDev steps only")
@@ -90,6 +101,22 @@ program
     if (opts.json) setJsonMode(true);
     if (opts.quiet) setLogMode("quiet");
     else setLogMode("verbose");
+  });
+
+program
+  .command("tui")
+  .description("Open interactive TUI (configure + test)")
+  .action(async () => {
+    const bin = invokedAsPlug() ? "plug" : "plugdev";
+    if (!isInteractiveTty() || isJsonMode()) {
+      printNonTtyHelp(bin);
+      process.exit(0);
+    }
+    const { run } = await runTui(process.cwd());
+    if (run) {
+      process.exit(await handoffRun(process.cwd()));
+    }
+    process.exit(0);
   });
 
 program
@@ -182,6 +209,10 @@ program
   .option("--purpur", "use Purpur server")
   .option("--pufferfish", "use Pufferfish server")
   .option("--spigot", "use Spigot server (requires cached jar)")
+  .option("--server", "use dedicated server (mods) or headless")
+  .option("--datagen", "run mod datagen Gradle task")
+  .option("--test", "mod server/test mode (same as --server)")
+  .option("--loader <name>", "mod loader subproject (fabric, neoforge, forge)")
   .option("--no-watch", "disable file watcher")
   .option("--config <path>", "config file path")
   .option("--debug", "enable JDWP debug port (5005)")
@@ -198,7 +229,9 @@ program
   .description("Copy join address or launch Minecraft client")
   .option("--client", "launch MC client")
   .option("--embedded", "use embedded @xmcl launcher")
-  .action(async (opts: { client?: boolean; embedded?: boolean }) => {
+  .option("--name <player>", "offline player name (launches embedded client)")
+  .option("--port <n>", "server port", (v: string) => Number(v))
+  .action(async (opts: { client?: boolean; embedded?: boolean; name?: string; port?: number }) => {
     process.exit(await runOpen(process.cwd(), opts));
   });
 
@@ -242,8 +275,9 @@ cache
   .description("Clear cached artifacts")
   .option("--servers", "Clear server JARs only")
   .option("--deps", "Clear dependency plugins only")
-  .option("--all", "Clear everything")
-  .action(async (opts: { servers?: boolean; deps?: boolean; all?: boolean }) => {
+  .option("--client", "Clear embedded Minecraft client cache")
+  .option("--all", "Clear everything (servers, deps, client, bootstrap)")
+  .action(async (opts: { servers?: boolean; deps?: boolean; client?: boolean; all?: boolean }) => {
     process.exit(await runCacheClear(opts));
   });
 
@@ -254,7 +288,8 @@ cache
   .option("--paper", "prefetch Paper server (default)")
   .option("--folia", "prefetch Folia server")
   .option("--client", "prefetch embedded Minecraft client only")
-  .action(async (opts: { version?: string; paper?: boolean; folia?: boolean; client?: boolean }) => {
+  .option("--force", "re-download / repair even if cached")
+  .action(async (opts: { version?: string; paper?: boolean; folia?: boolean; client?: boolean; force?: boolean }) => {
     process.exit(await runCachePrefetch(opts));
   });
 
@@ -333,8 +368,16 @@ program
   .command("network")
   .description("Start Velocity proxy + Paper backends from plugdev.yml")
   .option("--config <path>", "config file path")
-  .action(async (opts: { config?: string }) => {
-    process.exit(await runNetwork(process.cwd(), { configPath: opts.config }));
+  .option("--no-join", "do not auto-join Minecraft client")
+  .option("--no-watch", "disable proxy plugin file watcher")
+  .action(async (opts: { config?: string; join?: boolean; watch?: boolean }) => {
+    process.exit(
+      await runNetwork(process.cwd(), {
+        configPath: opts.config,
+        join: opts.join,
+        noWatch: opts.watch === false,
+      }),
+    );
   });
 
 program
@@ -379,14 +422,48 @@ program
   .option("--spigot", "use Spigot server (requires cached jar)")
   .option("--join", "auto-join Minecraft client when server ready")
   .option("--server", "use dedicated server (mods) or headless")
-  .option("--loader <name>", "mod loader subproject (fabric, neoforge)")
+  .option("--datagen", "run mod datagen Gradle task")
+  .option("--test", "mod server/test mode (same as --server)")
+  .option("--loader <name>", "mod loader subproject (fabric, neoforge, forge)")
   .option("--no-watch", "disable file watcher")
   .option("--config <path>", "config file path")
   .option("--debug", "enable JDWP debug port (5005)")
   .action(async (opts) => {
-    process.exit(
-      await runDev(process.cwd(), parseDevOpts(opts)),
+    const bin = invokedAsPlug() ? "plug" : "plugdev";
+    const globals = program.opts<{ json?: boolean }>();
+    const hasDevFlag = Boolean(
+      opts.port ||
+        opts.version ||
+        opts.paper ||
+        opts.folia ||
+        opts.purpur ||
+        opts.pufferfish ||
+        opts.spigot ||
+        opts.join ||
+        opts.server ||
+        opts.datagen ||
+        opts.test ||
+        opts.loader ||
+        opts.noWatch ||
+        opts.config ||
+        opts.debug,
     );
+
+    // Explicit legacy flags on bare command still start the loop
+    if (hasDevFlag) {
+      process.exit(await runDev(process.cwd(), parseDevOpts(opts)));
+    }
+
+    if (!isInteractiveTty() || globals.json || isJsonMode()) {
+      printNonTtyHelp(bin);
+      process.exit(0);
+    }
+
+    const { run } = await runTui(process.cwd());
+    if (run) {
+      process.exit(await handoffRun(process.cwd()));
+    }
+    process.exit(0);
   });
 
 program.parse();

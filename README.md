@@ -16,21 +16,23 @@ Boot Paper with your plugin, watch `src/` for reload, and auto-join with an embe
 npm install -g @plugdev/cli
 cd your-plugin
 plugdev init --setup
-plug run
+plugdev          # interactive TUI
+# or: plugdev run   # one-shot test loop
 ```
 
 `plug` and `plugdev` are the same CLI. Use whichever you prefer.
 
 | Prefer… | Same as |
 |---------|---------|
-| `plug run` | `plugdev run` |
+| `plug` / `plugdev` | Interactive TUI (TTY) |
+| `plug run` | `plugdev run` (server + watch + join) |
 | `plug setup` | `plugdev setup` |
 | `plug doctor` | `plugdev doctor` |
 | `plug clean` | `plugdev clean` |
 
-**Without a global install:** `npx @plugdev/cli@latest init --setup` then `npx @plugdev/cli@latest run`.
+**Without a global install:** `npx @plugdev/cli@latest init --setup` then `npx @plugdev/cli@latest` (TUI) or `… run`.
 
-Optional `npm run dev` scripts still work — they just call `plugdev run`.
+Optional `npm run dev` scripts still work — they call `plugdev run`.
 
 ### What happens
 
@@ -42,6 +44,8 @@ First boot remaps plugins (~10–30s). Later boots are much faster. **Ctrl+C** s
 
 | Command | Description |
 |---------|-------------|
+| `plug` / `plugdev` | Interactive TUI (configure + run) |
+| `plugdev tui` | Same TUI (explicit) |
 | `plug run` / `plugdev run` | Full loop: server + watch + auto-join |
 | `plug setup` | Prefetch Paper + Via* + client |
 | `plug clean` | Remove worlds or `.plugdev/run` |
@@ -114,6 +118,6 @@ client:
 
 ## Status
 
-**v0.7.6** — see [CHANGELOG.md](CHANGELOG.md).
+**v0.8.0** — Client integrity, multi-player, mod CLI honesty, network proxy plugins. See [CHANGELOG.md](CHANGELOG.md).
 
 Site: [pluglabs.app/plugdev](https://pluglabs.app/plugdev) · npm: [`@plugdev/cli`](https://www.npmjs.com/package/@plugdev/cli)

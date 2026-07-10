@@ -146,6 +146,22 @@ export const Errors = {
     });
   },
 
+  clientDownloadFailed(mcVersion: string, err?: unknown): PlugDevError {
+    const detail =
+      err instanceof Error
+        ? err.message.slice(0, 200)
+        : err
+          ? String(err).slice(0, 200)
+          : "unknown error";
+    return new PlugDevError({
+      what: `Minecraft client download failed (${mcVersion}).`,
+      cause: detail,
+      fix: "Retry: plugdev cache prefetch --client --force. Or set client.launcher to prism and pick an instance in the TUI.",
+      hint: "Mojang CDN timeouts are common — PlugDev retries with mirrors; assets can finish later.",
+      code: 2,
+    });
+  },
+
   bootstrapMissing(): PlugDevError {
     return new PlugDevError({
       what: "Bootstrap plugin JAR not found.",

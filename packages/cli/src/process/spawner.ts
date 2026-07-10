@@ -23,6 +23,25 @@ export interface JavaProcessOptions {
 
 const RING_MAX_LINES = 120;
 
+/** Write to child stdin without throwing EPIPE when the pipe is already closed. */
+export function safeStdinWrite(
+  stdin: NodeJS.WritableStream | null | undefined,
+  data: string,
+): void {
+  if (!stdin || stdin.destroyed || !stdin.writable) return;
+  try {
+    stdin.write(data, (err) => {
+      if (!err) return;
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === "EPIPE" || code === "ERR_STREAM_DESTROYED") return;
+    });
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "EPIPE" || code === "ERR_STREAM_DESTROYED") return;
+    throw err;
+  }
+}
+
 function pushRing(ring: string[], text: string): void {
   for (const line of text.split(/\r?\n/)) {
     if (line.length === 0) continue;
@@ -66,6 +85,11 @@ export function startJavaProcess(
       ...process.env,
       PLUGDEV: "true",
     },
+  });
+
+  proc.stdin?.on("error", (err) => {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "EPIPE" || code === "ERR_STREAM_DESTROYED") return;
   });
 
   let pluginError: string | undefined;
@@ -165,7 +189,7 @@ export function stopPaperServer(proc: ChildProcess): Promise<void> {
       return;
     }
     proc.once("exit", () => resolve());
-    proc.stdin?.write("stop\n");
+    safeStdinWrite(proc.stdin, "stop\n");
     setTimeout(() => {
       if (proc.exitCode === null) proc.kill();
       resolve();
@@ -173,26 +197,34 @@ export function stopPaperServer(proc: ChildProcess): Promise<void> {
   });
 }
 
+/** Active procs for the single shared SIGINT/SIGTERM handler (avoids stacking). */
+let shutdownProcs: ChildProcess[] = [];
+let shutdownHooksAttached = false;
+
+function sharedShutdown(): void {
+  for (const proc of shutdownProcs) {
+    if (!proc.killed && proc.exitCode === null) {
+      safeStdinWrite(proc.stdin, "shutdown\n");
+      safeStdinWrite(proc.stdin, "stop\n");
+    }
+  }
+  setTimeout(() => {
+    for (const proc of shutdownProcs) {
+      if (proc.exitCode === null) proc.kill();
+    }
+  }, 5000);
+}
+
 export function attachShutdownHooks(proc: ChildProcess): void {
   attachMultiShutdown([proc]);
 }
 
 export function attachMultiShutdown(procs: ChildProcess[]): void {
-  const shutdown = () => {
-    for (const proc of procs) {
-      if (!proc.killed && proc.exitCode === null) {
-        proc.stdin?.write("shutdown\n");
-        proc.stdin?.write("stop\n");
-      }
-    }
-    setTimeout(() => {
-      for (const proc of procs) {
-        if (proc.exitCode === null) proc.kill();
-      }
-    }, 5000);
-  };
-  process.on("SIGINT", shutdown);
-  process.on("SIGTERM", shutdown);
+  shutdownProcs = procs;
+  if (shutdownHooksAttached) return;
+  shutdownHooksAttached = true;
+  process.on("SIGINT", sharedShutdown);
+  process.on("SIGTERM", sharedShutdown);
 }
 
 export function printReadyBanner(

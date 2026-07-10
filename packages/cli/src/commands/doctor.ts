@@ -9,7 +9,7 @@ import {
   readInstanceMcVersion,
 } from "../client/detect.js";
 import { isServerJarCached, resolveServerProject } from "../cache/server.js";
-import { isEmbeddedClientCached } from "../client/prefetch.js";
+import { isEmbeddedClientReady } from "../client/prefetch.js";
 import { checkBootstrapJar } from "../util/bootstrap.js";
 import { serversCacheDir } from "../paths.js";
 import { join } from "node:path";
@@ -43,7 +43,7 @@ async function resolveClientTier(
     config.client?.launcher === "multimc";
 
   if (!wantsExternal) {
-    const embeddedReady = await isEmbeddedClientCached(config.version);
+    const embeddedReady = await isEmbeddedClientReady(config.version);
     return {
       tier: embeddedReady ? "embedded" : "needs-setup",
       instanceId: `embedded-${config.version}`,
@@ -63,7 +63,7 @@ async function resolveClientTier(
     return { tier: launcher.type, instanceId, ready: false };
   }
 
-  const embeddedReady = await isEmbeddedClientCached(config.version);
+  const embeddedReady = await isEmbeddedClientReady(config.version);
   return {
     tier: embeddedReady ? "embedded" : "needs-setup",
     instanceId,
@@ -97,7 +97,7 @@ export async function runDoctor(cwd: string): Promise<number> {
   }
 
   const serverCached = await isServerJarCached(config.version, serverProject);
-  const embeddedCached = await isEmbeddedClientCached(config.version);
+  const embeddedReady = await isEmbeddedClientReady(config.version);
   const client = await resolveClientTier(config);
   const bootstrap = await checkBootstrapJar();
   const foliaSupport =
@@ -132,16 +132,18 @@ export async function runDoctor(cwd: string): Promise<number> {
       ? 'Multi-module pom detected — set build.module (e.g. "plugin-module") for mvn -pl … -am'
       : undefined;
 
+  const isMod = project.type === "mod" || config.type === "mod";
+
   const toolchainReady =
     project.type !== "unknown" &&
     javaOk &&
     (project.buildSystem !== "gradle" || gradleOk) &&
     (project.buildSystem !== "maven" || mavenOk) &&
-    bootstrap.ok &&
+    (isMod || bootstrap.ok) &&
     !spigotMissing;
 
-  const clientReady = embeddedCached || client.ready;
-  const setupReady = serverCached && clientReady;
+  const clientReady = isMod ? true : embeddedReady || client.ready;
+  const setupReady = isMod ? toolchainReady : serverCached && clientReady;
 
   if (isJsonMode()) {
     emitJson({
@@ -188,7 +190,7 @@ export async function runDoctor(cwd: string): Promise<number> {
           : undefined,
         cache: {
           server: serverCached ? "cached" : "not cached",
-          embeddedClient: embeddedCached ? "cached" : "not cached",
+          embeddedClient: embeddedReady ? "ready" : "not ready",
         },
         client: {
           tier: client.tier,
@@ -262,55 +264,63 @@ export async function runDoctor(cwd: string): Promise<number> {
     return 3;
   }
 
-  if (bootstrap.ok) {
-    phase(`Bootstrap JAR: ${bootstrap.path}`);
+  if (isMod) {
+    if (config.gradleSubproject) {
+      phase(`Gradle subproject: ${config.gradleSubproject}`);
+    }
+    phase("Mod path: Gradle runClient/runServer (Paper bootstrap skipped)");
+    info("Reload: assets F3+T / data /reload / java restart — no plugin-style hot reload");
   } else {
-    warn("Bootstrap JAR not found — safe reload will fail");
-    info("Hint: npm run build:bootstrap (from plugdev monorepo)");
-  }
-
-  if (config.server === "folia") {
-    if (foliaSupport === "declared") {
-      warn(
-        "Folia: metadata declares support, but safe reload may still be unsafe — prefer restart",
-      );
+    if (bootstrap.ok) {
+      phase(`Bootstrap JAR: ${bootstrap.path}`);
     } else {
-      warn(
-        "Folia: plugin metadata does not declare Folia support — prefer watch.reloadJava: restart",
+      warn("Bootstrap JAR not found — safe reload will fail");
+      info("Hint: npm run build:bootstrap (from plugdev monorepo)");
+    }
+
+    if (config.server === "folia") {
+      if (foliaSupport === "declared") {
+        warn(
+          "Folia: metadata declares support, but safe reload may still be unsafe — prefer restart",
+        );
+      } else {
+        warn(
+          "Folia: plugin metadata does not declare Folia support — prefer watch.reloadJava: restart",
+        );
+      }
+    }
+
+    if (spigotMissing && spigotJarPath) {
+      warn(`Spigot jar missing at ${spigotJarPath}`);
+      info(
+        `Hint: Run BuildTools for ${config.version} and copy spigot-${config.version}.jar there`,
       );
     }
-  }
 
-  if (spigotMissing && spigotJarPath) {
-    warn(`Spigot jar missing at ${spigotJarPath}`);
-    info(
-      `Hint: Run BuildTools for ${config.version} and copy spigot-${config.version}.jar there`,
-    );
-  }
+    if (serverCached) {
+      phase(`Cache: ${serverLabel} ${config.version} cached`);
+    } else {
+      warn(`Cache: ${serverLabel} ${config.version} not cached`);
+    }
 
-  if (serverCached) {
-    phase(`Cache: ${serverLabel} ${config.version} cached`);
-  } else {
-    warn(`Cache: ${serverLabel} ${config.version} not cached`);
-  }
+    if (embeddedReady) {
+      phase(`Cache: Minecraft client ${config.version} ready`);
+    } else {
+      warn(`Cache: Minecraft client ${config.version} not ready (run plugdev setup)`);
+    }
 
-  if (embeddedCached) {
-    phase(`Cache: Minecraft client ${config.version} cached`);
-  } else {
-    warn(`Cache: Minecraft client ${config.version} not cached`);
-  }
-
-  if (client.tier === "embedded" || (embeddedCached && !client.ready)) {
-    phase("Client tier: embedded (ready)");
-  } else if (client.tier === "needs-setup") {
-    warn("Client tier: needs setup (run plugdev setup)");
-  } else if (client.ready) {
-    phase(`Client tier: ${client.tier} — ${client.instanceId} ready`);
-  } else {
-    warn(
-      `Client tier: ${client.tier} — instance "${client.instanceId}" needs provisioning`,
-    );
-    info("Run: plugdev setup");
+    if (client.tier === "embedded" || (embeddedReady && !client.ready)) {
+      phase("Client tier: embedded (ready)");
+    } else if (client.tier === "needs-setup") {
+      warn("Client tier: needs setup (run plugdev setup)");
+    } else if (client.ready) {
+      phase(`Client tier: ${client.tier} — ${client.instanceId} ready`);
+    } else {
+      warn(
+        `Client tier: ${client.tier} — instance "${client.instanceId}" needs provisioning`,
+      );
+      info("Run: plugdev setup");
+    }
   }
 
   if (!toolchainReady) {

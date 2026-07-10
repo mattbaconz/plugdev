@@ -11,8 +11,8 @@ import {
 import { ensureInstance } from "../client/instance.js";
 import {
   embeddedClientDir,
-  isEmbeddedClientCached,
-  prefetchEmbeddedClient,
+  ensureEmbeddedClient,
+  isEmbeddedClientReady,
 } from "../client/prefetch.js";
 import { DEFAULT_COMPAT_DEPS } from "../deps/presets.js";
 import { prefetchDeps } from "../deps/hangar.js";
@@ -45,6 +45,44 @@ export async function runSetup(
 
   const project = await detectProject(cwd);
   const config = await loadConfig(cwd, project);
+
+  // Mod projects: Gradle owns the client — skip Paper/Via*/embedded prefetch
+  if (project.type === "mod" || config.type === "mod") {
+    try {
+      await requireJava21();
+      phase("Java 21+");
+    } catch {
+      warn("Java 21+ required — install from https://adoptium.net/");
+      return 2;
+    }
+    if (project.buildSystem === "gradle") {
+      const gradleOk = await checkGradle(cwd);
+      if (gradleOk) phase("Gradle wrapper");
+      else warn("Gradle wrapper not found — build may fail");
+    }
+    phase(
+      `Mod project (${config.loader ?? project.loader ?? "unknown"}) — setup skips Paper/Via*`,
+    );
+    if (config.gradleSubproject) {
+      phase(`Gradle subproject: ${config.gradleSubproject}`);
+    }
+    info("");
+    success("Setup complete — ready to run");
+    info(`  Run: plugdev${config.loader ? ` --loader ${config.loader}` : ""}`);
+    info("  Tip: mods use Gradle runClient/runServer — no Paper cache needed");
+    if (isJsonMode()) {
+      emitJson({
+        ok: true,
+        data: {
+          type: "mod",
+          loader: config.loader ?? project.loader,
+          gradleSubproject: config.gradleSubproject,
+        },
+      });
+    }
+    return 0;
+  }
+
   const serverProject = resolveServerProject(config.server);
   const serverLabel = serverDisplayName(config.server);
 
@@ -69,7 +107,7 @@ export async function runSetup(
   }
 
   const serverCached = await isServerJarCached(config.version, serverProject);
-  const clientCached = await isEmbeddedClientCached(config.version);
+  const clientReady = await isEmbeddedClientReady(config.version);
   const launcherEarly = await detectLauncher("auto", config.client);
   const wantsExternal =
     Boolean(opts.instance) ||
@@ -110,17 +148,23 @@ export async function runSetup(
     phase(
       `Skip embedded client — using ${launcherEarly!.type} "${configuredInstance}"`,
     );
-  } else if (clientCached) {
+  } else if (clientReady) {
     phase(`Cache hit — Minecraft client ${config.version}`);
   } else {
     const report = createDownloadProgress(
-      `Downloading Minecraft client ${config.version}…`,
+      `Ensuring Minecraft client ${config.version}…`,
     );
     try {
-      await prefetchEmbeddedClient(config.version, {
+      const result = await ensureEmbeddedClient(config.version, {
         onProgress: (percent, label) => report(percent, label),
       });
-      phase(`Downloaded Minecraft client ${config.version}`);
+      if (result.repaired) {
+        phase(`Repaired Minecraft client ${config.version}`);
+      } else if (result.cacheHit) {
+        phase(`Cache hit — Minecraft client ${config.version}`);
+      } else {
+        phase(`Downloaded Minecraft client ${config.version}`);
+      }
     } catch (err) {
       warn(
         `Embedded client download failed: ${err instanceof Error ? err.message : String(err)}`,

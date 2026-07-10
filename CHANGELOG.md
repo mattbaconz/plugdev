@@ -1,5 +1,67 @@
 # Changelog
 
+## 0.9.2 — 2026-07-10
+
+### [fixed]
+- Embedded client asset downloads no longer crash the run with a huge AggregateError dump when Mojang CDN times out
+- Empty (0-byte) asset files from failed downloads are purged before retry
+- Connect timeout raised to 60s with undici retries; BMCLAPI mirror tried before Mojang assets CDN
+
+### [changed]
+- Client install splits core (jar + libraries, required) from assets (retried, then best-effort)
+- If assets still fail, PlugDev warns and continues when jar/libs are ready — retry with `plugdev cache prefetch --client --force`
+
+## 0.9.1 — 2026-07-10
+
+### [fixed]
+- Ctrl+C no longer crashes with unhandled `EPIPE` when writing stop to a closed server stdin
+- SIGINT/SIGTERM handlers no longer stack on every server restart
+- Configure now auto-saves on field commit (Enter) — offline name and other fields persist without pressing S
+
+### [added]
+- Configure: ←→ cycle for server, launcher, world, gamemode, join-on-ready
+- Prism/MultiMC instance picker from Configure (lists launcher instances)
+- Persist `client.instance` from TUI
+
+### [changed]
+- Home header shows launcher instance when set
+- Clearer Configure footer (auto-save status)
+
+## 0.9.0 — 2026-07-10
+
+### [added]
+- Interactive TUI (Ink): bare `plugdev` / `plug` opens a menu to configure `plugdev.yml` and start the test loop
+- `plugdev tui` alias; Configure screen for common fields (version, server, port, client, world, JVM)
+- `updatePlugdevYml` deep-merge helper for writing config patches
+
+### [changed]
+- Bare `plugdev` / `plug` on a TTY opens the TUI instead of starting the loop immediately
+- `plugdev run` remains the one-shot test loop (server + watch + join)
+- Non-TTY / `--json` / CI prints short help (does not hang waiting for keys)
+- Saving from Configure rewrites YAML (comments may be lost)
+
+## 0.8.1 — 2026-07-10
+
+### [fixed]
+- Doctor `resolveClientTier` referenced removed import (`isEmbeddedClientCached`) — use integrity-ready check
+
+## 0.8.0 — 2026-07-10
+
+### [fixed]
+- Embedded client “Missing N libraries” after false cache hit — integrity check via `@xmcl/core` `diagnose()`, repair with `installLibraries` / full reinstall
+- `plugdev setup` / `cache prefetch --client` no longer treat version JSON alone as ready
+- Launch retries once after repairing corrupt libraries
+
+### [added]
+- `ensureEmbeddedClient` / `isEmbeddedClientReady`; `plugdev cache clear --client`; `cache prefetch --client --force`
+- Multi-player: `client.players` in `plugdev.yml`; `plugdev open --name <player>`
+- Mod CLI honesty: `--loader` maps to Gradle subproject; `--datagen` / `--test`; legacy Forge detection; mod-aware `setup` / `doctor`
+- Network: build + deploy Velocity proxy plugin JAR; auto-join client to proxy; watch rebuilds with restart hint
+
+### [changed]
+- Doctor reports client **ready** (integrity) not merely cached
+- Client-launch docs: Prism Microsoft account default; multi-player flow
+
 ## 0.7.6 — 2026-07-09
 
 ### [fixed]

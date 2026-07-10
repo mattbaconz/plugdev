@@ -107,6 +107,18 @@
           "default": "DevPlayer",
           "description": "Offline username when client.offline is true (also used by embedded client)"
         },
+        "players": {
+          "type": "array",
+          "description": "Extra offline players to launch on plug run (in addition to offlineName). Each needs a distinct name.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "minLength": 1 }
+            },
+            "required": ["name"],
+            "additionalProperties": false
+          }
+        },
         "joinOnReady": {
           "type": "boolean",
           "default": true,

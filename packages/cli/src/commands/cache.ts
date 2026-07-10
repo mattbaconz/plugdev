@@ -10,8 +10,8 @@ import { depSearchTerms } from "../deps/hangar.js";
 import { ensureServerJar, resolveServerProject, isServerJarCached } from "../cache/server.js";
 import {
   embeddedClientDir,
-  isEmbeddedClientCached,
-  prefetchEmbeddedClient,
+  ensureEmbeddedClient,
+  isEmbeddedClientReady,
 } from "../client/prefetch.js";
 
 async function dirSize(path: string): Promise<number> {
@@ -40,6 +40,7 @@ export async function runCachePrefetch(opts: {
   paper?: boolean;
   folia?: boolean;
   client?: boolean;
+  force?: boolean;
   cwd?: string;
 }): Promise<number> {
   const cwd = opts.cwd ?? process.cwd();
@@ -54,26 +55,27 @@ export async function runCachePrefetch(opts: {
 
   const onProgress = createDownloadProgress(
     opts.client
-      ? `Downloading Minecraft ${mcVersion}…`
+      ? `Ensuring Minecraft ${mcVersion}…`
       : `Downloading ${serverProject} ${mcVersion}…`,
   );
 
   if (opts.client) {
     heading(`Prefetch Minecraft client ${mcVersion}\n`);
-    const cached = await isEmbeddedClientCached(mcVersion);
-    if (cached) {
-      success(`Cache hit — Minecraft ${mcVersion}`);
-      info(`Path: ${embeddedClientDir()}`);
-      return 0;
-    }
     try {
-      await prefetchEmbeddedClient(mcVersion, {
+      const result = await ensureEmbeddedClient(mcVersion, {
+        force: opts.force,
         onProgress: (percent, label) => onProgress(percent, label),
       });
+      if (result.cacheHit) {
+        success(`Cache hit — Minecraft ${mcVersion} (integrity OK)`);
+      } else if (result.repaired) {
+        success(`Repaired Minecraft client ${mcVersion}`);
+      } else {
+        success(`Cached Minecraft client ${mcVersion}`);
+      }
     } finally {
       endDownloadProgress();
     }
-    success(`Cached Minecraft client ${mcVersion}`);
     info(`Path: ${embeddedClientDir()}`);
     return 0;
   }
@@ -111,12 +113,13 @@ export async function runCacheStatus(): Promise<number> {
 export async function runCacheClear(flags: {
   servers?: boolean;
   deps?: boolean;
+  client?: boolean;
   all?: boolean;
 }): Promise<number> {
   const home = plugdevHome();
-  if (!flags.all && !flags.servers && !flags.deps) {
-    warn("Specify what to clear: --servers, --deps, or --all");
-    info("Example: plugdev cache clear --servers");
+  if (!flags.all && !flags.servers && !flags.deps && !flags.client) {
+    warn("Specify what to clear: --servers, --deps, --client, or --all");
+    info("Example: plugdev cache clear --client");
     return 1;
   }
   if (flags.all || flags.servers) {
@@ -126,6 +129,10 @@ export async function runCacheClear(flags: {
   if (flags.all || flags.deps) {
     await rm(depsCacheDir(), { recursive: true, force: true });
     success("Cleared deps cache");
+  }
+  if (flags.all || flags.client) {
+    await rm(embeddedClientDir(), { recursive: true, force: true });
+    success("Cleared embedded Minecraft client cache");
   }
   if (flags.all) {
     await rm(bootstrapCacheDir(), { recursive: true, force: true });

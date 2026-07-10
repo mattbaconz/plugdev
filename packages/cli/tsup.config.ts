@@ -7,6 +7,9 @@ export default defineConfig({
   format: ["esm"],
   target: "node20",
   clean: true,
+  esbuildOptions(options) {
+    options.jsx = "automatic";
+  },
   onSuccess: async () => {
     const specDir = join("dist", "spec");
     mkdirSync(specDir, { recursive: true });
