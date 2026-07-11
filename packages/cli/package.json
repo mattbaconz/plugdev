@@ -40,7 +40,7 @@
     "build": "tsup",
     "prepare": "npm run build",
     "start": "node dist/cli.js",
-    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "test": "node ../../scripts/run-tests.mjs",
     "smoke:reload": "node scripts/smoke-reload.mjs",
     "prepublishOnly": "cd ../.. && npm run build"
   },
