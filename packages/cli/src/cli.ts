@@ -287,7 +287,7 @@ cache
   .option("--version <mc>", "Minecraft version")
   .option("--paper", "prefetch Paper server (default)")
   .option("--folia", "prefetch Folia server")
-  .option("--client", "prefetch embedded Minecraft client only")
+  .option("--client", "prefetch embedded Minecraft client (combine with --paper/--folia for both)")
   .option("--force", "re-download / repair even if cached")
   .action(async (opts: { version?: string; paper?: boolean; folia?: boolean; client?: boolean; force?: boolean }) => {
     process.exit(await runCachePrefetch(opts));

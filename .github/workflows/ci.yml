@@ -46,7 +46,9 @@ jobs:
 
       - name: Prefetch Paper cache
         working-directory: test/fixtures/paper-plugin
-        run: node ../../../packages/cli/dist/cli.js cache prefetch --version 1.21.4 --paper --client
+        run: |
+          node ../../../packages/cli/dist/cli.js cache prefetch --version 1.21.4 --paper
+          node ../../../packages/cli/dist/cli.js cache prefetch --version 1.21.4 --client
 
       - name: Doctor smoke
         working-directory: test/fixtures/paper-plugin

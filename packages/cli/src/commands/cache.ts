@@ -53,13 +53,13 @@ export async function runCachePrefetch(opts: {
       ? "paper"
       : resolveServerProject(config.server);
 
-  const onProgress = createDownloadProgress(
-    opts.client
-      ? `Ensuring Minecraft ${mcVersion}…`
-      : `Downloading ${serverProject} ${mcVersion}…`,
-  );
+  // --client alone → client only. --client with --paper/--folia → both.
+  // No --client → server (default / --paper / --folia).
+  const wantClient = Boolean(opts.client);
+  const wantServer = !wantClient || Boolean(opts.paper) || Boolean(opts.folia);
 
-  if (opts.client) {
+  if (wantClient) {
+    const onProgress = createDownloadProgress(`Ensuring Minecraft ${mcVersion}…`);
     heading(`Prefetch Minecraft client ${mcVersion}\n`);
     try {
       const result = await ensureEmbeddedClient(mcVersion, {
@@ -77,25 +77,30 @@ export async function runCachePrefetch(opts: {
       endDownloadProgress();
     }
     info(`Path: ${embeddedClientDir()}`);
-    return 0;
   }
 
-  heading(`Prefetch ${serverProject} ${mcVersion}\n`);
-  const cached = await isServerJarCached(mcVersion, serverProject);
-  let jar: Awaited<ReturnType<typeof ensureServerJar>>;
-  try {
-    jar = await ensureServerJar(mcVersion, serverProject, {
-      onProgress: (percent, label) => onProgress(percent, label),
-    });
-  } finally {
-    endDownloadProgress();
+  if (wantServer) {
+    const onProgress = createDownloadProgress(
+      `Downloading ${serverProject} ${mcVersion}…`,
+    );
+    heading(`Prefetch ${serverProject} ${mcVersion}\n`);
+    const cached = await isServerJarCached(mcVersion, serverProject);
+    let jar: Awaited<ReturnType<typeof ensureServerJar>>;
+    try {
+      jar = await ensureServerJar(mcVersion, serverProject, {
+        onProgress: (percent, label) => onProgress(percent, label),
+      });
+    } finally {
+      endDownloadProgress();
+    }
+    if (cached) {
+      success(`Cache hit — ${serverProject} ${mcVersion}`);
+    } else {
+      success(`Downloaded ${serverProject} ${mcVersion}`);
+    }
+    info(`Path: ${join(serversCacheDir(mcVersion, serverProject), jar.jarName)}`);
   }
-  if (cached) {
-    success(`Cache hit — ${serverProject} ${mcVersion}`);
-  } else {
-    success(`Downloaded ${serverProject} ${mcVersion}`);
-  }
-  info(`Path: ${join(serversCacheDir(mcVersion, serverProject), jar.jarName)}`);
+
   return 0;
 }
 
