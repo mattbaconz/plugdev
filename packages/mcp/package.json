@@ -31,7 +31,7 @@
     "prepare": "npm run build",
     "prepublishOnly": "cd ../.. && npm run build -w @plugdev/mcp",
     "smoke": "node scripts/smoke.mjs",
-    "test": "node --import tsx --test src/**/*.test.ts"
+    "test": "node --import tsx --test src/json.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
