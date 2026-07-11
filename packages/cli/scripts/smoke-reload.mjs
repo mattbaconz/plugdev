@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Smoke: boot Paper fixture → write reload trigger → assert bootstrap reload log.
+ * Smoke: boot Paper fixture → copy timestamped reload JAR → trigger → assert bootstrap reload log.
  * Run from plugdev repo root after npm run build (+ bootstrap build).
  *
  * Env:
@@ -8,7 +8,7 @@
  *   PLUGDEV_RELOAD_SMOKE_FIXTURE — fixture folder under test/fixtures (default paper-plugin)
  */
 import { execa } from "execa";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, copyFile, readdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,6 +18,7 @@ const fixtureName = process.env.PLUGDEV_RELOAD_SMOKE_FIXTURE ?? "paper-plugin";
 const fixture = join(root, "test", "fixtures", fixtureName);
 const smokePort = process.env.PLUGDEV_RELOAD_SMOKE_PORT ?? "25567";
 const runDir = join(fixture, ".plugdev", "run");
+const pluginsDir = join(runDir, "plugins");
 const logPath = join(runDir, "logs", "latest.log");
 
 const RELOAD_OK = /\[PlugDev\] Loaded dev plugin:|Loaded dev plugin:/i;
@@ -64,35 +65,32 @@ if (start.exitCode !== 0) {
 }
 console.log("OK server start");
 
-// Ensure plugins dir + reload.list exist; touch trigger with current plugin JAR from reload.list or plugins/
-await mkdir(runDir, { recursive: true });
+await mkdir(pluginsDir, { recursive: true });
 
-let reloadList = "";
-try {
-  reloadList = (await readFile(join(runDir, "reload.list"), "utf8")).trim();
-} catch {
-  // build list from plugins/*.jar excluding bootstrap
+const plugins = await readdir(pluginsDir);
+const sourceJar = plugins.find(
+  (f) =>
+    f.endsWith(".jar") &&
+    !f.includes("bootstrap") &&
+    !f.includes("plugdev-bootstrap") &&
+    !f.includes("-reload-"),
+);
+if (!sourceJar) {
+  console.error("FAIL no plugin JAR in plugins/");
+  await execa("node", [cli, "server", "stop"], { cwd: fixture, reject: false });
+  process.exit(1);
 }
 
-if (!reloadList) {
-  const { readdir } = await import("node:fs/promises");
-  const plugins = await readdir(join(runDir, "plugins"));
-  const jar = plugins.find(
-    (f) => f.endsWith(".jar") && !f.includes("bootstrap") && !f.includes("plugdev-bootstrap"),
-  );
-  if (!jar) {
-    console.error("FAIL no plugin JAR in plugins/");
-    await execa("node", [cli, "server", "stop"], { cwd: fixture, reject: false });
-    process.exit(1);
-  }
-  reloadList = join(runDir, "plugins", jar);
-  await writeFile(join(runDir, "reload.list"), reloadList + "\n");
-}
+// Match watcher: deploy a fresh timestamped JAR so Paper can load new providers
+const reloadJarName = sourceJar.replace(/\.jar$/i, `-reload-${Date.now()}.jar`);
+const reloadJarPath = join(pluginsDir, reloadJarName);
+await copyFile(join(pluginsDir, sourceJar), reloadJarPath);
+await writeFile(join(runDir, "reload.list"), reloadJarPath + "\n");
 
 const before = await readFile(logPath, "utf8").catch(() => "");
 await writeFile(join(runDir, ".reload-trigger"), String(Date.now()));
 
-console.log("Triggered reload via .reload-trigger");
+console.log("Triggered reload via", reloadJarName);
 
 try {
   await waitForLog(RELOAD_OK, 60_000);
