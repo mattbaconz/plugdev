@@ -64,7 +64,14 @@ jobs:
       - name: Maven fixture doctor + build
         working-directory: test/fixtures/maven-plugin
         run: |
+          set +e
           node ../../../packages/cli/dist/cli.js doctor --json > doctor.json
+          code=$?
+          set -e
+          # 0 = fully ready, 2 = toolchain ok but setup/cache incomplete
+          if [ "$code" -ne 0 ] && [ "$code" -ne 2 ]; then
+            exit "$code"
+          fi
           node -e "const d=require('./doctor.json'); if(d.data.projectType!=='plugin') process.exit(3); if(d.data.buildSystem!=='maven') process.exit(4); console.log('maven fixture detect ok');"
           node ../../../packages/cli/dist/cli.js build --json
 
