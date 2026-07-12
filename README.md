@@ -8,7 +8,7 @@
 
 **Test Minecraft plugins and mods in one command.**
 
-Paper-family plugins get a real server, client join, and reload on save. Fabric / NeoForge / Quilt / Forge mods hand off to Gradle `runClient`. Discord bots are experimental.
+Paper-family plugins get a real server, client join, and reload on save. Fabric / NeoForge / Quilt / Forge mods hand off to Gradle `runClient`.
 
 **[Watch the demo](https://www.youtube.com/watch?v=IFrxqWrVrLY)** · [pluglabs.app/plugdev](https://pluglabs.app/plugdev)
 
@@ -81,7 +81,7 @@ PlugDev detects the loader and runs Gradle (`runClient` by default). No Paper ca
 | `plug` / `plugdev` | Interactive TUI |
 | `plugdev tui` | Same TUI |
 | `plug run` / `plugdev run` | Full loop (plugin or mod path) |
-| `plug setup` | Prefetch (plugins) or toolchain check (mods / Discord) |
+| `plug setup` | Prefetch (plugins) or toolchain check (mods) |
 | `plug clean` | Wipe worlds or `.plugdev/run` |
 | `plug doctor` | Detect project + toolchain |
 | `plug init` | Create `plugdev.yml` + scripts |
@@ -118,17 +118,6 @@ watch:
 ```
 
 Hotswap starts JDWP, compiles classes, and tries redefine. New methods/fields, `plugin.yml`, or a failed redefine fall back to safe reload (or restart). PlugDev still sets up the server and client; hotswap is the fast inner loop.
-
-## Discord bots (experimental)
-
-```powershell
-cd your-bot
-plugdev init --setup
-# set DISCORD_TOKEN (or DISCORD_BOT_TOKEN) in the environment / .env
-plug run
-```
-
-Detects `discord.js` (and similar Node libs). Starts the bot process, watches files, restarts on save. No Paper, no Minecraft client. Node only in this release.
 
 ## Dev server on disk (plugins)
 
@@ -194,9 +183,19 @@ Not the primary pitch. Prefer `init --setup --agents` until the CLI stick.
 }
 ```
 
+## Demos
+
+Drop GIFs under `brand/demos/` after recording (see local `RECORDING.md` on the demo plugin):
+
+| Clip | What it shows |
+|------|----------------|
+| `detect-26.1.2.gif` | `api-version` + Prism FO 26.1.2 auto-match |
+| `hotswap-plugtest.gif` | Method-body edit, instant `/plugtest` |
+| `hotswap-fallback.gif` | Structural edit → safe reload fallback |
+
 ## Status
 
-**v0.10.0** — Mods + Discord bot testing (experimental) + optional Java hotswap. See [CHANGELOG.md](CHANGELOG.md).
+**v0.10.0** — Mods + optional Java hotswap. See [CHANGELOG.md](CHANGELOG.md).
 
 Site: [pluglabs.app/plugdev](https://pluglabs.app/plugdev) · npm: [`@plugdev/cli`](https://www.npmjs.com/package/@plugdev/cli)
 

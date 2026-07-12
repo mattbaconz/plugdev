@@ -45,7 +45,6 @@ plug run
 - Do not use Bukkit \`/reload\` — PlugDev uses safe JAR reload via bootstrap
 - On Folia, prefer full restart over safe reload (\`server: folia\` in \`plugdev.yml\`)
 - Optional \`--hotswap\` / \`watch.reload.java: hotswap\` is method-body JDWP redefine only; structural changes fall back to safe reload
-- Discord bots (\`type: discord-bot\`) are experimental: process restart on save, not Paper
 - Do not delete \`~/.plugdev\` unless the user asks (\`plugdev cache clear\`)
 `;
 
@@ -61,7 +60,6 @@ This project uses [PlugDev](https://github.com/mattbaconz/plugdev) for the Minec
 - Deps: \`plugdev deps add|remove|list\` (defaults include Via*, VaultUnlocked, EssentialsX, MineConomy)
 - Headless: \`plugdev server start|stop|status|command|logs\`
 - Optional hotswap (\`--hotswap\`): method bodies only; falls back to safe reload
-- Discord bots (\`type: discord-bot\`): experimental Node process restart loop
 
 Do not use Bukkit \`/reload\`. On Folia, prefer full restart over safe reload.
 `;
@@ -89,7 +87,6 @@ This is a Minecraft Paper plugin developed with PlugDev. Prefer \`plug run\` ove
 | Cache | \`~/.plugdev/\` |
 | Reload | Safe JAR reload (not \`/reload\`); optional \`--hotswap\` for method bodies |
 | Folia | Prefer full restart over safe reload |
-| Discord | Experimental \`type: discord-bot\` — process restart on save |
 | Headless | \`plugdev server start|stop|status|command|logs\` + \`--json\` |
 
 Optional MCP (experimental): \`npx @plugdev/mcp\` — do not promote as an AI product; use for agent control of the same loop.
