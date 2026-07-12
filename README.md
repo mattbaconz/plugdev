@@ -10,6 +10,8 @@
 
 Starts a real server with your plugin, opens Minecraft, and reloads when you save. Works with Paper, Folia, Purpur, Pufferfish, and Spigot.
 
+**[Watch the demo](https://www.youtube.com/watch?v=IFrxqWrVrLY)** · [pluglabs.app/plugdev](https://pluglabs.app/plugdev)
+
 [![npm](https://img.shields.io/npm/v/@plugdev/cli.svg)](https://www.npmjs.com/package/@plugdev/cli)
 [![license](https://img.shields.io/npm/l/@plugdev/cli.svg)](https://github.com/mattbaconz/plugdev/blob/main/LICENSE)
 [![release](https://img.shields.io/github/v/release/mattbaconz/plugdev?display_name=tag&label=release)](https://github.com/mattbaconz/plugdev/releases)
@@ -31,12 +33,14 @@ Feels like `npm run dev` — for Minecraft plugins.
 ```powershell
 npm install -g @plugdev/cli
 cd your-plugin
-plugdev init --setup
+plugdev init --setup --agents
 plugdev          # interactive TUI
 # or: plugdev run   # one-shot test loop
 ```
 
 `plug` and `plugdev` are the same CLI. Use whichever you prefer.
+
+`--agents` wires Cursor (`.cursor/rules/plugdev.mdc`), Claude Code (`CLAUDE.md`), and Codex (`AGENTS.md`) in the same step. Skip it if you only want the human loop.
 
 | Prefer… | Same as |
 |---------|---------|
@@ -46,7 +50,7 @@ plugdev          # interactive TUI
 | `plug doctor` | `plugdev doctor` |
 | `plug clean` | `plugdev clean` |
 
-**Without a global install:** `npx @plugdev/cli@latest init --setup` then `npx @plugdev/cli@latest` (TUI) or `… run`.
+**Without a global install:** `npx @plugdev/cli@latest init --setup --agents` then `npx @plugdev/cli@latest` (TUI) or `… run`.
 
 Optional `npm run dev` scripts still work — they call `plugdev run`.
 
@@ -67,6 +71,8 @@ First boot remaps plugins (~10–30s). Later boots are much faster. **Ctrl+C** s
 | `plug clean` | Remove worlds or `.plugdev/run` |
 | `plug doctor` | Detect project + toolchain |
 | `plug init` | Create `plugdev.yml` + scripts |
+| `plugdev init --setup --agents` | Init + prefetch + AI tool snippets |
+| `plugdev agent install --all` | Cursor / Claude / Codex project rules |
 | `plugdev demo` | Built-in demo fixture |
 | `plugdev server start` | Headless server (agents/MCP) |
 | `plugdev deps add viaversion` | Install preset dep |
@@ -118,7 +124,21 @@ client:
   offline: false
 ```
 
-## PlugDev MCP
+## Agents
+
+Wire AI coding tools into the project (preferred over hand-rolled Paper scripts):
+
+```powershell
+plugdev init --setup --agents
+# or later:
+plugdev agent install --all
+```
+
+Portable skill (discover PlugDev before project rules exist): see [`skills/plugdev`](skills/plugdev).
+
+## PlugDev MCP (experimental)
+
+Not the primary pitch. Prefer `init --setup --agents` until you have a sticky CLI workflow.
 
 ```json
 {
