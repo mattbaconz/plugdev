@@ -20,7 +20,13 @@ import { prefetchDeps } from "../deps/hangar.js";
 import { writeClientInstanceToYml } from "../deps/config-write.js";
 import { banner, phase, info, success, warn } from "../util/log.js";
 import { createDownloadProgress, endDownloadProgress } from "../util/progress.js";
-import { requireJava21, checkGradle, checkMaven } from "../util/tools.js";
+import {
+  requireJava,
+  requireJava21,
+  checkGradle,
+  checkMaven,
+  minJavaMajorForServerVersion,
+} from "../util/tools.js";
 import { isJsonMode, emitJson } from "../util/output.js";
 
 function serverDisplayName(server: string): string {
@@ -139,11 +145,14 @@ export async function runSetup(
   const serverProject = resolveServerProject(config.server);
   const serverLabel = serverDisplayName(config.server);
 
+  const minJava = minJavaMajorForServerVersion(config.version);
   try {
-    await requireJava21();
-    phase("Java 21+");
+    const java = await requireJava(minJava);
+    phase(`Java ${java.version ?? minJava + "+"}`);
   } catch {
-    warn("Java 21+ required — install from https://adoptium.net/");
+    warn(
+      `Java ${minJava}+ required — install from https://adoptium.net/ (or: scoop install temurin${minJava}-jdk)`,
+    );
     return 2;
   }
 

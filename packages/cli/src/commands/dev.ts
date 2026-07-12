@@ -36,7 +36,10 @@ import { banner, phase, info, warn, error as logError, resetPhases } from "../ut
 import { createDownloadProgress, endDownloadProgress } from "../util/progress.js";
 import { CLI_VERSION } from "../constants.js";
 import { Errors, formatError, formatErrorJson, getExitCode, PlugDevError } from "../util/errors.js";
-import { requireJava21 } from "../util/tools.js";
+import {
+  minJavaMajorForServerVersion,
+  requireJava,
+} from "../util/tools.js";
 import { isPortAvailable } from "../util/port.js";
 import { getLogMode, isJsonMode, emitJson } from "../util/output.js";
 import { resolveBootstrapJar } from "../util/bootstrap.js";
@@ -122,7 +125,7 @@ export async function runDev(
       throw Errors.noBuildSystem();
     }
 
-    await requireJava21();
+    await requireJava(minJavaMajorForServerVersion(config.version));
 
     if (config.watch.reloadJava === "hotswap" && config.jvm.debugPort <= 0) {
       warn("Hotswap requested but JDWP port is 0 — enabling port 5005");

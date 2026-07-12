@@ -110,18 +110,21 @@ export const Errors = {
   javaNotFound(): PlugDevError {
     return new PlugDevError({
       what: "Java not found.",
-      cause: "The java command is not on PATH and JAVA_HOME may be unset.",
-      fix: "Install Java 21+ and ensure java is available in your terminal.",
+      cause: "No JDK found via JAVA_HOME, common install paths, or PATH.",
+      fix: "Install Java 21+ (Paper 26.x needs Java 25+) from Adoptium or scoop install temurin25-jdk.",
       hint: "https://adoptium.net/",
       code: 2,
     });
   },
 
-  javaVersionUnsupported(found: string): PlugDevError {
+  javaVersionUnsupported(found: string, minMajor = 21): PlugDevError {
     return new PlugDevError({
       what: `Unsupported Java version (${found}).`,
-      cause: "Paper 1.21+ requires Java 21 or newer.",
-      fix: "Install JDK 21+ and set JAVA_HOME to point at it.",
+      cause:
+        minMajor >= 25
+          ? `Paper/Folia 26.x requires Java ${minMajor} or newer.`
+          : `Paper 1.21+ requires Java ${minMajor} or newer.`,
+      fix: `Install JDK ${minMajor}+ and set JAVA_HOME to point at it (PlugDev resolves it without rewriting PATH).`,
       hint: "https://adoptium.net/",
       code: 2,
     });

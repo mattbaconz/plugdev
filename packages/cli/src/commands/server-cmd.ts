@@ -23,7 +23,10 @@ import {
   type ServerSession,
 } from "../session.js";
 import { isPortAvailable } from "../util/port.js";
-import { requireJava21 } from "../util/tools.js";
+import {
+  minJavaMajorForServerVersion,
+  requireJava,
+} from "../util/tools.js";
 import { heading, info, success } from "../util/log.js";
 import { isJsonMode, emitJson, getLogMode } from "../util/output.js";
 import { formatError, getExitCode, Errors } from "../util/errors.js";
@@ -38,7 +41,9 @@ export async function runServerStart(
   overrides: CliOverrides = {},
 ): Promise<number> {
   try {
-    await requireJava21();
+    const project = await detectProject(cwd);
+    const config = await loadConfig(cwd, project, overrides);
+    await requireJava(minJavaMajorForServerVersion(config.version));
     const existing = await readSession(cwd);
     if (existing && isProcessRunning(existing.pid)) {
       if (isJsonMode()) {
@@ -51,9 +56,6 @@ export async function runServerStart(
       info(`Server already running (pid ${existing.pid}, port ${existing.gamePort})`);
       return 0;
     }
-
-    const project = await detectProject(cwd);
-    const config = await loadConfig(cwd, project, overrides);
 
     if (!(await isPortAvailable(config.port))) {
       throw Errors.portInUse(config.port);

@@ -2,6 +2,11 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { success, info, dumpLogTail } from "../util/log.js";
 import { Errors } from "../util/errors.js";
 import type { LogMode } from "../util/output.js";
+import {
+  getResolvedJava,
+  javaChildEnv,
+  type ResolvedJava,
+} from "../util/tools.js";
 
 export interface ServerProcess {
   proc: ChildProcess;
@@ -19,6 +24,8 @@ export interface JavaProcessOptions {
   args?: string[];
   logMode?: LogMode;
   background?: boolean;
+  /** Absolute java path from resolveJava / requireJava */
+  java?: ResolvedJava | null;
 }
 
 const RING_MAX_LINES = 120;
@@ -76,15 +83,19 @@ export function startJavaProcess(
 
   const readyPattern = opts.readyPattern ?? /Done \(|Timings Reset/;
   const pluginName = opts.pluginName;
+  const java = opts.java ?? getResolvedJava();
+  const javaPath = java?.path ?? "java";
 
-  const proc = spawn("java", args, {
+  const proc = spawn(javaPath, args, {
     cwd: runDir,
     detached: opts.background ?? false,
     stdio: ["pipe", "pipe", "pipe"],
     env: {
-      ...process.env,
+      ...javaChildEnv(java),
       PLUGDEV: "true",
     },
+    // Avoid cmd.exe wrapping on Windows for absolute paths
+    windowsHide: true,
   });
 
   proc.stdin?.on("error", (err) => {

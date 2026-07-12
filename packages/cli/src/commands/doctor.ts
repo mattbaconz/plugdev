@@ -1,6 +1,6 @@
 import { detectProject, detectFoliaSupport } from "../detect/project.js";
 import { loadConfig } from "../config/loader.js";
-import { checkGradle, checkJava, checkMaven, parseJavaMajor } from "../util/tools.js";
+import { checkGradle, checkJava, checkMaven, minJavaMajorForServerVersion, parseJavaMajor } from "../util/tools.js";
 import { pomHasModules } from "../build/maven.js";
 import {
   detectLauncher,
@@ -77,13 +77,16 @@ export async function runDoctor(cwd: string): Promise<number> {
   const serverProject = resolveServerProject(config.server);
   const serverLabel = serverDisplayName(config.server);
 
-  const java = await checkJava();
+  const minJava = minJavaMajorForServerVersion(config.version);
+  const java = await checkJava(minJava);
   let javaOk = false;
   let javaVersion: string | undefined;
   if (java.ok) {
     javaVersion = java.version;
     const major = java.major ?? parseJavaMajor(java.version);
-    javaOk = major === undefined || major >= 21;
+    javaOk = major === undefined || major >= minJava;
+  } else if (java.version) {
+    javaVersion = java.version;
   }
 
   let gradleOk: boolean | undefined;
@@ -195,7 +198,14 @@ export async function runDoctor(cwd: string): Promise<number> {
         jarTaskHint,
         runPaperHint,
         multiModuleHint,
-        java: { ok: java.ok, version: javaVersion, meetsPaper21: javaOk },
+        java: {
+          ok: java.ok,
+          version: javaVersion,
+          path: java.path,
+          meetsMin: javaOk,
+          minMajor: minJava,
+          meetsPaper21: javaOk,
+        },
         gradle: gradleOk,
         maven: mavenOk,
         bootstrap: {
@@ -242,7 +252,7 @@ export async function runDoctor(cwd: string): Promise<number> {
             : spigotMissing
               ? `Spigot jar missing — place at ${spigotJarPath}`
               : !javaOk
-                ? "Install JDK 21+ from https://adoptium.net/"
+                ? `Install JDK ${minJava}+ from https://adoptium.net/`
                 : !setupReady
                   ? "Run: plugdev setup"
                   : undefined,
@@ -292,16 +302,24 @@ export async function runDoctor(cwd: string): Promise<number> {
     if (config.watch.reloadJava === "hotswap") {
       info("Note: watch.reload.java hotswap applies to Minecraft Java, not Discord bots");
     }
-  } else if (java.ok) {
+  } else if (java.ok || java.version) {
     const major = java.major ?? parseJavaMajor(java.version);
-    if (major !== undefined && major < 21) {
-      warn(`Java ${java.version} found — Paper 1.21+ needs Java 21+`);
+    if (major !== undefined && major < minJava) {
+      warn(
+        `Java ${java.version} found — ${serverLabel} ${config.version} needs Java ${minJava}+`,
+      );
+    } else if (java.ok) {
+      phase(`Java ${java.version}${java.path ? ` (${java.path})` : ""}`);
     } else {
-      phase(`Java ${java.version}`);
+      warn(`Java ${java.version} found — needs Java ${minJava}+`);
     }
   } else {
-    warn("Java not found on PATH");
-    info("Hint: https://adoptium.net/");
+    warn("Java not found (JAVA_HOME / common installs / PATH)");
+    info(
+      minJava >= 25
+        ? "Hint: scoop install temurin25-jdk — https://adoptium.net/"
+        : "Hint: https://adoptium.net/",
+    );
   }
 
   if (!isDiscordBot && project.buildSystem === "gradle") {

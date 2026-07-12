@@ -5,10 +5,15 @@ import type { ResolvedConfig } from "../config/loader.js";
 import type { DetectedProject } from "../detect/project.js";
 import { info } from "../util/log.js";
 import { Errors } from "../util/errors.js";
+import { getResolvedJava, javaChildEnv } from "../util/tools.js";
 import { findJarByPattern } from "./jars.js";
 import type { BuildResult } from "./types.js";
 
 export type { BuildResult } from "./types.js";
+
+function gradleEnv(): NodeJS.ProcessEnv {
+  return javaChildEnv(getResolvedJava());
+}
 
 function gradlewCommand(cwd: string): string {
   return join(cwd, process.platform === "win32" ? "gradlew.bat" : "gradlew");
@@ -36,7 +41,7 @@ export async function runModGradle(
   const gradleArgs = modGradleArgs(config, project);
   const modTask = gradleArgs[gradleArgs.length - 1];
   info(`Mod dev: delegating to Gradle ${gradleArgs.join(":")}`);
-  await execa(gradlew, gradleArgs, { cwd, stdio: "inherit" });
+  await execa(gradlew, gradleArgs, { cwd, stdio: "inherit", env: gradleEnv() });
   return { task: modTask };
 }
 
@@ -49,7 +54,11 @@ export async function runGradleTask(
   const gradlew = gradlewCommand(cwd);
   const sub = config.gradleSubproject?.replace(":", "");
   const args = sub ? [sub, task] : [task];
-  await execa(gradlew, [...args, "--quiet"], { cwd, stdio: "inherit" });
+  await execa(gradlew, [...args, "--quiet"], {
+    cwd,
+    stdio: "inherit",
+    env: gradleEnv(),
+  });
 }
 
 export async function runGradleBuild(
@@ -70,7 +79,11 @@ export async function runGradleBuild(
   let lastError: unknown;
   for (const t of tasks) {
     try {
-      await execa(gradlew, [t, "-x", "test", "--quiet"], { cwd, stdio: "inherit" });
+      await execa(gradlew, [t, "-x", "test", "--quiet"], {
+        cwd,
+        stdio: "inherit",
+        env: gradleEnv(),
+      });
       const jarPath = await findBuiltJar(cwd, t, config.build.jarPattern);
       return { jarPath, task: t };
     } catch (e) {

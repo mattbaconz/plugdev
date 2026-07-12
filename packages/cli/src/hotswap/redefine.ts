@@ -108,16 +108,23 @@ async function ensureHelper(): Promise<string> {
 
   if (!(await exists(classPath))) {
     info("Compiling hotswap helper (once)...");
-    const r = await execa("javac", ["--release", "21", "HotSwapRedefine.java"], {
+    const { getResolvedJava, javaToolPath, javaChildEnv, resolveJava } =
+      await import("../util/tools.js");
+    const java = getResolvedJava() ?? (await resolveJava(0));
+    const javac = javaToolPath(java, "javac");
+    const env = javaChildEnv(java);
+    const r = await execa(javac, ["--release", "21", "HotSwapRedefine.java"], {
       cwd: dir,
       stdio: "pipe",
       reject: false,
+      env,
     });
     if (r.exitCode !== 0) {
-      const r2 = await execa("javac", ["HotSwapRedefine.java"], {
+      const r2 = await execa(javac, ["HotSwapRedefine.java"], {
         cwd: dir,
         stdio: "pipe",
         reject: false,
+        env,
       });
       if (r2.exitCode !== 0) {
         throw new Error(
@@ -229,10 +236,14 @@ export async function attemptHotswap(opts: {
     String(port),
     ...targets,
   ];
-  const result = await execa("java", args, {
+  const { getResolvedJava, javaToolPath, javaChildEnv, resolveJava } =
+    await import("../util/tools.js");
+  const java = getResolvedJava() ?? (await resolveJava(0));
+  const result = await execa(javaToolPath(java, "java"), args, {
     cwd: opts.cwd,
     reject: false,
     stdio: "pipe",
+    env: javaChildEnv(java),
   });
 
   if (result.exitCode === 0) {

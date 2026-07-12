@@ -5,6 +5,7 @@ import { execa } from "execa";
 import type { ResolvedConfig } from "../config/loader.js";
 import { info } from "../util/log.js";
 import { Errors } from "../util/errors.js";
+import { getResolvedJava, javaChildEnv } from "../util/tools.js";
 import { findJarByPattern, isExcludedJar, pickBestJar } from "./jars.js";
 import type { BuildResult } from "./types.js";
 
@@ -110,6 +111,7 @@ export async function runMavenBuild(
     await execa(command, args, {
       cwd,
       stdio: "inherit",
+      env: javaChildEnv(getResolvedJava()),
     });
   } catch (e) {
     throw Errors.buildFailed(

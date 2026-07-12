@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { execa } from "execa";
 import { info } from "../../util/log.js";
+import { resolveJava, javaToolPath } from "../../util/tools.js";
 import {
   embeddedClientDir,
   ensureEmbeddedClient,
@@ -16,17 +16,8 @@ import type {
 } from "./types.js";
 
 async function resolveJavaPath(): Promise<string> {
-  if (process.env.JAVA_HOME) {
-    const bin =
-      process.platform === "win32"
-        ? join(process.env.JAVA_HOME, "bin", "java.exe")
-        : join(process.env.JAVA_HOME, "bin", "java");
-    return bin;
-  }
-  const cmd = process.platform === "win32" ? "where" : "which";
-  const { stdout } = await execa(cmd, ["java"], { reject: false });
-  const first = stdout.split(/\r?\n/).find((l) => l.trim());
-  return first?.trim() || "java";
+  const java = await resolveJava(0);
+  return javaToolPath(java, "java");
 }
 
 export const embeddedAdapter: LauncherAdapter = {

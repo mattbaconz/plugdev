@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.1 — 2026-07-12
+
+### [fixed]
+- Windows cmd no longer fails with "The input line is too long" when JAVA_HOME/PATH helpers rewrite a huge PATH — Java is resolved by absolute path (JAVA_HOME, Scoop Temurin, PATH) without batch `set PATH=`
+- Paper/Folia **26.x** requires Java **25+**; PlugDev picks the newest suitable JDK (e.g. scoop `temurin25-jdk`) for setup/run/doctor/server/hotswap/Gradle/Maven
+- Server, hotswap helper, and builds spawn `java`/`javac` via the resolved binary and set `JAVA_HOME` on the child env only
+
 ## 0.10.0 — 2026-07-12
 
 ### [added]

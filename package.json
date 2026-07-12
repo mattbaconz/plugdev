@@ -1,7 +1,7 @@
 {
   "name": "plugdev",
   "private": true,
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "Test Minecraft plugins in one command. Starts a real server with your plugin, opens Minecraft, and reloads when you save. Works with Paper, Folia, Purpur, Pufferfish, and Spigot.",
   "workspaces": [
     "packages/cli",
