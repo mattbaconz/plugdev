@@ -1,89 +1,46 @@
 import { writeFile, readFile, access } from "node:fs/promises";
 import { join } from "node:path";
 import { constants } from "node:fs";
-import { detectProject } from "../detect/project.js";
+import { detectProject, printDetectionSummary } from "../detect/project.js";
+import {
+  detectProjectDeps,
+  formatDepsYaml,
+  type DetectedHangarDep,
+} from "../detect/deps.js";
 import { loadConfig } from "../config/loader.js";
 import { CLI_VERSION } from "../constants.js";
 import { heading, success, info, warn } from "../util/log.js";
 import { formatNextSteps, initNextSteps } from "../util/shell-hints.js";
 import { runSetup } from "./setup.js";
+import { runAgentInstall } from "./agent.js";
 
-const PLUGIN_GRADLE_TEMPLATE = `# PlugDev configuration — auto-generated
-type: plugin
-server: paper
-version: "{{version}}"
-port: 25565
-
-build:
-  system: gradle
-  task: build
-  jarTask: {{jarTask}}
-
-client:
-  launcher: auto
-  offline: false
-  offlineName: DevPlayer
-
-jvm:
-  memory: 1G
-
-# Keep .plugdev/run between sessions (fast). Options: never | on-exit | worlds
-run:
-  cleanup: never
-
-dev:
-  gamemode: creative
-  world: void
-  op: true
-  peaceful: true
-  onlineMode: false
-
-# Cross-version join (Via*) + common APIs (VaultUnlocked, EssentialsX, MineConomy).
-# Remove any with: plugdev deps remove <name>
-deps:
-  - name: ViaVersion
-    source: hangar
-    author: ViaVersion
-    slug: ViaVersion
-  - name: ViaBackwards
-    source: hangar
-    author: ViaVersion
-    slug: ViaBackwards
-  - name: ViaRewind
-    source: hangar
-    author: ViaVersion
-    slug: ViaRewind
-  - name: VaultUnlocked
-    source: hangar
-    author: TNE
-    slug: VaultUnlocked
-  - name: EssentialsX
-    source: hangar
-    author: EssentialsX
-    slug: EssentialsX
-  - name: MineConomy
-    source: hangar
-    author: piyushkadam
-    slug: MineConomy
-
-watch:
-  paths:
-    - src/
-  debounceMs: 300
-  reload:
-    java: safe
-`;
-
-const PLUGIN_MAVEN_TEMPLATE = `# PlugDev configuration — auto-generated
-type: plugin
-server: paper
-version: "{{version}}"
-port: 25565
-
-build:
+function buildPluginTemplate(opts: {
+  server: string;
+  version: string;
+  buildSystem: "gradle" | "maven";
+  jarTask: string;
+  deps: DetectedHangarDep[];
+  reloadJava: string;
+}): string {
+  const depsBlock = formatDepsYaml(opts.deps);
+  const buildBlock =
+    opts.buildSystem === "maven"
+      ? `build:
   system: maven
   task: package
-  jarPattern: "target/*.jar"
+  jarPattern: "target/*.jar"`
+      : `build:
+  system: gradle
+  task: build
+  jarTask: ${opts.jarTask}`;
+
+  return `# PlugDev configuration — auto-generated
+type: plugin
+server: ${opts.server}
+version: "${opts.version}"
+port: 25565
+
+${buildBlock}
 
 client:
   launcher: auto
@@ -104,41 +61,19 @@ dev:
   peaceful: true
   onlineMode: false
 
-# Cross-version join (Via*) + common APIs (VaultUnlocked, EssentialsX, MineConomy).
-# Remove any with: plugdev deps remove <name>
+# Via* for cross-version join + deps detected from plugin.yml / build files.
+# Add more with: plugdev deps add <name>   Remove with: plugdev deps remove <name>
 deps:
-  - name: ViaVersion
-    source: hangar
-    author: ViaVersion
-    slug: ViaVersion
-  - name: ViaBackwards
-    source: hangar
-    author: ViaVersion
-    slug: ViaBackwards
-  - name: ViaRewind
-    source: hangar
-    author: ViaVersion
-    slug: ViaRewind
-  - name: VaultUnlocked
-    source: hangar
-    author: TNE
-    slug: VaultUnlocked
-  - name: EssentialsX
-    source: hangar
-    author: EssentialsX
-    slug: EssentialsX
-  - name: MineConomy
-    source: hangar
-    author: piyushkadam
-    slug: MineConomy
+${depsBlock}
 
 watch:
   paths:
     - src/
   debounceMs: 300
   reload:
-    java: safe
+    java: ${opts.reloadJava}
 `;
+}
 
 const MOD_TEMPLATE = `# PlugDev configuration — auto-generated
 type: mod
@@ -161,6 +96,20 @@ watch:
     data: reload
 `;
 
+const DISCORD_BOT_TEMPLATE = `# PlugDev configuration — auto-generated (experimental)
+type: discord-bot
+
+bot:
+  runtime: node
+  entry: auto
+  tokenEnv: DISCORD_TOKEN
+
+watch:
+  paths:
+    - src/
+  debounceMs: 400
+`;
+
 const DEFAULT_SCRIPTS: Record<string, string> = {
   setup: "plugdev setup",
   dev: "plugdev run",
@@ -171,13 +120,52 @@ const DEFAULT_SCRIPTS: Record<string, string> = {
 export async function runInit(
   cwd: string,
   force = false,
-  opts: { setup?: boolean } = {},
+  opts: { setup?: boolean; agents?: boolean } = {},
 ): Promise<number> {
   heading("PlugDev Init\n");
 
   const project = await detectProject(cwd);
   const config = await loadConfig(cwd, project);
+  const detectedDeps = await detectProjectDeps(cwd);
   const configPath = join(cwd, "plugdev.yml");
+
+  const jarTask = project.hasShadowJar ? "shadowJar" : "jar";
+  const server =
+    project.suggestedServer === "folia" || project.foliaSupported
+      ? "folia"
+      : "paper";
+  const reloadJava = server === "folia" ? "restart" : "safe";
+
+  printDetectionSummary(project, {
+    version: project.type === "discord-bot" ? undefined : config.version,
+    jarTask:
+      project.type === "plugin" ||
+      (project.buildSystem !== "none" && project.type !== "discord-bot")
+        ? jarTask
+        : undefined,
+    server:
+      project.type === "mod" || project.type === "discord-bot"
+        ? undefined
+        : server,
+  });
+
+  if (
+    detectedDeps.deps.length > 0 &&
+    project.type !== "mod" &&
+    project.type !== "discord-bot"
+  ) {
+    info(
+      `Deps: ${detectedDeps.deps.map((d) => d.slug).join(", ")}` +
+        (detectedDeps.sources.length
+          ? ` (project: ${detectedDeps.sources.map((s) => s.slug).join(", ")})`
+          : " (Via* defaults)"),
+    );
+  }
+  if (detectedDeps.unmapped.length > 0 && project.type !== "discord-bot") {
+    info(
+      `Unmapped plugin.yml deps (add manually): ${detectedDeps.unmapped.join(", ")}`,
+    );
+  }
 
   let configExists = false;
   try {
@@ -190,7 +178,6 @@ export async function runInit(
     // will create
   }
 
-  const jarTask = project.hasShadowJar ? "shadowJar" : "jar";
   let content: string;
 
   if (project.type === "mod") {
@@ -198,13 +185,17 @@ export async function runInit(
       "{{version}}",
       config.version,
     );
-  } else if (project.buildSystem === "maven") {
-    content = PLUGIN_MAVEN_TEMPLATE.replaceAll("{{version}}", config.version);
+  } else if (project.type === "discord-bot") {
+    content = DISCORD_BOT_TEMPLATE;
   } else {
-    content = PLUGIN_GRADLE_TEMPLATE.replaceAll("{{version}}", config.version).replace(
-      "{{jarTask}}",
+    content = buildPluginTemplate({
+      server,
+      version: config.version,
+      buildSystem: project.buildSystem === "maven" ? "maven" : "gradle",
       jarTask,
-    );
+      deps: detectedDeps.deps,
+      reloadJava,
+    });
   }
 
   if (!configExists || force) {
@@ -219,7 +210,12 @@ export async function runInit(
     pkg = JSON.parse(await readFile(pkgPath, "utf8")) as Record<string, unknown>;
     pkgExists = true;
   } catch {
-    pkg = { name: project.pluginName?.toLowerCase() ?? "my-plugin", private: true };
+    pkg = {
+      name:
+        project.pluginName?.toLowerCase() ??
+        (project.type === "discord-bot" ? "my-discord-bot" : "my-plugin"),
+      private: true,
+    };
   }
 
   const devDeps = (pkg.devDependencies as Record<string, string>) ?? {};
@@ -240,6 +236,12 @@ export async function runInit(
   await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
   success(pkgExists ? `Updated ${pkgPath}` : `Created ${pkgPath}`);
 
+  if (opts.agents) {
+    info("");
+    await runAgentInstall(cwd, { all: true, force, silent: true });
+    success("Agent wiring: .cursor/rules/plugdev.mdc, CLAUDE.md, AGENTS.md");
+  }
+
   if (opts.setup) {
     info("");
     const setupCode = await runSetup(cwd);
@@ -251,15 +253,18 @@ export async function runInit(
     info("Next:");
     info(formatNextSteps(["plug run"]));
     info("Same as: plugdev run");
+    if (opts.agents) {
+      info("Agent rules written — Cursor / Claude / Codex will prefer plug run");
+    }
     info("(PowerShell tip: run each command on its own line — do not use &&)");
     return 0;
   }
 
   info("");
   info("Next (global install — recommended):");
-  info(formatNextSteps(initNextSteps()));
+  info(formatNextSteps(initNextSteps({ agents: opts.agents })));
   info("Or with npx only:");
-  info(formatNextSteps(initNextSteps({ usedNpx: true })));
-  info("Faster one-shot: npx @plugdev/cli@latest init --setup");
+  info(formatNextSteps(initNextSteps({ usedNpx: true, agents: opts.agents })));
+  info("Faster one-shot: npx @plugdev/cli@latest init --setup --agents");
   return 0;
 }

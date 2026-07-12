@@ -31,9 +31,10 @@ describe("runInit", () => {
       assert.match(yml, /ViaVersion/);
       assert.match(yml, /ViaBackwards/);
       assert.match(yml, /ViaRewind/);
-      assert.match(yml, /VaultUnlocked/);
-      assert.match(yml, /EssentialsX/);
-      assert.match(yml, /MineConomy/);
+      // Full Vault/Essentials stack only when detected from project
+      assert.doesNotMatch(yml, /VaultUnlocked/);
+      assert.doesNotMatch(yml, /EssentialsX/);
+      assert.doesNotMatch(yml, /MineConomy/);
       assert.doesNotMatch(yml, /instance: plugdev-/);
       assert.match(yml, /cleanup: never/);
 
@@ -120,6 +121,61 @@ describe("runInit", () => {
       assert.match(yml, /task:\s*package/);
       assert.match(yml, /jarPattern:\s*"target\/\*\.jar"/);
       assert.doesNotMatch(yml, /system:\s*gradle/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("writes agent snippets with --agents", async () => {
+    const dir = join(tmpdir(), `plugdev-init-agents-${Date.now()}`);
+    await mkdir(join(dir, "src"), { recursive: true });
+    await writeFile(
+      join(dir, "plugin.yml"),
+      "name: TestPlugin\nversion: 1.0.0\nmain: test.Main\napi-version: '1.21'\n",
+    );
+    await writeFile(join(dir, "build.gradle"), "plugins { id 'java' }\n");
+
+    try {
+      const code = await runInit(dir, false, { agents: true });
+      assert.equal(code, 0);
+      const rule = await readFile(join(dir, ".cursor", "rules", "plugdev.mdc"), "utf8");
+      assert.match(rule, /plug run/);
+      const claude = await readFile(join(dir, "CLAUDE.md"), "utf8");
+      assert.match(claude, /## PlugDev/);
+      const agents = await readFile(join(dir, "AGENTS.md"), "utf8");
+      assert.match(agents, /PlugDev/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("writes detected softdepend deps and Folia server", async () => {
+    const dir = join(tmpdir(), `plugdev-init-deps-${Date.now()}`);
+    await mkdir(join(dir, "src", "main", "resources"), { recursive: true });
+    await writeFile(
+      join(dir, "src", "main", "resources", "plugin.yml"),
+      `name: SoftDeps
+main: test.Main
+api-version: '1.21'
+folia-supported: true
+softdepend: [Vault, LuckPerms]
+`,
+    );
+    await writeFile(
+      join(dir, "build.gradle"),
+      `dependencies { compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT") }\n`,
+    );
+
+    try {
+      const code = await runInit(dir, false);
+      assert.equal(code, 0);
+      const yml = await readFile(join(dir, "plugdev.yml"), "utf8");
+      assert.match(yml, /server:\s*folia/);
+      assert.match(yml, /java:\s*restart/);
+      assert.match(yml, /ViaVersion/);
+      assert.match(yml, /VaultUnlocked/);
+      assert.match(yml, /LuckPerms/);
+      assert.doesNotMatch(yml, /EssentialsX/);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

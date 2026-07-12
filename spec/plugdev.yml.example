@@ -31,6 +31,9 @@ watch:
   reload:
     java: safe
 
+# Via* always; add more from plugin.yml softdepend or: plugdev deps add luckperms
 # deps:
-#   - name: vault
-#     enabled: true
+#   - name: ViaVersion
+#     source: hangar
+#     author: ViaVersion
+#     slug: ViaVersion

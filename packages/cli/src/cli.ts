@@ -62,6 +62,7 @@ function devOptions() {
     noWatch: false,
     configPath: undefined as string | undefined,
     debug: false,
+    hotswap: false,
     watch: true,
     quiet: false,
   };
@@ -84,6 +85,7 @@ function parseDevOpts(opts: ReturnType<typeof devOptions>) {
     noWatch: opts.noWatch,
     configPath: opts.configPath,
     debug: opts.debug,
+    hotswap: opts.hotswap,
     watch: opts.watch !== false,
     quiet: opts.quiet,
   };
@@ -131,9 +133,13 @@ program
   .description("Scaffold plugdev.yml and package.json scripts")
   .option("--force", "Overwrite existing plugdev.yml")
   .option("--setup", "Also run plugdev setup (prefetch Paper + client)")
-  .action(async (opts: { force?: boolean; setup?: boolean }) => {
+  .option("--agents", "Also wire Cursor / Claude / Codex project snippets")
+  .action(async (opts: { force?: boolean; setup?: boolean; agents?: boolean }) => {
     process.exit(
-      await runInit(process.cwd(), opts.force, { setup: opts.setup }),
+      await runInit(process.cwd(), opts.force, {
+        setup: opts.setup,
+        agents: opts.agents,
+      }),
     );
   });
 
@@ -216,6 +222,7 @@ program
   .option("--no-watch", "disable file watcher")
   .option("--config <path>", "config file path")
   .option("--debug", "enable JDWP debug port (5005)")
+  .option("--hotswap", "plugins: JDWP redefine for method bodies (falls back to safe reload)")
   .action(async (opts) => {
     process.exit(
       await runDev(process.cwd(), {
@@ -408,8 +415,15 @@ program
   .command("watch")
   .description("Start dev server with file watching")
   .option("--debug", "enable JDWP debug port (5005)")
-  .action(async (opts: { debug?: boolean }) => {
-    process.exit(await runDev(process.cwd(), { watch: true, debug: opts.debug }));
+  .option("--hotswap", "plugins: JDWP redefine for method bodies (falls back to safe reload)")
+  .action(async (opts: { debug?: boolean; hotswap?: boolean }) => {
+    process.exit(
+      await runDev(process.cwd(), {
+        watch: true,
+        debug: opts.debug,
+        hotswap: opts.hotswap,
+      }),
+    );
   });
 
 program
@@ -428,6 +442,7 @@ program
   .option("--no-watch", "disable file watcher")
   .option("--config <path>", "config file path")
   .option("--debug", "enable JDWP debug port (5005)")
+  .option("--hotswap", "plugins: JDWP redefine for method bodies (falls back to safe reload)")
   .action(async (opts) => {
     const bin = invokedAsPlug() ? "plug" : "plugdev";
     const globals = program.opts<{ json?: boolean }>();
@@ -446,7 +461,8 @@ program
         opts.loader ||
         opts.noWatch ||
         opts.config ||
-        opts.debug,
+        opts.debug ||
+        opts.hotswap,
     );
 
     // Explicit legacy flags on bare command still start the loop

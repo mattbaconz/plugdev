@@ -133,17 +133,42 @@ export async function runDoctor(cwd: string): Promise<number> {
       : undefined;
 
   const isMod = project.type === "mod" || config.type === "mod";
+  const isDiscordBot =
+    project.type === "discord-bot" || config.type === "discord-bot";
 
-  const toolchainReady =
-    project.type !== "unknown" &&
-    javaOk &&
-    (project.buildSystem !== "gradle" || gradleOk) &&
-    (project.buildSystem !== "maven" || mavenOk) &&
-    (isMod || bootstrap.ok) &&
-    !spigotMissing;
+  let nodeOk: boolean | undefined;
+  let tokenPresent: boolean | undefined;
+  let tokenEnvName: string | undefined;
+  if (isDiscordBot) {
+    const { loadDotEnv, resolveBotTokenEnv } = await import("../util/dotenv.js");
+    await loadDotEnv(cwd);
+    try {
+      const { execa } = await import("execa");
+      const node = await execa("node", ["--version"], { reject: false });
+      nodeOk = node.exitCode === 0;
+    } catch {
+      nodeOk = false;
+    }
+    const token = resolveBotTokenEnv(config.bot?.tokenEnv);
+    tokenPresent = token.present;
+    tokenEnvName = token.name;
+  }
 
-  const clientReady = isMod ? true : embeddedReady || client.ready;
-  const setupReady = isMod ? toolchainReady : serverCached && clientReady;
+  const toolchainReady = isDiscordBot
+    ? project.type !== "unknown" && nodeOk === true
+    : project.type !== "unknown" &&
+      javaOk &&
+      (project.buildSystem !== "gradle" || gradleOk) &&
+      (project.buildSystem !== "maven" || mavenOk) &&
+      (isMod || bootstrap.ok) &&
+      !spigotMissing;
+
+  const clientReady = isMod || isDiscordBot ? true : embeddedReady || client.ready;
+  const setupReady = isDiscordBot
+    ? toolchainReady && tokenPresent === true
+    : isMod
+      ? toolchainReady
+      : serverCached && clientReady;
 
   if (isJsonMode()) {
     emitJson({
@@ -153,8 +178,15 @@ export async function runDoctor(cwd: string): Promise<number> {
         buildSystem: project.buildSystem,
         pluginName: project.pluginName,
         loader: project.loader,
-        minecraftVersion: config.version,
-        server: config.server,
+        minecraftVersion: isDiscordBot ? undefined : config.version,
+        server: isDiscordBot ? undefined : config.server,
+        bot: isDiscordBot
+          ? {
+              tokenEnv: tokenEnvName,
+              tokenPresent,
+              nodeOk,
+            }
+          : undefined,
         jarTask: config.build.jarTask,
         jarPattern: config.build.jarPattern,
         module: config.build.module,
@@ -175,7 +207,7 @@ export async function runDoctor(cwd: string): Promise<number> {
               support: foliaSupport,
               warning:
                 foliaSupport !== "declared"
-                  ? "Folia: plugin metadata does not declare Folia support; prefer watch.reloadJava: restart"
+                  ? "Folia: plugin metadata does not declare Folia support; prefer watch.reload.java: restart"
                   : "Folia: safe reload may still be unsafe — prefer restart after code changes",
             }
           : undefined,
@@ -199,15 +231,21 @@ export async function runDoctor(cwd: string): Promise<number> {
         },
         toolchainReady,
         setupReady,
-        hint: !bootstrap.ok
-          ? "Bootstrap JAR missing — run npm run build:bootstrap from the plugdev monorepo"
-          : spigotMissing
-            ? `Spigot jar missing — place at ${spigotJarPath}`
-            : !javaOk
-              ? "Install JDK 21+ from https://adoptium.net/"
-              : !setupReady
-                ? "Run: plugdev setup"
-                : undefined,
+        hint: isDiscordBot
+          ? !nodeOk
+            ? "Install Node.js from https://nodejs.org/"
+            : !tokenPresent
+              ? `Set ${tokenEnvName ?? "DISCORD_TOKEN"} in the environment or .env`
+              : undefined
+          : !bootstrap.ok
+            ? "Bootstrap JAR missing — run npm run build:bootstrap from the plugdev monorepo"
+            : spigotMissing
+              ? `Spigot jar missing — place at ${spigotJarPath}`
+              : !javaOk
+                ? "Install JDK 21+ from https://adoptium.net/"
+                : !setupReady
+                  ? "Run: plugdev setup"
+                  : undefined,
       },
     });
     if (!toolchainReady) return 3;
@@ -221,23 +259,40 @@ export async function runDoctor(cwd: string): Promise<number> {
   info(`Build system: ${pc.bold(project.buildSystem)}`);
   if (project.pluginName) info(`Plugin name: ${project.pluginName}`);
   if (project.loader) info(`Mod loader: ${project.loader}`);
-  info(`Minecraft version: ${config.version}`);
-  info(`Server software: ${serverLabel}`);
-  info(`Config jar task: ${config.build.jarTask}`);
-  if (config.build.jarPattern) info(`JAR pattern: ${config.build.jarPattern}`);
-  if (config.build.module) info(`Maven module: ${config.build.module}`);
-  if (project.hasShadowJar) {
+  if (!isDiscordBot) {
+    info(`Minecraft version: ${config.version}`);
+    info(`Server software: ${serverLabel}`);
+    info(`Config jar task: ${config.build.jarTask}`);
+    if (config.build.jarPattern) info(`JAR pattern: ${config.build.jarPattern}`);
+    if (config.build.module) info(`Maven module: ${config.build.module}`);
+  } else {
+    info(`Bot entry: ${config.bot?.entry ?? "auto"}`);
+    info(`Token env: ${tokenEnvName ?? "DISCORD_TOKEN"}`);
+  }
+  if (project.hasShadowJar && !isDiscordBot) {
     info(
       project.buildSystem === "maven"
         ? "Shade JAR: maven-shade-plugin detected"
         : "Shadow JAR: detected in build.gradle",
     );
   }
-  if (jarTaskHint) warn(jarTaskHint);
-  if (runPaperHint) info(runPaperHint);
-  if (multiModuleHint) warn(multiModuleHint);
+  if (jarTaskHint && !isDiscordBot) warn(jarTaskHint);
+  if (runPaperHint && !isDiscordBot) info(runPaperHint);
+  if (multiModuleHint && !isDiscordBot) warn(multiModuleHint);
 
-  if (java.ok) {
+  if (isDiscordBot) {
+    if (nodeOk) phase("Node.js");
+    else warn("Node.js not found on PATH");
+    if (tokenPresent) phase(`Token env ${tokenEnvName} is set`);
+    else
+      warn(
+        `Token env not set — export ${tokenEnvName ?? "DISCORD_TOKEN"} or add it to .env`,
+      );
+    phase("Discord bot path: process restart on save (experimental)");
+    if (config.watch.reloadJava === "hotswap") {
+      info("Note: watch.reload.java hotswap applies to Minecraft Java, not Discord bots");
+    }
+  } else if (java.ok) {
     const major = java.major ?? parseJavaMajor(java.version);
     if (major !== undefined && major < 21) {
       warn(`Java ${java.version} found — Paper 1.21+ needs Java 21+`);
@@ -249,33 +304,46 @@ export async function runDoctor(cwd: string): Promise<number> {
     info("Hint: https://adoptium.net/");
   }
 
-  if (project.buildSystem === "gradle") {
+  if (!isDiscordBot && project.buildSystem === "gradle") {
     if (gradleOk) phase("Gradle wrapper");
     else warn("Gradle wrapper not found");
   }
 
-  if (project.buildSystem === "maven") {
+  if (!isDiscordBot && project.buildSystem === "maven") {
     if (mavenOk) phase("Maven (mvnw or mvn)");
     else warn("Maven not found — install Maven or add mvnw wrapper");
   }
 
   if (project.type === "unknown") {
-    warn("Could not detect plugin or mod project");
+    warn("Could not detect plugin, mod, or Discord bot project");
     return 3;
   }
 
-  if (isMod) {
+  if (isDiscordBot) {
+    // already printed above
+  } else if (isMod) {
     if (config.gradleSubproject) {
       phase(`Gradle subproject: ${config.gradleSubproject}`);
     }
     phase("Mod path: Gradle runClient/runServer (Paper bootstrap skipped)");
     info("Reload: assets F3+T / data /reload / java restart — no plugin-style hot reload");
+    if (config.watch.reloadJava === "hotswap") {
+      info(
+        "hotswap mode: PlugDev will try JDWP redefine after ./gradlew classes; structural changes still need restart",
+      );
+    }
   } else {
     if (bootstrap.ok) {
       phase(`Bootstrap JAR: ${bootstrap.path}`);
     } else {
       warn("Bootstrap JAR not found — safe reload will fail");
-      info("Hint: npm run build:bootstrap (from plugdev monorepo)");
+      info("Hint: reinstall CLI — npm i -g @plugdev/cli@latest");
+    }
+
+    if (config.watch.reloadJava === "hotswap") {
+      info(
+        `Hotswap enabled — JDWP port ${config.jvm.debugPort || 5005}; method bodies only; falls back to safe reload`,
+      );
     }
 
     if (config.server === "folia") {
@@ -285,7 +353,7 @@ export async function runDoctor(cwd: string): Promise<number> {
         );
       } else {
         warn(
-          "Folia: plugin metadata does not declare Folia support — prefer watch.reloadJava: restart",
+          "Folia: plugin metadata does not declare Folia support — prefer watch.reload.java: restart",
         );
       }
     }
@@ -329,7 +397,11 @@ export async function runDoctor(cwd: string): Promise<number> {
   }
 
   if (!setupReady) {
-    warn("Not ready — run: plugdev setup");
+    warn(
+      isDiscordBot
+        ? `Not ready — set ${tokenEnvName ?? "DISCORD_TOKEN"} then re-run doctor`
+        : "Not ready — run: plugdev setup",
+    );
     return 2;
   }
 

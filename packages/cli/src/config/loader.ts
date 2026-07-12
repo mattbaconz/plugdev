@@ -4,10 +4,10 @@ import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 import Ajv2020 from "ajv/dist/2020.js";
 import type { DetectedProject } from "../detect/project.js";
-import { warn } from "../util/log.js";
+import { info, warn } from "../util/log.js";
 
 export interface PlugDevConfig {
-  type?: "plugin" | "mod" | "network" | "pack";
+  type?: "plugin" | "mod" | "network" | "pack" | "discord-bot";
   proxy?: {
     software?: "velocity" | "waterfall";
     port?: number;
@@ -27,6 +27,12 @@ export interface PlugDevConfig {
   version?: string;
   port?: number;
   loader?: string;
+  /** Discord bot (experimental) */
+  bot?: {
+    runtime?: "node";
+    entry?: string;
+    tokenEnv?: string;
+  };
   build?: {
     system?: "gradle" | "maven";
     task?: string;
@@ -86,7 +92,7 @@ export interface PlugDevConfig {
 }
 
 export interface ResolvedConfig {
-  type: "plugin" | "mod" | "network" | "pack";
+  type: "plugin" | "mod" | "network" | "pack" | "discord-bot";
   server: string;
   version: string;
   port: number;
@@ -104,6 +110,11 @@ export interface ResolvedConfig {
   };
   jvm: { memory: string; debugPort: number; args?: string[] };
   run: { cleanup: "never" | "on-exit" | "worlds" };
+  bot?: {
+    runtime: "node";
+    entry?: string;
+    tokenEnv: string;
+  };
   dev: PlugDevConfig["dev"];
   deps: PlugDevConfig["deps"];
   client?: PlugDevConfig["client"];
@@ -124,6 +135,8 @@ export interface CliOverrides {
   spigot?: boolean;
   join?: boolean;
   debug?: boolean;
+  /** Optional JDWP hotswap fast path for plugins (method bodies). */
+  hotswap?: boolean;
   server?: boolean;
   /** Run datagen Gradle task (mods). */
   datagen?: boolean;
@@ -192,7 +205,11 @@ function resolveServer(
   return raw.server ?? "paper";
 }
 
-function resolveReloadJava(raw: PlugDevConfig): "safe" | "restart" | "hotswap" {
+function resolveReloadJava(
+  raw: PlugDevConfig,
+  overrides: CliOverrides = {},
+): "safe" | "restart" | "hotswap" {
+  if (overrides.hotswap) return "hotswap";
   const mode = raw.watch?.reload?.java;
   if (mode === "restart" || mode === "hotswap" || mode === "safe") return mode;
   return "safe";
@@ -230,12 +247,25 @@ export async function loadConfig(
       ? `${version}.4`
       : version;
 
-  const debugPort =
-    overrides.debug === true
-      ? raw.jvm?.debugPort && raw.jvm.debugPort > 0
-        ? raw.jvm.debugPort
-        : 5005
-      : (raw.jvm?.debugPort ?? 0);
+  if (normalizedVersion !== version) {
+    info(`Normalized MC version ${version} → ${normalizedVersion}`);
+  }
+
+  const wantsJdwp =
+    overrides.debug === true ||
+    overrides.hotswap === true ||
+    raw.watch?.reload?.java === "hotswap";
+
+  const debugPort = wantsJdwp
+    ? raw.jvm?.debugPort && raw.jvm.debugPort > 0
+      ? raw.jvm.debugPort
+      : 5005
+    : (raw.jvm?.debugPort ?? 0);
+
+  const defaultWatchPaths =
+    type === "discord-bot"
+      ? (raw.watch?.paths ?? ["src/", "."]).filter((p) => p !== "node_modules")
+      : (raw.watch?.paths ?? ["src/"]);
 
   return {
     type: type as ResolvedConfig["type"],
@@ -266,9 +296,9 @@ export async function loadConfig(
       })(),
     },
     watch: {
-      paths: raw.watch?.paths ?? ["src/"],
-      debounceMs: raw.watch?.debounceMs ?? 300,
-      reloadJava: resolveReloadJava(raw),
+      paths: defaultWatchPaths,
+      debounceMs: raw.watch?.debounceMs ?? (type === "discord-bot" ? 400 : 300),
+      reloadJava: resolveReloadJava(raw, overrides),
     },
     jvm: {
       memory: raw.jvm?.memory ?? "1G",
@@ -281,6 +311,14 @@ export async function loadConfig(
           ? raw.run.cleanup
           : "never",
     },
+    bot:
+      type === "discord-bot"
+        ? {
+            runtime: "node",
+            entry: raw.bot?.entry ?? project.botEntry,
+            tokenEnv: raw.bot?.tokenEnv ?? project.botTokenEnv ?? "DISCORD_TOKEN",
+          }
+        : undefined,
     dev: raw.dev,
     deps: (raw.deps ?? []).filter((d) => d.enabled !== false),
     client: raw.client,

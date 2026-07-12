@@ -11,10 +11,40 @@ import { info, success, warn, error } from "../util/log.js";
 import { formatError, formatErrorJson } from "../util/errors.js";
 import { isJsonMode, emitJson } from "../util/output.js";
 import { confirmReload } from "../util/reload-feedback.js";
+import { attemptHotswap } from "../hotswap/redefine.js";
+import { execa } from "execa";
 
 export interface PluginWatcherCallbacks {
   onSafeReload: (jarPath: string) => Promise<void>;
   onRestart: () => Promise<void>;
+}
+
+async function fastCompile(
+  cwd: string,
+  config: ResolvedConfig,
+): Promise<boolean> {
+  try {
+    if (config.build.system === "maven") {
+      const { resolveMavenCommand } = await import("../build/maven.js");
+      const { command } = await resolveMavenCommand(cwd);
+      const compileArgs = config.build.module
+        ? ["-pl", config.build.module, "-am", "compile", "-DskipTests", "-q"]
+        : ["compile", "-DskipTests", "-q"];
+      await execa(command, compileArgs, { cwd, stdio: "inherit" });
+      return true;
+    }
+    const gradlew =
+      process.platform === "win32"
+        ? join(cwd, "gradlew.bat")
+        : join(cwd, "gradlew");
+    await execa(gradlew, ["classes", "-x", "test", "--quiet"], {
+      cwd,
+      stdio: "inherit",
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function startPluginWatcher(
@@ -48,6 +78,24 @@ export function startPluginWatcher(
 
     try {
       info(`[watch] ${changedPath.replace(cwd, ".")}`);
+
+      // Optional hotswap fast path (method bodies)
+      if (reloadMode === "hotswap") {
+        const compiled = await fastCompile(cwd, config);
+        if (compiled) {
+          const hs = await attemptHotswap({
+            cwd,
+            debugPort: config.jvm.debugPort > 0 ? config.jvm.debugPort : 5005,
+          });
+          if (hs.ok) {
+            return;
+          }
+          warn("Falling back to safe reload");
+        } else {
+          warn("Fast compile failed — falling back to safe reload");
+        }
+      }
+
       const build =
         config.build.system === "maven"
           ? await runMavenBuild(cwd, config)
@@ -98,26 +146,42 @@ export function startModWatchOrchestrator(
     const rel = changedPath.replace(cwd, ".");
     info(`[watch] ${rel}`);
 
+    const lower = changedPath.replace(/\\/g, "/").toLowerCase();
     try {
-      if (rel.includes("assets/")) {
+      if (lower.includes("/assets/") || lower.endsWith(".png") || lower.endsWith(".json") && lower.includes("assets")) {
         await runGradleTask(cwd, config, project, "processResources");
-        warn("Asset change → press F3+T in Minecraft to reload resources");
+        info("→ Press F3+T in Minecraft to reload resources");
         return;
       }
-      if (rel.includes("data/")) {
+      if (lower.includes("/data/")) {
         await runGradleTask(cwd, config, project, "processResources");
-        warn("Data change → run /reload in-game (or restart client if it fails)");
+        info("→ Run /reload on the integrated server");
         return;
       }
-      if (rel.endsWith(".java")) {
-        await runGradleTask(cwd, config, project, "classes");
+
+      if (config.watch.reloadJava === "hotswap") {
+        try {
+          await runGradleTask(cwd, config, project, "classes");
+          const hs = await attemptHotswap({
+            cwd,
+            debugPort: config.jvm.debugPort > 0 ? config.jvm.debugPort : 5005,
+          });
+          if (hs.ok) return;
+        } catch {
+          // fall through to restart hint
+        }
         warn("Java change → restart Minecraft client (or use IDE hotswap while debugging)");
         return;
       }
-      await runGradleTask(cwd, config, project, "build");
-      warn("Source change → restart Minecraft client recommended");
+
+      await runGradleTask(cwd, config, project, "classes");
+      warn("Java change → restart Minecraft client (or use IDE hotswap while debugging)");
     } catch (e) {
-      error(formatError(e, debug));
+      if (isJsonMode()) {
+        emitJson(formatErrorJson(e, debug));
+      } else {
+        error(formatError(e, debug));
+      }
     }
   }, config.watch.debounceMs);
 
@@ -128,13 +192,42 @@ export function startModWatchOrchestrator(
 
   watcher.on("change", handleChange);
   watcher.on("add", handleChange);
+
   return () => watcher.close();
 }
 
-/** @deprecated use startModWatchOrchestrator */
-export function startModWatchNotifier(
+export function startDiscordBotWatcher(
   cwd: string,
   config: ResolvedConfig,
+  onRestart: () => Promise<void>,
+  debug = false,
 ): () => void {
-  return startModWatchOrchestrator(cwd, config, { type: "mod", buildSystem: "gradle", hasShadowJar: false }, false);
+  const paths = config.watch.paths.map((p) => join(cwd, p));
+  info(`Watching ${paths.join(", ")} (discord-bot restart)...`);
+
+  const handleChange = debounce(async (changedPath: string) => {
+    info(`[watch] ${changedPath.replace(cwd, ".")}`);
+    try {
+      await onRestart();
+      success("Bot process restarted");
+    } catch (e) {
+      error(formatError(e, debug));
+    }
+  }, config.watch.debounceMs);
+
+  const watcher = chokidar.watch(paths, {
+    ignoreInitial: true,
+    ignored: [
+      "**/node_modules/**",
+      "**/.git/**",
+      "**/plugdev.yml",
+      "**/.env",
+    ],
+    awaitWriteFinish: { stabilityThreshold: 200 },
+  });
+
+  watcher.on("change", handleChange);
+  watcher.on("add", handleChange);
+
+  return () => watcher.close();
 }

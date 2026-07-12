@@ -112,6 +112,51 @@ test("detectProject treats mvnw as maven signal", async () => {
   }
 });
 
+test("detectProject treats Gradle paper-api without plugin.yml as plugin", async () => {
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const dir = await mkdtemp(join(tmpdir(), "plugdev-gradle-paper-"));
+  try {
+    await writeFile(
+      join(dir, "build.gradle.kts"),
+      `plugins {
+  java
+  id("xyz.jpenilla.run-paper") version "2.3.1"
+}
+dependencies {
+  compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
+}
+`,
+    );
+    const project = await detectProject(dir);
+    assert.equal(project.type, "plugin");
+    assert.equal(project.buildSystem, "gradle");
+    assert.equal(project.minecraftVersion, "1.21.4");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("detectProject sets suggestedServer folia when declared", async () => {
+  const { mkdtemp, writeFile, mkdir, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const dir = await mkdtemp(join(tmpdir(), "plugdev-folia-"));
+  try {
+    await mkdir(join(dir, "src", "main", "resources"), { recursive: true });
+    await writeFile(join(dir, "build.gradle"), "plugins { id 'java' }\n");
+    await writeFile(
+      join(dir, "src", "main", "resources", "plugin.yml"),
+      "name: FoliaPlug\nmain: a.B\napi-version: '1.21'\nfolia-supported: true\n",
+    );
+    const project = await detectProject(dir);
+    assert.equal(project.type, "plugin");
+    assert.equal(project.foliaSupported, true);
+    assert.equal(project.suggestedServer, "folia");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("detectFoliaSupport is absent for paper-plugin fixture without Folia flag", async () => {
   const support = await detectFoliaSupport(fixtureRoot);
   assert.equal(support, "absent");

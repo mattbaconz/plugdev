@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.10.0 — 2026-07-12
+
+### [added]
+- Optional Java hotswap fast path: `watch.reload.java: hotswap` or `plug run --hotswap` (JDWP redefine for method bodies; falls back to safe reload)
+- Experimental Discord bot loop: detect `discord.js` / similar, `type: discord-bot`, run + watch + process restart
+- Smarter project detection: deps from `plugin.yml` / `compileOnly`, Prism instance recommend, Folia signals
+- Agent snippets mention hotswap limits and Discord bot experimental path
+
+### [changed]
+- README positions PlugDev for plugins + mods; Discord bots experimental
+- `setup` / `doctor` skip Paper/client for mods and Discord bots; Discord checks Node + token env presence
+- Schema: `discordBotConfig`; hotswap description clarified
+
+### [fixed]
+- `watch.reload.java: hotswap` no longer silently took the safe-reload path without attempting redefine
+
 ## 0.9.2 — 2026-07-10
 
 ### [fixed]

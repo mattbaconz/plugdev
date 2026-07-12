@@ -11,17 +11,20 @@ export function isWindowsShell(): boolean {
 export function initNextSteps(opts?: {
   usedNpx?: boolean;
   globalPreferred?: boolean;
+  agents?: boolean;
 }): string[] {
+  const initCmd = opts?.agents
+    ? "plugdev init --setup --agents"
+    : "plugdev init --setup";
   if (opts?.usedNpx) {
-    return ["npx @plugdev/cli@latest setup", "npx @plugdev/cli@latest run"];
+    const npxInit = opts?.agents
+      ? "npx @plugdev/cli@latest init --setup --agents"
+      : "npx @plugdev/cli@latest setup";
+    return [npxInit, "npx @plugdev/cli@latest run"];
   }
   // Global install is the primary UX (plug + plugdev bins)
   if (opts?.globalPreferred !== false) {
-    return [
-      "npm install -g @plugdev/cli",
-      "plugdev init --setup",
-      "plug run",
-    ];
+    return ["npm install -g @plugdev/cli", initCmd, "plug run"];
   }
   return ["npm install", "npm run setup", "npm run dev"];
 }

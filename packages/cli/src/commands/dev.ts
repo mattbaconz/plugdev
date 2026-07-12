@@ -1,6 +1,11 @@
 import { join } from "node:path";
 import type { ChildProcess } from "node:child_process";
-import { detectProject } from "../detect/project.js";
+import {
+  detectProject,
+  detectFoliaSupport,
+  formatDetectionSummary,
+  type DetectedProject,
+} from "../detect/project.js";
 import { loadConfig, type CliOverrides, type ResolvedConfig } from "../config/loader.js";
 import { ensureServerJar, resolveServerProject, isServerJarCached } from "../cache/server.js";
 import {
@@ -24,7 +29,7 @@ import {
 } from "../process/spawner.js";
 import { attachInteractiveConsole, type InteractiveConsole } from "../process/interactive-console.js";
 import { installDeps } from "../deps/hangar.js";
-import { startPluginWatcher, startModWatchOrchestrator } from "../watch/watcher.js";
+import { startPluginWatcher, startModWatchOrchestrator, startDiscordBotWatcher } from "../watch/watcher.js";
 import { launchClient } from "../client/launch.js";
 import { launchPlayers } from "../client/players.js";
 import { banner, phase, info, warn, error as logError, resetPhases } from "../util/log.js";
@@ -35,8 +40,6 @@ import { requireJava21 } from "../util/tools.js";
 import { isPortAvailable } from "../util/port.js";
 import { getLogMode, isJsonMode, emitJson } from "../util/output.js";
 import { resolveBootstrapJar } from "../util/bootstrap.js";
-import { detectFoliaSupport } from "../detect/project.js";
-import type { DetectedProject } from "../detect/project.js";
 import {
   writeSession,
   clearSession,
@@ -44,6 +47,12 @@ import {
   type ServerSession,
 } from "../session.js";
 import { projectRunDir } from "../paths.js";
+import { loadDotEnv, resolveBotTokenEnv } from "../util/dotenv.js";
+import {
+  resolveDiscordBotEntry,
+  spawnDiscordBot,
+  stopDiscordBot,
+} from "../process/discord-bot.js";
 
 function watchEnabled(overrides: CliOverrides & { watch?: boolean }): boolean {
   if (overrides.noWatch) return false;
@@ -101,6 +110,10 @@ export async function runDev(
 
     if (!isJsonMode()) banner(CLI_VERSION);
 
+    if (config.type === "discord-bot" || project.type === "discord-bot") {
+      return runDiscordBotDev(cwd, config, overrides, debug);
+    }
+
     if (config.type === "mod" || project.type === "mod") {
       return runModDev(cwd, config, project, overrides, debug);
     }
@@ -111,11 +124,17 @@ export async function runDev(
 
     await requireJava21();
 
-    const buildLabel = config.build.system === "maven" ? "Maven" : "Gradle";
+    if (config.watch.reloadJava === "hotswap" && config.jvm.debugPort <= 0) {
+      warn("Hotswap requested but JDWP port is 0 — enabling port 5005");
+    }
+
     const serverLabel = serverDisplayName(config.server);
     phase(
-      `Detect project — ${buildLabel} + ${serverLabel}` +
-        (project.pluginName ? ` (${project.pluginName})` : ""),
+      `Detect project — ${formatDetectionSummary(project, {
+        version: config.version,
+        jarTask: config.build.jarTask,
+        server: serverLabel,
+      })}`,
     );
 
     if (config.build.system === "maven" || project.buildSystem === "maven") {
@@ -130,6 +149,80 @@ export async function runDev(
   } catch (e) {
     return handleDevError(e, debug);
   }
+}
+
+async function runDiscordBotDev(
+  cwd: string,
+  config: ResolvedConfig,
+  overrides: CliOverrides & { watch?: boolean },
+  debug: boolean,
+): Promise<number> {
+  await loadDotEnv(cwd);
+  const token = resolveBotTokenEnv(config.bot?.tokenEnv);
+  if (!token.present) {
+    throw new PlugDevError({
+      what: "Discord bot token missing.",
+      cause: `${token.name} (and DISCORD_BOT_TOKEN) are unset.`,
+      fix: `Export ${token.name} or add it to a local .env file.`,
+      hint: "Never commit the token. plugdev setup / doctor check for presence only.",
+      code: 2,
+    });
+  }
+
+  const plan = await resolveDiscordBotEntry(cwd, config.bot?.entry);
+  phase(`Detect discord-bot — ${plan.label} · token ${token.name}`);
+
+  let child: ChildProcess | undefined;
+  let closeWatcher: (() => void) | undefined;
+  let shuttingDown = false;
+
+  const start = async () => {
+    await stopDiscordBot(child);
+    child = spawnDiscordBot({
+      cwd,
+      entry: plan.entry,
+      useShell: plan.useShell,
+    });
+    child.on("exit", (code, signal) => {
+      if (!shuttingDown && code !== 0 && signal !== "SIGTERM") {
+        warn(`Bot exited (code=${code ?? "?"} signal=${signal ?? "none"})`);
+      }
+    });
+  };
+
+  await start();
+
+  if (watchEnabled(overrides)) {
+    closeWatcher = startDiscordBotWatcher(
+      cwd,
+      config,
+      async () => {
+        await start();
+      },
+      debug,
+    );
+  }
+
+  return await new Promise<number>((resolve) => {
+    const shutdown = async () => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      closeWatcher?.();
+      await stopDiscordBot(child);
+      resolve(0);
+    };
+    process.once("SIGINT", () => {
+      void shutdown();
+    });
+    process.once("SIGTERM", () => {
+      void shutdown();
+    });
+    if (!watchEnabled(overrides)) {
+      child?.once("exit", (code) => {
+        resolve(code ?? 0);
+      });
+    }
+  });
 }
 
 async function runModDev(
@@ -284,9 +377,9 @@ async function runPluginDev(
 
     // Install missing deps on every boot (skip JARs already in plugins/)
     if (config.deps?.length) {
-      if (first) phase("Install default deps", "active");
+      if (first) phase("Install test deps", "active");
       await installDeps(pluginsDir, config.deps, config.server, config.version);
-      if (first) phase("Install default deps");
+      if (first) phase("Install test deps");
     }
 
     await writeReloadTrigger(cwd, [devJar]);

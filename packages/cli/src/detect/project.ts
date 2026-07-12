@@ -1,9 +1,16 @@
 import { readFile, access } from "node:fs/promises";
 import { join } from "node:path";
 import { constants } from "node:fs";
+import { info } from "../util/log.js";
 
-export type ProjectType = "plugin" | "mod" | "network" | "pack" | "unknown";
-export type BuildSystem = "gradle" | "maven" | "none";
+export type ProjectType =
+  | "plugin"
+  | "mod"
+  | "network"
+  | "pack"
+  | "discord-bot"
+  | "unknown";
+export type BuildSystem = "gradle" | "maven" | "node" | "none";
 
 export interface DetectedProject {
   type: ProjectType;
@@ -18,6 +25,11 @@ export interface DetectedProject {
   hasRunPaperMaven?: boolean;
   /** True when paper-plugin.yml / plugin.yml declares Folia support. */
   foliaSupported?: boolean;
+  /** Suggested server software for generated plugdev.yml (Folia when declared). */
+  suggestedServer?: "paper" | "folia";
+  /** Discord bot entry hint from package.json */
+  botEntry?: string;
+  botTokenEnv?: string;
   configPath?: string;
 }
 
@@ -84,6 +96,37 @@ function parsePaperApiVersionFromPom(pom: string): string | undefined {
   return mc?.[1];
 }
 
+/** Parse MC version from Gradle paper-api / spigot-api dependency coordinates. */
+function parsePaperApiVersionFromGradle(gradle: string): string | undefined {
+  const patterns = [
+    /(?:paper|spigot)-api[:\s"']+(\d+\.\d+(?:\.\d+)?)(?:-R[\d.]+)?(?:-SNAPSHOT)?/i,
+    /io\.papermc\.paper:paper-api:(\d+\.\d+(?:\.\d+)?)/i,
+    /org\.spigotmc:spigot-api:(\d+\.\d+(?:\.\d+)?)/i,
+  ];
+  for (const re of patterns) {
+    const m = gradle.match(re);
+    if (m?.[1]) return m[1];
+  }
+  return undefined;
+}
+
+function hasGradlePluginSignal(gradle: string): boolean {
+  const needles = [
+    "paper-api",
+    "spigot-api",
+    "xyz.jpenilla.run-paper",
+    "run-paper",
+    "com.rikonardo.papermake",
+    "papermake",
+    "ru.endlesscode.bukkitgradle",
+    "bukkitgradle",
+    "io.papermc.paperweight",
+    "paperweight",
+  ];
+  const lower = gradle.toLowerCase();
+  return needles.some((n) => lower.includes(n.toLowerCase()));
+}
+
 function parseGradleProperties(content: string): Record<string, string> {
   const props: Record<string, string> = {};
   for (const line of content.split("\n")) {
@@ -91,6 +134,41 @@ function parseGradleProperties(content: string): Record<string, string> {
     if (m) props[m[1].trim()] = m[2].trim();
   }
   return props;
+}
+
+function isFoliaDeclared(content: string): boolean {
+  return (
+    /folia-supported:\s*true/i.test(content) ||
+    /folia:\s*true/i.test(content) ||
+    /supports-folia:\s*true/i.test(content)
+  );
+}
+
+/** Human-readable one-line detection summary for init / setup / run. */
+export function formatDetectionSummary(
+  project: DetectedProject,
+  opts?: { version?: string; jarTask?: string; server?: string },
+): string {
+  const parts: string[] = [];
+  const type = project.type === "unknown" ? "unknown" : project.type;
+  parts.push(type);
+  if (project.pluginName) parts.push(project.pluginName);
+  if (project.loader) parts.push(project.loader);
+  if (project.buildSystem !== "none") parts.push(project.buildSystem);
+  const version = opts?.version ?? project.minecraftVersion;
+  if (version) parts.push(`MC ${version}`);
+  if (opts?.server) parts.push(opts.server);
+  const jarTask = opts?.jarTask ?? (project.hasShadowJar ? "shadowJar" : undefined);
+  if (jarTask && project.type === "plugin") parts.push(jarTask);
+  if (project.foliaSupported) parts.push("folia-supported");
+  return parts.join(" · ");
+}
+
+export function printDetectionSummary(
+  project: DetectedProject,
+  opts?: { version?: string; jarTask?: string; server?: string },
+): void {
+  info(`Detected: ${formatDetectionSummary(project, opts)}`);
 }
 
 export async function detectProject(cwd: string): Promise<DetectedProject> {
@@ -210,10 +288,8 @@ export async function detectProject(cwd: string): Promise<DetectedProject> {
       result.pluginName = parsed.name;
       result.mainClass = parsed.main;
       result.minecraftVersion = parsed.apiVersion;
-      result.foliaSupported =
-        /folia-supported:\s*true/i.test(content) ||
-        /folia:\s*true/i.test(content) ||
-        /supports-folia:\s*true/i.test(content);
+      result.foliaSupported = isFoliaDeclared(content);
+      if (result.foliaSupported) result.suggestedServer = "folia";
       break;
     }
   }
@@ -222,22 +298,78 @@ export async function detectProject(cwd: string): Promise<DetectedProject> {
     const props = parseGradleProperties(
       (await readText(join(cwd, "gradle.properties"))) ?? "",
     );
-    result.minecraftVersion = props.minecraftVersion ?? props.paperVersion;
+    result.minecraftVersion =
+      props.minecraftVersion ??
+      props.paperVersion ??
+      props.minecraft_version ??
+      parsePaperApiVersionFromGradle(gradleContent);
   }
 
   if (result.type === "plugin" && !result.minecraftVersion && pomContent) {
     result.minecraftVersion = parsePaperApiVersionFromPom(pomContent);
   }
 
+  // Gradle plugin (no plugin.yml yet, but paper/spigot signals in build)
+  if (result.type === "unknown" && (hasGradle || hasGradlew) && hasGradlePluginSignal(gradleContent)) {
+    result.type = "plugin";
+    result.buildSystem = "gradle";
+    const props = parseGradleProperties(
+      (await readText(join(cwd, "gradle.properties"))) ?? "",
+    );
+    result.minecraftVersion =
+      props.minecraftVersion ??
+      props.paperVersion ??
+      props.minecraft_version ??
+      parsePaperApiVersionFromGradle(gradleContent);
+  }
+
   // Maven plugin (no plugin.yml yet, but paper-api in pom)
   if (result.type === "unknown" && (hasMaven || hasMvnw)) {
     const pom = pomContent || ((await readText(join(cwd, "pom.xml"))) ?? "");
-    if (pom.includes("paper-api")) {
+    if (pom.includes("paper-api") || pom.includes("spigot-api")) {
       result.type = "plugin";
       result.buildSystem = "maven";
       result.minecraftVersion = parsePaperApiVersionFromPom(pom);
       if (pom.includes("maven-shade-plugin")) result.hasShadowJar = true;
       if (pom.includes("run-paper-maven-plugin")) result.hasRunPaperMaven = true;
+    }
+  }
+
+  // Discord bot (Node) — only if not already a Minecraft project
+  if (result.type === "unknown") {
+    const pkgRaw = await readText(join(cwd, "package.json"));
+    if (pkgRaw) {
+      try {
+        const pkg = JSON.parse(pkgRaw) as {
+          main?: string;
+          scripts?: Record<string, string>;
+          dependencies?: Record<string, string>;
+          devDependencies?: Record<string, string>;
+        };
+        const deps = {
+          ...(pkg.dependencies ?? {}),
+          ...(pkg.devDependencies ?? {}),
+        };
+        const discordLibs = [
+          "discord.js",
+          "@discordjs/core",
+          "oceanic.js",
+          "eris",
+        ];
+        if (discordLibs.some((name) => name in deps)) {
+          result.type = "discord-bot";
+          result.buildSystem = "node";
+          result.botTokenEnv = "DISCORD_TOKEN";
+          result.botEntry =
+            pkg.scripts?.dev?.trim() ||
+            pkg.scripts?.start?.trim() ||
+            pkg.main?.trim() ||
+            undefined;
+          result.pluginName = undefined;
+        }
+      } catch {
+        // ignore invalid package.json
+      }
     }
   }
 

@@ -56,7 +56,10 @@ export const DEP_PRESETS: DepPreset[] = [
   },
 ];
 
-/** Default Hangar deps written by `plugdev init` and prefetched by `setup`. */
+/**
+ * Historical full default stack (Via* + common APIs).
+ * `init` now writes Via* + project-detected deps; this list remains for tests / reference.
+ */
 export const DEFAULT_COMPAT_DEPS: Array<{
   name: string;
   source: "hangar";

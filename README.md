@@ -2,13 +2,13 @@
 
 <img src="brand/plugdev-logo.png" alt="PlugDev" width="128" />
 
-# PlugDev · v0.9.2
+# PlugDev · v0.10.0
 
 ---
 
-**Test Minecraft plugins in one command.**
+**Test Minecraft plugins and mods in one command.**
 
-Starts a real server with your plugin, opens Minecraft, and reloads when you save. Works with Paper, Folia, Purpur, Pufferfish, and Spigot.
+Paper-family plugins get a real server, client join, and reload on save. Fabric / NeoForge / Quilt / Forge mods hand off to Gradle `runClient`. Discord bots are experimental.
 
 **[Watch the demo](https://www.youtube.com/watch?v=IFrxqWrVrLY)** · [pluglabs.app/plugdev](https://pluglabs.app/plugdev)
 
@@ -26,56 +26,70 @@ Before: build → copy JAR → restart → open launcher → join
 After:  plugdev / plug run
 ```
 
-Feels like `npm run dev` — for Minecraft plugins.
+Same idea as `npm run dev`, for Minecraft plugin and mod projects.
 
 ## Quick start
+
+### Plugin (Paper / Folia / Purpur / …)
 
 ```powershell
 npm install -g @plugdev/cli
 cd your-plugin
 plugdev init --setup --agents
-plugdev          # interactive TUI
-# or: plugdev run   # one-shot test loop
+plugdev          # TUI
+# or: plug run
 ```
 
-`plug` and `plugdev` are the same CLI. Use whichever you prefer.
+### Mod (Fabric / NeoForge / Quilt / Forge)
 
-`--agents` wires Cursor (`.cursor/rules/plugdev.mdc`), Claude Code (`CLAUDE.md`), and Codex (`AGENTS.md`) in the same step. Skip it if you only want the human loop.
+```powershell
+cd your-mod
+plugdev init --setup --agents
+plugdev run          # → Gradle runClient
+# plugdev --loader neoforge
+# plugdev --server
+```
+
+`plug` and `plugdev` are the same CLI.
+
+`--agents` writes Cursor / Claude / Codex project rules. Skip it for a human-only loop.
 
 | Prefer… | Same as |
 |---------|---------|
 | `plug` / `plugdev` | Interactive TUI (TTY) |
-| `plug run` | `plugdev run` (server + watch + join) |
+| `plug run` | `plugdev run` |
 | `plug setup` | `plugdev setup` |
 | `plug doctor` | `plugdev doctor` |
 | `plug clean` | `plugdev clean` |
 
-**Without a global install:** `npx @plugdev/cli@latest init --setup --agents` then `npx @plugdev/cli@latest` (TUI) or `… run`.
+**Without a global install:** `npx @plugdev/cli@latest init --setup --agents` then `npx @plugdev/cli@latest` or `… run`.
 
-Optional `npm run dev` scripts still work — they call `plugdev run`.
+### What happens (plugins)
 
-### What happens
+Paper + Via* cache under `~/.plugdev/`. Project server in `.plugdev/run/`. Embedded client joins `localhost:25565`. Edit `src/` → save → safe reload (or optional hotswap; see below).
 
-Paper + Via* cache under `~/.plugdev/`. Your project server lives in `.plugdev/run/` (kept by default for fast restarts). An embedded client matching your MC version joins `localhost:25565`. Edit `src/` → save → safe reload.
+First boot remaps plugins (~10–30s). Later boots are faster. **Ctrl+C** stops the server; closing Minecraft does not.
 
-First boot remaps plugins (~10–30s). Later boots are much faster. **Ctrl+C** stops the server; closing Minecraft does not.
+### What happens (mods)
+
+PlugDev detects the loader and runs Gradle (`runClient` by default). No Paper cache, no plugin safe-reload. Java changes usually need a client restart (or IDE/debug hotswap). Assets: F3+T. Data: `/reload`.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `plug` / `plugdev` | Interactive TUI (configure + run) |
-| `plugdev tui` | Same TUI (explicit) |
-| `plug run` / `plugdev run` | Full loop: server + watch + auto-join |
-| `plug setup` | Prefetch Paper + Via* + client |
-| `plug clean` | Remove worlds or `.plugdev/run` |
+| `plug` / `plugdev` | Interactive TUI |
+| `plugdev tui` | Same TUI |
+| `plug run` / `plugdev run` | Full loop (plugin or mod path) |
+| `plug setup` | Prefetch (plugins) or toolchain check (mods / Discord) |
+| `plug clean` | Wipe worlds or `.plugdev/run` |
 | `plug doctor` | Detect project + toolchain |
 | `plug init` | Create `plugdev.yml` + scripts |
-| `plugdev init --setup --agents` | Init + prefetch + AI tool snippets |
-| `plugdev agent install --all` | Cursor / Claude / Codex project rules |
+| `plugdev init --setup --agents` | Init + prefetch + agent rules |
+| `plugdev agent install --all` | Cursor / Claude / Codex rules |
 | `plugdev demo` | Built-in demo fixture |
 | `plugdev server start` | Headless server (agents/MCP) |
-| `plugdev deps add viaversion` | Install preset dep |
+| `plugdev deps add viaversion` | Hangar test dep (plugins) |
 
 ### Global flags
 
@@ -85,19 +99,49 @@ First boot remaps plugins (~10–30s). Later boots are much faster. **Ctrl+C** s
 | `--json` | Structured JSON output |
 | `--join` | Auto-join client |
 | `--no-watch` | One-shot boot |
+| `--hotswap` | Plugins: JDWP + method-body redefine (falls back to safe reload) |
+| `--loader <name>` | Mods: fabric / neoforge / forge subproject |
+| `--debug` | Enable JDWP on port 5005 |
 
-## Dev server on disk
+## Hotswap (optional, plugins)
+
+Default reload is **safe** (JAR + bootstrap). For method-body edits only:
+
+```powershell
+plug run --hotswap
+```
+
+```yaml
+watch:
+  reload:
+    java: hotswap
+```
+
+Hotswap starts JDWP, compiles classes, and tries redefine. New methods/fields, `plugin.yml`, or a failed redefine fall back to safe reload (or restart). PlugDev still sets up the server and client; hotswap is the fast inner loop.
+
+## Discord bots (experimental)
+
+```powershell
+cd your-bot
+plugdev init --setup
+# set DISCORD_TOKEN (or DISCORD_BOT_TOKEN) in the environment / .env
+plug run
+```
+
+Detects `discord.js` (and similar Node libs). Starts the bot process, watches files, restarts on save. No Paper, no Minecraft client. Node only in this release.
+
+## Dev server on disk (plugins)
 
 | Path | Kept? |
 |------|--------|
 | `~/.plugdev/` (Paper, Via*, client) | Yes — global cache |
-| `<project>/.plugdev/run/` | Yes by default (fast restarts) |
+| `<project>/.plugdev/run/` | Yes by default |
 
 ```yaml
 run:
-  cleanup: never    # default — keep run folder
-  # cleanup: on-exit  # delete .plugdev/run when you stop
-  # cleanup: worlds   # wipe world folders each start/exit (keep plugins)
+  cleanup: never    # default
+  # cleanup: on-exit
+  # cleanup: worlds
 ```
 
 ```powershell
@@ -105,11 +149,11 @@ plug clean           # wipe worlds only
 plug clean --all     # delete entire .plugdev/run
 ```
 
-## Client options
+## Client options (plugins)
 
-**Default (`launcher: auto`):** embedded client = server MC version (fast, light).
+**Default (`launcher: auto`):** embedded client matching server MC version.
 
-**Prism with your Microsoft account:**
+**Prism:**
 
 ```powershell
 plug client list
@@ -126,19 +170,17 @@ client:
 
 ## Agents
 
-Wire AI coding tools into the project (preferred over hand-rolled Paper scripts):
-
 ```powershell
 plugdev init --setup --agents
 # or later:
 plugdev agent install --all
 ```
 
-Portable skill (discover PlugDev before project rules exist): see [`skills/plugdev`](skills/plugdev).
+Portable skill: [`skills/plugdev`](skills/plugdev).
 
 ## PlugDev MCP (experimental)
 
-Not the primary pitch. Prefer `init --setup --agents` until you have a sticky CLI workflow.
+Not the primary pitch. Prefer `init --setup --agents` until the CLI stick.
 
 ```json
 {
@@ -154,7 +196,7 @@ Not the primary pitch. Prefer `init --setup --agents` until you have a sticky CL
 
 ## Status
 
-**v0.9.2** — Asset CDN resilience, Ink TUI, Prism instance picker. See [CHANGELOG.md](CHANGELOG.md).
+**v0.10.0** — Mods + Discord bot testing (experimental) + optional Java hotswap. See [CHANGELOG.md](CHANGELOG.md).
 
 Site: [pluglabs.app/plugdev](https://pluglabs.app/plugdev) · npm: [`@plugdev/cli`](https://www.npmjs.com/package/@plugdev/cli)
 

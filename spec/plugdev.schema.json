@@ -8,7 +8,8 @@
     { "$ref": "#/$defs/pluginConfig" },
     { "$ref": "#/$defs/modConfig" },
     { "$ref": "#/$defs/networkConfig" },
-    { "$ref": "#/$defs/packConfig" }
+    { "$ref": "#/$defs/packConfig" },
+    { "$ref": "#/$defs/discordBotConfig" }
   ],
   "$defs": {
     "devDefaults": {
@@ -45,7 +46,7 @@
             "java": {
               "type": "string",
               "enum": ["safe", "hotswap", "restart"],
-              "description": "Plugin: safe. Mod: hotswap or restart."
+              "description": "Plugin default: safe. hotswap = JDWP redefine for method bodies (falls back to safe). Mod: hotswap hint or restart."
             },
             "assets": {
               "type": "string",
@@ -134,7 +135,7 @@
           "type": "array",
           "items": { "type": "string" }
         },
-        "memory": { "type": "string", "default": "2G" },
+        "memory": { "type": "string", "default": "1G" },
         "enhancedRedefinition": { "type": "boolean", "default": false },
         "mixinAgent": {
           "type": "string",
@@ -297,6 +298,35 @@
           },
           "additionalProperties": false
         }
+      },
+      "additionalProperties": false
+    },
+    "discordBotConfig": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "discord-bot" },
+        "bot": {
+          "type": "object",
+          "properties": {
+            "runtime": {
+              "type": "string",
+              "enum": ["node"],
+              "default": "node"
+            },
+            "entry": {
+              "type": "string",
+              "description": "auto | relative path | shell command (default: package.json scripts.dev / start / main)"
+            },
+            "tokenEnv": {
+              "type": "string",
+              "default": "DISCORD_TOKEN",
+              "description": "Env var name for the bot token (value never logged)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "watch": { "$ref": "#/$defs/watchConfig" }
       },
       "additionalProperties": false
     }
