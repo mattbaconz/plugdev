@@ -40,15 +40,22 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: Restore PlugDev server cache
+        uses: actions/cache@v4
+        id: plugdev-server-cache
+        with:
+          path: ~/.plugdev/servers
+          key: plugdev-servers-${{ runner.os }}-paper-1.21.4
+          restore-keys: |
+            plugdev-servers-${{ runner.os }}-paper-
+
       - name: Build fixture plugin
         working-directory: test/fixtures/paper-plugin
         run: ./gradlew build -q
 
       - name: Prefetch Paper cache
         working-directory: test/fixtures/paper-plugin
-        run: |
-          node ../../../packages/cli/dist/cli.js cache prefetch --version 1.21.4 --paper
-          node ../../../packages/cli/dist/cli.js cache prefetch --version 1.21.4 --client
+        run: node ../../../packages/cli/dist/cli.js cache prefetch --version 1.21.4 --paper --quiet
 
       - name: Doctor smoke
         working-directory: test/fixtures/paper-plugin

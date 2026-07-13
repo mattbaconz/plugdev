@@ -295,8 +295,16 @@ cache
   .option("--paper", "prefetch Paper server (default)")
   .option("--folia", "prefetch Folia server")
   .option("--client", "prefetch embedded Minecraft client (combine with --paper/--folia for both)")
+  .option("--skip-assets", "client only: skip texture/sound assets (faster; libs + jar still required)")
   .option("--force", "re-download / repair even if cached")
-  .action(async (opts: { version?: string; paper?: boolean; folia?: boolean; client?: boolean; force?: boolean }) => {
+  .action(async (opts: {
+    version?: string;
+    paper?: boolean;
+    folia?: boolean;
+    client?: boolean;
+    force?: boolean;
+    skipAssets?: boolean;
+  }) => {
     process.exit(await runCachePrefetch(opts));
   });
 

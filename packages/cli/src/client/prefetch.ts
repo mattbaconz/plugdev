@@ -117,6 +117,9 @@ export async function purgeEmptyAssetObjects(
 
 async function createDownloadDispatcher(): Promise<unknown> {
   const undici = await import("undici");
+  const { setMaxListeners } = await import("node:events");
+  // @xmcl/installer retries can attach multiple abort listeners per download
+  setMaxListeners(32, AbortSignal.prototype);
   const Agent = undici.Agent;
   const interceptors = undici.interceptors;
   // Longer timeouts — Mojang CDN often exceeds undici's 10s default abroad
@@ -229,12 +232,9 @@ async function installAssetsBestEffort(
   return { ok: false };
 }
 
-/**
- * Full client install: core (jar+libs) required; assets retried then optional.
- */
 async function fullInstall(
   mcVersion: string,
-  opts?: { onProgress?: PrefetchProgress },
+  opts?: { onProgress?: PrefetchProgress; skipAssets?: boolean },
 ): Promise<void> {
   const gamePath = embeddedClientDir();
   await purgeEmptyAssetObjects(gamePath);
@@ -245,43 +245,45 @@ async function fullInstall(
     throw Errors.clientDownloadFailed(mcVersion, err);
   }
 
-  const assets = await installAssetsBestEffort(mcVersion, opts);
-  if (!assets.ok) {
-    warn(
-      "Minecraft assets download timed out or failed — client may miss textures/sounds.",
-    );
-    warn(
-      "Retry later: plugdev cache prefetch --client --force  (or use Prism launcher)",
-    );
-    // Persist a marker so we can surface this in doctor without failing run
-    try {
-      await writeFile(
-        join(gamePath, "assets", ".plugdev-assets-incomplete"),
-        new Date().toISOString(),
-        "utf8",
+  if (!opts?.skipAssets) {
+    const assets = await installAssetsBestEffort(mcVersion, opts);
+    if (!assets.ok) {
+      warn(
+        "Minecraft assets download timed out or failed — client may miss textures/sounds.",
       );
-    } catch {
-      // ignore
-    }
-  } else {
-    try {
-      await unlink(join(gamePath, "assets", ".plugdev-assets-incomplete"));
-    } catch {
-      // ignore
+      warn(
+        "Retry later: plugdev cache prefetch --client --force  (or use Prism launcher)",
+      );
+      // Persist a marker so we can surface this in doctor without failing run
+      try {
+        await writeFile(
+          join(gamePath, "assets", ".plugdev-assets-incomplete"),
+          new Date().toISOString(),
+          "utf8",
+        );
+      } catch {
+        // ignore
+      }
+    } else {
+      try {
+        await unlink(join(gamePath, "assets", ".plugdev-assets-incomplete"));
+      } catch {
+        // ignore
+      }
     }
   }
 
   if (!(await isEmbeddedClientReady(mcVersion))) {
     throw Errors.clientDownloadFailed(
       mcVersion,
-      assets.error ?? new Error("Client still not ready after install"),
+      new Error("Client still not ready after install"),
     );
   }
 }
 
 async function repairInstall(
   mcVersion: string,
-  opts?: { onProgress?: PrefetchProgress },
+  opts?: { onProgress?: PrefetchProgress; skipAssets?: boolean },
 ): Promise<"repaired" | "full"> {
   const { diagnose, Version } = await import("@xmcl/core");
   const gamePath = embeddedClientDir();
@@ -348,7 +350,11 @@ async function repairInstall(
  */
 export async function ensureEmbeddedClient(
   mcVersion: string,
-  opts?: { force?: boolean; onProgress?: PrefetchProgress },
+  opts?: {
+    force?: boolean;
+    skipAssets?: boolean;
+    onProgress?: PrefetchProgress;
+  },
 ): Promise<{ cacheHit: boolean; repaired: boolean }> {
   if (!opts?.force && (await isEmbeddedClientReady(mcVersion))) {
     return { cacheHit: true, repaired: false };

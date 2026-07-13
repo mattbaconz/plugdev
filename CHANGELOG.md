@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.2 — 2026-07-13
+
+### [fixed]
+- CI no longer prefetches the embedded Minecraft client (smokes only need Paper); server JAR is cached in GitHub Actions between runs
+- `cache prefetch --paper --client` downloads server and client in parallel
+- `cache prefetch --client --skip-assets` skips texture/sound assets (jar + libraries only)
+- MaxListenersExceededWarning during client library downloads
+
 ## 0.10.1 — 2026-07-12
 
 ### [fixed]

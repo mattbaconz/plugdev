@@ -41,6 +41,7 @@ export async function runCachePrefetch(opts: {
   folia?: boolean;
   client?: boolean;
   force?: boolean;
+  skipAssets?: boolean;
   cwd?: string;
 }): Promise<number> {
   const cwd = opts.cwd ?? process.cwd();
@@ -58,12 +59,13 @@ export async function runCachePrefetch(opts: {
   const wantClient = Boolean(opts.client);
   const wantServer = !wantClient || Boolean(opts.paper) || Boolean(opts.folia);
 
-  if (wantClient) {
+  const prefetchClient = async () => {
     const onProgress = createDownloadProgress(`Ensuring Minecraft ${mcVersion}…`);
     heading(`Prefetch Minecraft client ${mcVersion}\n`);
     try {
       const result = await ensureEmbeddedClient(mcVersion, {
         force: opts.force,
+        skipAssets: opts.skipAssets,
         onProgress: (percent, label) => onProgress(percent, label),
       });
       if (result.cacheHit) {
@@ -77,9 +79,9 @@ export async function runCachePrefetch(opts: {
       endDownloadProgress();
     }
     info(`Path: ${embeddedClientDir()}`);
-  }
+  };
 
-  if (wantServer) {
+  const prefetchServer = async () => {
     const onProgress = createDownloadProgress(
       `Downloading ${serverProject} ${mcVersion}…`,
     );
@@ -99,6 +101,14 @@ export async function runCachePrefetch(opts: {
       success(`Downloaded ${serverProject} ${mcVersion}`);
     }
     info(`Path: ${join(serversCacheDir(mcVersion, serverProject), jar.jarName)}`);
+  };
+
+  if (wantClient && wantServer) {
+    await Promise.all([prefetchClient(), prefetchServer()]);
+  } else if (wantClient) {
+    await prefetchClient();
+  } else if (wantServer) {
+    await prefetchServer();
   }
 
   return 0;
