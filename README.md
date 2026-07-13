@@ -185,13 +185,25 @@ Not the primary pitch. Prefer `init --setup --agents` until the CLI stick.
 
 ## Demos
 
-Drop GIFs under `brand/demos/` after recording (see local `RECORDING.md` on the demo plugin):
+Recorded on `plugdev-test-plugin-1` (Paper **26.1.2**, Prism **FO 26.1.2**, `plug run --hotswap`).
 
-| Clip | What it shows |
-|------|----------------|
-| `detect-26.1.2.gif` | `api-version` + Prism FO 26.1.2 auto-match |
-| `hotswap-plugtest.gif` | Method-body edit, instant `/plugtest` |
-| `hotswap-fallback.gif` | Structural edit → safe reload fallback |
+### Detect + Prism FO 26.1.2
+
+Auto-detects plugin MC version and matches a Prism instance.
+
+<img src="brand/demos/detect-26.1.2.gif" alt="PlugDev detects MC 26.1.2 and Prism FO 26.1.2, then launches" width="800" />
+
+### HotSwap — method body edit
+
+Edit → save → instant `/plugtest` (no server restart).
+
+<img src="brand/demos/hotswap-plugtest.gif" alt="HotSwap: edit sendMessage literal, save, instant in-game result" width="800" />
+
+### HotSwap — honest fallback
+
+Structural change (new private method) → hotswap fails → safe reload.
+
+<img src="brand/demos/hotswap-fallback.gif" alt="HotSwap fails on new method, falls back to safe reload" width="800" />
 
 ## Status
 
