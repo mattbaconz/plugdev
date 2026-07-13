@@ -12,13 +12,19 @@ export function initNextSteps(opts?: {
   usedNpx?: boolean;
   globalPreferred?: boolean;
   agents?: boolean;
+  mcp?: boolean;
 }): string[] {
-  const initCmd = opts?.agents
-    ? "plugdev init --setup --agents"
-    : "plugdev init --setup";
+  const flags = [
+    "--setup",
+    opts?.agents ? "--agents" : null,
+    opts?.mcp ? "--mcp" : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const initCmd = `plugdev init ${flags}`;
   if (opts?.usedNpx) {
-    const npxInit = opts?.agents
-      ? "npx @plugdev/cli@latest init --setup --agents"
+    const npxInit = opts?.agents || opts?.mcp
+      ? `npx @plugdev/cli@latest init ${flags}`
       : "npx @plugdev/cli@latest setup";
     return [npxInit, "npx @plugdev/cli@latest run"];
   }

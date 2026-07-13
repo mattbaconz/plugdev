@@ -23,10 +23,11 @@ Both `plug` and `plugdev` are installed. Same commands either way.
 ### AI agents
 
 ```powershell
-plugdev agent install --all
-# or: --cursor / --claude / --codex
+npx skills add mattbaconz/plugdev --skill plugdev
+plugdev init --setup --agents --mcp
+# or: plugdev agent install --all --mcp
 ```
 
-Optional MCP (experimental): `npx @plugdev/mcp` — same loop for agents; not a public “AI product” promo.
+Optional MCP: `npx -y @plugdev/mcp` — same loop for headless agent control (not an AI plugin generator).
 
 Full docs: [github.com/mattbaconz/plugdev](https://github.com/mattbaconz/plugdev) · [pluglabs.app/plugdev](https://pluglabs.app/plugdev)

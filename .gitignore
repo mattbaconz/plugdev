@@ -6,6 +6,7 @@ dist/
 # Private docs (local only — not published to GitHub)
 docs/
 AGENTS.md
+!skills/**/AGENTS.md
 TODO.md
 templates/
 .github-support-cache-purge-request.txt

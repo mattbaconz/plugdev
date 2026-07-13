@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.11.0 — 2026-07-14
+
+### [added]
+- `plugdev init --mcp` and `plugdev agent install --mcp` write `.cursor/mcp.json` and `.mcp.json`
+- Agent install copies portable skill into `.agents/skills/plugdev` and `.cursor/skills/plugdev`
+- skills.sh-ready package under `skills/plugdev/` (`npx skills add mattbaconz/plugdev --skill plugdev`)
+- Cursor plugin manifest (`.cursor-plugin/plugin.json` + root `mcp.json`)
+- `@plugdev/mcp` 0.2.0: `plugdev_init` tool; falls back to `npx -y @plugdev/cli` when `plugdev` is not on PATH
+
+### [changed]
+- Canonical agent setup: `plugdev init --setup --agents --mcp`
+- Agent rule templates mention MCP tools for headless control when configured
+
 ## 0.10.2 — 2026-07-13
 
 ### [fixed]

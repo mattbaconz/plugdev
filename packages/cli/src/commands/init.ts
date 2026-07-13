@@ -120,7 +120,7 @@ const DEFAULT_SCRIPTS: Record<string, string> = {
 export async function runInit(
   cwd: string,
   force = false,
-  opts: { setup?: boolean; agents?: boolean } = {},
+  opts: { setup?: boolean; agents?: boolean; mcp?: boolean } = {},
 ): Promise<number> {
   heading("PlugDev Init\n");
 
@@ -236,10 +236,20 @@ export async function runInit(
   await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
   success(pkgExists ? `Updated ${pkgPath}` : `Created ${pkgPath}`);
 
-  if (opts.agents) {
+  if (opts.agents || opts.mcp) {
     info("");
-    await runAgentInstall(cwd, { all: true, force, silent: true });
-    success("Agent wiring: .cursor/rules/plugdev.mdc, CLAUDE.md, AGENTS.md");
+    await runAgentInstall(cwd, {
+      all: opts.agents === true,
+      mcp: opts.mcp === true,
+      force,
+      silent: true,
+    });
+    if (opts.agents) {
+      success("Agent wiring: .cursor/rules/plugdev.mdc, CLAUDE.md, AGENTS.md, project skills");
+    }
+    if (opts.mcp) {
+      success("MCP config: .cursor/mcp.json, .mcp.json");
+    }
   }
 
   if (opts.setup) {
@@ -256,15 +266,18 @@ export async function runInit(
     if (opts.agents) {
       info("Agent rules written — Cursor / Claude / Codex will prefer plug run");
     }
+    if (opts.mcp) {
+      info("MCP configs written — restart the ADE to load @plugdev/mcp");
+    }
     info("(PowerShell tip: run each command on its own line — do not use &&)");
     return 0;
   }
 
   info("");
   info("Next (global install — recommended):");
-  info(formatNextSteps(initNextSteps({ agents: opts.agents })));
+  info(formatNextSteps(initNextSteps({ agents: opts.agents, mcp: opts.mcp })));
   info("Or with npx only:");
-  info(formatNextSteps(initNextSteps({ usedNpx: true, agents: opts.agents })));
-  info("Faster one-shot: npx @plugdev/cli@latest init --setup --agents");
+  info(formatNextSteps(initNextSteps({ usedNpx: true, agents: opts.agents, mcp: opts.mcp })));
+  info("Faster one-shot: npx @plugdev/cli@latest init --setup --agents --mcp");
   return 0;
 }

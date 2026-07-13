@@ -134,11 +134,13 @@ program
   .option("--force", "Overwrite existing plugdev.yml")
   .option("--setup", "Also run plugdev setup (prefetch Paper + client)")
   .option("--agents", "Also wire Cursor / Claude / Codex project snippets")
-  .action(async (opts: { force?: boolean; setup?: boolean; agents?: boolean }) => {
+  .option("--mcp", "Also write .cursor/mcp.json and .mcp.json for @plugdev/mcp")
+  .action(async (opts: { force?: boolean; setup?: boolean; agents?: boolean; mcp?: boolean }) => {
     process.exit(
       await runInit(process.cwd(), opts.force, {
         setup: opts.setup,
         agents: opts.agents,
+        mcp: opts.mcp,
       }),
     );
   });
@@ -178,6 +180,7 @@ agentCmd
   .option("--claude", "Append PlugDev section to CLAUDE.md")
   .option("--codex", "Write or append AGENTS.md")
   .option("--all", "Install all targets (default if none selected)")
+  .option("--mcp", "Write .cursor/mcp.json and .mcp.json for @plugdev/mcp")
   .option("--force", "Overwrite existing snippets")
   .action(
     async (opts: {
@@ -185,6 +188,7 @@ agentCmd
       claude?: boolean;
       codex?: boolean;
       all?: boolean;
+      mcp?: boolean;
       force?: boolean;
     }) => {
       process.exit(await runAgentInstall(process.cwd(), opts));

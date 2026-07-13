@@ -1,31 +1,43 @@
 ---
 name: plugdev
 description: >-
-  Use when testing, booting, hot-reloading, or joining a local Minecraft Paper/Spigot
-  plugin project — PlugDev CLI setup, plug run, plug doctor, headless server commands,
-  Folia restart, and agent wiring (Cursor/Claude/Codex).
+  Use when testing, booting, hot-reloading, or joining a local Minecraft Paper,
+  Spigot, Folia, or Purpur plugin project — PlugDev CLI setup, plug run, plug
+  doctor, headless server commands, Folia restart, agent wiring (Cursor/Claude/Codex),
+  and optional MCP tools for structured control of the same loop.
 ---
 
 # PlugDev test loop
 
 PlugDev is the local **test environment** for Minecraft plugins (not an AI plugin generator). Prefer it over manually starting Paper and copying JARs.
 
-## First moves
+## First moves (agent: set up the best env)
 
-1. Check PATH for `plugdev` or `plug`. If missing:
+When the user asks to test, run, or set up a Minecraft plugin project — or when you need a local Paper loop:
+
+1. **Install CLI** if `plugdev` / `plug` is missing from PATH:
    ```powershell
    npm install -g @plugdev/cli
    ```
-2. If the project has no `plugdev.yml`:
+   Or one-shot: `npx @plugdev/cli@latest <command>`.
+
+2. **Wire the project** if there is no `plugdev.yml` (or rules/MCP are missing):
    ```powershell
-   plugdev init --setup --agents
+   plugdev init --setup --agents --mcp
    ```
-   That writes config, prefetches server/client into `~/.plugdev/`, and installs agent rules.
-3. Boot the loop:
+   That writes config, prefetches server/client into `~/.plugdev/`, installs Cursor/Claude/Codex rules, project skill copies, and MCP configs (`.cursor/mcp.json`, `.mcp.json`).
+
+3. If config exists but agent wiring does not:
+   ```powershell
+   plugdev agent install --all --mcp
+   ```
+
+4. **Boot the loop:**
    ```powershell
    plug run
    ```
-4. If boot or detection fails, run `plug doctor` and fix what it reports (Java 21+, Node 20+, Gradle/Maven).
+
+5. If boot or detection fails, run `plug doctor` and fix what it reports (Java 21+, Node 20+, Gradle/Maven). Paper/Folia 26.x needs Java 25+.
 
 ## Day loop
 
@@ -41,23 +53,26 @@ PlugDev is the local **test environment** for Minecraft plugins (not an AI plugi
 
 After the server is ready, type console commands in the **same terminal** (RCON), e.g. `op DevPlayer`, `list`.
 
+## MCP (optional structured tools)
+
+When `.cursor/mcp.json` or `.mcp.json` includes PlugDev (via `init --mcp` / `agent install --mcp`), prefer MCP tools for headless control:
+
+- `plugdev_doctor`, `plugdev_setup`, `plugdev_init`
+- `plugdev_build_plugin`, `plugdev_sync_plugin`
+- `plugdev_start_server`, `plugdev_stop_server`, `plugdev_get_server_status`
+- `plugdev_tail_logs`, `plugdev_run_server_command`, `plugdev_op_player`
+- `plugdev_run_test_loop` — build → sync → start → OP
+
+CLI remains primary for interactive `plug run` (server + watch + client join). MCP is the same loop without a TTY — not an AI plugin generator.
+
+Install MCP alone: `npx -y @plugdev/mcp` (stdio). See `references/mcp.md`.
+
 ## Hard rules
 
 - Prefer `plug run` over manually starting Paper.
 - Do **not** use Bukkit `/reload` — PlugDev uses safe JAR reload via bootstrap.
 - On **Folia**, prefer full restart over safe reload.
 - Do not delete `~/.plugdev` unless the user asks (`plugdev cache clear`).
-- MCP (`npx @plugdev/mcp`) is experimental — do not treat it as the primary setup path.
-
-## Agent wiring only
-
-If config already exists but rules do not:
-
-```powershell
-plugdev agent install --all
-```
-
-Writes `.cursor/rules/plugdev.mdc`, a `CLAUDE.md` section, and `AGENTS.md`.
 
 ## Facts
 
@@ -67,4 +82,5 @@ Writes `.cursor/rules/plugdev.mdc`, a `CLAUDE.md` section, and `AGENTS.md`.
 | Config | `plugdev.yml` |
 | Run dir | `.plugdev/run/` |
 | Cache | `~/.plugdev/` |
+| Skill install | `npx skills add mattbaconz/plugdev --skill plugdev` |
 | Docs | https://pluglabs.app/plugdev |

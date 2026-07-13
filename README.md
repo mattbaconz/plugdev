@@ -2,7 +2,7 @@
 
 <img src="brand/plugdev-logo.png" alt="PlugDev" width="128" />
 
-# PlugDev · v0.10.2
+# PlugDev · v0.11.0
 
 ---
 
@@ -35,7 +35,7 @@ Same idea as `npm run dev`, for Minecraft plugin and mod projects.
 ```powershell
 npm install -g @plugdev/cli
 cd your-plugin
-plugdev init --setup --agents
+plugdev init --setup --agents --mcp
 plugdev          # TUI
 # or: plug run
 ```
@@ -160,16 +160,20 @@ client:
 ## Agents
 
 ```powershell
-plugdev init --setup --agents
+# Install skill (any ADE)
+npx skills add mattbaconz/plugdev --skill plugdev
+
+# Wire this project (rules + skill copy + MCP)
+plugdev init --setup --agents --mcp
 # or later:
-plugdev agent install --all
+plugdev agent install --all --mcp
 ```
 
-Portable skill: [`skills/plugdev`](skills/plugdev).
+Portable skill: [`skills/plugdev`](skills/plugdev) · Cursor plugin: [skills/plugdev/references/cursor-plugin.md](skills/plugdev/references/cursor-plugin.md)
 
-## PlugDev MCP (experimental)
+## PlugDev MCP
 
-Not the primary pitch. Prefer `init --setup --agents` until the CLI stick.
+Optional structured tools for headless control of the same loop (`npx -y @plugdev/mcp`). Prefer CLI `plug run` for interactive sessions. Wire with `plugdev agent install --mcp`:
 
 ```json
 {
@@ -207,7 +211,7 @@ Structural change (new private method) → hotswap fails → safe reload.
 
 ## Status
 
-**v0.10.0** — Mods + optional Java hotswap. See [CHANGELOG.md](CHANGELOG.md).
+**v0.11.0** — Agent skills + MCP install plumbing. See [CHANGELOG.md](CHANGELOG.md).
 
 Site: [pluglabs.app/plugdev](https://pluglabs.app/plugdev) · npm: [`@plugdev/cli`](https://www.npmjs.com/package/@plugdev/cli)
 

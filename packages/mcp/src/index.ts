@@ -1,29 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { execa } from "execa";
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { parsePlugdevJson, type JsonResult } from "./json.js";
+import { resolvePlugdevInvocation } from "./resolve-cli.js";
 
+const MCP_VERSION = "0.2.0";
 const projectRoot = process.env.PLUGDEV_PROJECT_ROOT ?? process.cwd();
-
-function resolvePlugdevInvocation(): { command: string; baseArgs: string[] } {
-  const fromEnv = process.env.PLUGDEV_CLI;
-  if (fromEnv) {
-    const parts = fromEnv.split(" ").filter(Boolean);
-    return { command: parts[0]!, baseArgs: parts.slice(1) };
-  }
-
-  const here = dirname(fileURLToPath(import.meta.url));
-  const localCli = join(here, "..", "..", "cli", "dist", "cli.js");
-  if (existsSync(localCli)) {
-    return { command: "node", baseArgs: [localCli] };
-  }
-
-  return { command: "plugdev", baseArgs: [] };
-}
 
 async function plugdev(args: string[]): Promise<JsonResult> {
   const { command, baseArgs } = resolvePlugdevInvocation();
@@ -41,7 +24,8 @@ async function plugdev(args: string[]): Promise<JsonResult> {
   return {
     ok: false,
     error: result.exitCode !== 0 ? combined || "plugdev command failed" : "Invalid JSON from plugdev",
-    hint: "Ensure plugdev is built (npm run build) and PLUGDEV_CLI points at packages/cli/dist/cli.js",
+    hint:
+      "Ensure @plugdev/cli is available (npm i -g @plugdev/cli), or set PLUGDEV_CLI to the CLI entrypoint",
     data: { exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr },
   };
 }
@@ -54,8 +38,33 @@ function textResult(data: unknown): { content: Array<{ type: "text"; text: strin
 
 const server = new McpServer({
   name: "plugdev",
-  version: "0.1.1",
+  version: MCP_VERSION,
 });
+
+server.tool(
+  "plugdev_init",
+  "Scaffold plugdev.yml, prefetch server/client, and wire Cursor/Claude/Codex agent rules (init --setup --agents)",
+  {
+    force: z.boolean().optional().describe("Overwrite existing plugdev.yml and agent snippets"),
+    agents: z
+      .boolean()
+      .optional()
+      .describe("Write agent rules (default true)"),
+    setup: z
+      .boolean()
+      .optional()
+      .describe("Prefetch Paper/client/deps (default true)"),
+  },
+  async ({ force, agents, setup }) => {
+    const args = ["init"];
+    if (setup !== false) args.push("--setup");
+    if (agents !== false) args.push("--agents");
+    if (force) args.push("--force");
+    const result = await plugdev(args);
+    if (!result.ok && result.error) return { ...textResult(result), isError: true };
+    return textResult(result.data ?? { ok: true, message: "init complete" });
+  },
+);
 
 server.tool(
   "plugdev_doctor",
