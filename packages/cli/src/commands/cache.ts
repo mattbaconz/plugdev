@@ -161,6 +161,28 @@ export async function runDepsAdd(
   name: string,
   opts: { version?: string; source?: string; url?: string } = {},
 ): Promise<number> {
+  const lower = name.toLowerCase().replace(/\s+/g, "");
+  if (lower === "plugtrace" || lower === "plug-trace") {
+    const { updatePlugdevYml } = await import("../deps/config-write.js");
+    const { plugTraceBuildHint } = await import("../deps/plugtrace.js");
+    const result = await updatePlugdevYml(cwd, {
+      integrations: {
+        plugtrace: {
+          enabled: true,
+          artifact: "auto",
+        },
+      },
+    });
+    if (!result.ok) {
+      warn(result.reason);
+      return 1;
+    }
+    success("Enabled integrations.plugtrace in plugdev.yml");
+    info(plugTraceBuildHint());
+    info("Set integrations.plugtrace.jar to your built PlugTrace fat JAR, then run plugdev run / sync.");
+    return 0;
+  }
+
   const { downloadHangarPlugin, downloadUrlPlugin, resolveHangarDep } = await import(
     "../deps/hangar.js"
   );

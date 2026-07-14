@@ -29,8 +29,9 @@ import {
 } from "../process/spawner.js";
 import { attachInteractiveConsole, type InteractiveConsole } from "../process/interactive-console.js";
 import { installDeps } from "../deps/hangar.js";
+import { installPlugTraceJar, writePlugDevIdentity } from "../deps/plugtrace.js";
 import { startPluginWatcher, startModWatchOrchestrator, startDiscordBotWatcher } from "../watch/watcher.js";
-import { launchClient } from "../client/launch.js";
+import { JOIN_HOST } from "../client/launch.js";
 import { launchPlayers } from "../client/players.js";
 import { banner, phase, info, warn, error as logError, resetPhases } from "../util/log.js";
 import { createDownloadProgress, endDownloadProgress } from "../util/progress.js";
@@ -378,12 +379,28 @@ async function runPluginDev(
     );
     await deployBootstrapJar(bootstrap, pluginsDir);
 
+    if (config.integrations.plugtrace.enabled) {
+      if (first) phase("Install PlugTrace", "active");
+      await installPlugTraceJar(cwd, pluginsDir, config.integrations.plugtrace, config.server);
+      if (first) phase("Install PlugTrace");
+    }
+
     // Install missing deps on every boot (skip JARs already in plugins/)
     if (config.deps?.length) {
       if (first) phase("Install test deps", "active");
       await installDeps(pluginsDir, config.deps, config.server, config.version);
       if (first) phase("Install test deps");
     }
+
+    await writePlugDevIdentity({
+      cwd,
+      runDir,
+      projectName: project.pluginName,
+      buildSystem: config.build.system,
+      buildTask: build.task,
+      projectJarPath: build.jarPath,
+      sessionId: undefined,
+    });
 
     await writeReloadTrigger(cwd, [devJar]);
     phase("Sync plugin JAR to server");
@@ -432,7 +449,7 @@ async function runPluginDev(
           version: config.version,
           software: config.server,
           pluginName: project.pluginName,
-          join: `localhost:${config.port}`,
+          join: `${JOIN_HOST}:${config.port}`,
         },
       });
     } else {
@@ -455,9 +472,16 @@ async function runPluginDev(
       consoleHandle.resume();
     }
 
-    if (shouldJoinClient(overrides, config)) {
+    // Auto-join only on first boot — watcher restarts would Quick Play while the
+    // port is still coming back up ("Failed to Quick Play" / connection refused).
+    if (first && shouldJoinClient(overrides, config)) {
       phase("Launch Minecraft client", "active");
-      await launchPlayers({ config, waitForServer: false });
+      await launchPlayers({
+        config,
+        host: JOIN_HOST,
+        // TCP probe after log-ready — closes the race before Quick Play
+        waitForServer: true,
+      });
       phase("Launch Minecraft client");
     }
 

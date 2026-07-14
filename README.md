@@ -2,7 +2,7 @@
 
 <img src="brand/plugdev-logo.png" alt="PlugDev" width="128" />
 
-# PlugDev · v0.11.0
+# PlugDev · v0.11.1
 
 ---
 

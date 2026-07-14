@@ -13,6 +13,7 @@ import { runMavenBuild } from "../build/maven.js";
 import { startPaperServer } from "../process/spawner.js";
 import { sendRconCommand } from "../process/rcon.js";
 import { installDeps } from "../deps/hangar.js";
+import { installPlugTraceJar, writePlugDevIdentity } from "../deps/plugtrace.js";
 import { projectRunDir } from "../paths.js";
 import {
   readSession,
@@ -84,9 +85,22 @@ export async function runServerStart(
     const bootstrap = await resolveBootstrapJar();
     await deployBootstrapJar(bootstrap, pluginsDir);
 
+    if (config.integrations.plugtrace.enabled) {
+      await installPlugTraceJar(cwd, pluginsDir, config.integrations.plugtrace, config.server);
+    }
+
     if (config.deps?.length) {
       await installDeps(pluginsDir, config.deps, config.server, config.version);
     }
+
+    await writePlugDevIdentity({
+      cwd,
+      runDir,
+      projectName: project.pluginName,
+      buildSystem: config.build.system,
+      buildTask: build.task,
+      projectJarPath: build.jarPath,
+    });
 
     const { proc, waitForReady } = startPaperServer(
       runDir,
@@ -127,7 +141,7 @@ export async function runServerStart(
 
     if (!isJsonMode()) {
       heading("PlugDev server\n");
-      success(`Server ready on localhost:${config.port}`);
+      success(`Server ready on 127.0.0.1:${config.port}`);
       info(`RCON: ${session.rconHost}:${rconPort}`);
       info(`Plugin: ${devJar}`);
     } else {

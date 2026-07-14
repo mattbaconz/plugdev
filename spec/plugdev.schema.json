@@ -158,6 +158,30 @@
       },
       "additionalProperties": false
     },
+    "integrationsConfig": {
+      "type": "object",
+      "properties": {
+        "plugtrace": {
+          "type": "object",
+          "description": "Optional private PlugTrace dogfood: copy local JAR + write plugdev-identity.json",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "jar": {
+              "type": "string",
+              "description": "Path to built PlugTrace fat JAR (relative to project or absolute). Not fetched from Hangar/Modrinth."
+            },
+            "artifact": {
+              "type": "string",
+              "enum": ["paper-modern", "folia", "auto"],
+              "default": "auto",
+              "description": "auto → paper-modern unless server is folia"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "pluginConfig": {
       "type": "object",
       "required": ["type"],
@@ -195,7 +219,8 @@
         },
         "client": { "$ref": "#/$defs/clientConfig" },
         "jvm": { "$ref": "#/$defs/jvmConfig" },
-        "run": { "$ref": "#/$defs/runConfig" }
+        "run": { "$ref": "#/$defs/runConfig" },
+        "integrations": { "$ref": "#/$defs/integrationsConfig" }
       },
       "additionalProperties": false
     },

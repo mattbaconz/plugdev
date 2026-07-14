@@ -23,7 +23,7 @@ import { heading, info, success, step, warn, phase } from "../util/log.js";
 import { isPortAvailable } from "../util/port.js";
 import { Errors } from "../util/errors.js";
 import { CLI_VERSION } from "../constants.js";
-import { launchClient } from "../client/launch.js";
+import { JOIN_HOST, launchClient } from "../client/launch.js";
 import { debounce } from "../util/debounce.js";
 
 interface BackendSpec {
@@ -222,9 +222,9 @@ export async function runNetwork(
   step(`Starting Velocity (:${proxyPort})...`, "done");
 
   success("Network ready");
-  info(`Proxy:  localhost:${proxyPort}`);
+  info(`Proxy:  ${JOIN_HOST}:${proxyPort}`);
   for (const backend of backends) {
-    info(`Backend ${backend.name}: localhost:${backend.port}`);
+    info(`Backend ${backend.name}: ${JOIN_HOST}:${backend.port}`);
   }
   if (shouldBuildProxy) {
     info("Proxy plugin loaded under .plugdev/network/proxy/plugins/");
@@ -239,11 +239,12 @@ export async function runNetwork(
     await launchClient({
       config: { ...config, port: proxyPort },
       port: proxyPort,
-      waitForServer: false,
+      host: JOIN_HOST,
+      waitForServer: true,
     });
     phase("Launch Minecraft client → proxy");
   } else {
-    info(`Join: localhost:${proxyPort}`);
+    info(`Join: ${JOIN_HOST}:${proxyPort}`);
   }
 
   let closeWatcher: (() => void) | undefined;

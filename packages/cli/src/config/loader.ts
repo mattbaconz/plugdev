@@ -89,6 +89,16 @@ export interface PlugDevConfig {
     /** never (default) | on-exit | worlds */
     cleanup?: "never" | "on-exit" | "worlds";
   };
+  /** Optional private PlugTrace dogfood integration (local JAR copy + identity). */
+  integrations?: {
+    plugtrace?: {
+      enabled?: boolean;
+      /** Path to built PlugTrace fat JAR (relative to project or absolute). */
+      jar?: string;
+      /** Which PlugTrace artifact to prefer when jar is unset / auto-resolving. */
+      artifact?: "paper-modern" | "folia" | "auto";
+    };
+  };
 }
 
 export interface ResolvedConfig {
@@ -121,6 +131,13 @@ export interface ResolvedConfig {
   loader?: string;
   devMode?: string;
   gradleSubproject?: string;
+  integrations: {
+    plugtrace: {
+      enabled: boolean;
+      jar?: string;
+      artifact: "paper-modern" | "folia" | "auto";
+    };
+  };
   raw: PlugDevConfig;
 }
 
@@ -323,6 +340,20 @@ export async function loadConfig(
     deps: (raw.deps ?? []).filter((d) => d.enabled !== false),
     client: raw.client,
     loader: overrides.loader ?? raw.loader ?? project.loader,
+    integrations: {
+      plugtrace: (() => {
+        const pt = raw.integrations?.plugtrace;
+        const artifact =
+          pt?.artifact === "folia" || pt?.artifact === "paper-modern" || pt?.artifact === "auto"
+            ? pt.artifact
+            : "auto";
+        return {
+          enabled: pt?.enabled === true,
+          jar: pt?.jar,
+          artifact,
+        };
+      })(),
+    },
     devMode: (() => {
       if (overrides.datagen) return "datagen";
       if (overrides.server || overrides.test) return "server";

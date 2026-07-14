@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.11.1 — 2026-07-14
+
+### [fixed]
+- Auto-join Quick Play no longer hits "Connection refused: getsockopt" on Windows: join `127.0.0.1` (not `localhost`/`::1`), wait for the game TCP port after log-ready, and only auto-join on first boot (not watcher restarts)
+
 ## 0.11.0 — 2026-07-14
 
 ### [added]

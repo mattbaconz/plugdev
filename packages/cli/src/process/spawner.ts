@@ -188,7 +188,8 @@ export function startPaperServer(
     logMode,
     background,
     jvmArgs,
-    readyPattern: /Done \(|Timings Reset/,
+    // Prefer "Done (" — "Timings Reset" can appear before the game port listens.
+    readyPattern: /Done \(/,
     args: ["nogui"],
   });
 }
@@ -262,7 +263,7 @@ export function printReadyBanner(
         : "You are op (offline mode)",
     );
   }
-  info(`Join: localhost:${port}`);
+  info(`Join: 127.0.0.1:${port}`);
   info("Tip: first boot remaps plugins (~10–30s); later boots are much faster.");
   info("Type server commands below (e.g. op DevPlayer). Ctrl+C stops PlugDev.");
   info("Ctrl+C stops the server — closing Minecraft does not.");

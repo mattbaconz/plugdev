@@ -1,6 +1,6 @@
 import { detectProject } from "../detect/project.js";
 import { loadConfig } from "../config/loader.js";
-import { launchClient, copyJoinAddress } from "../client/launch.js";
+import { JOIN_HOST, launchClient, copyJoinAddress } from "../client/launch.js";
 import type { ClientLauncherMode } from "../client/adapters/types.js";
 
 export async function runOpen(
@@ -17,13 +17,14 @@ export async function runOpen(
     await launchClient({
       config,
       launcher: opts.name ? "embedded" : launcher,
-      waitForServer: false,
+      // Wait until the game port is open (server must already be running / coming up)
+      waitForServer: true,
       offlineName,
       port,
-      host: "localhost",
+      host: JOIN_HOST,
     });
   } else {
-    await copyJoinAddress(`localhost:${port}`);
+    await copyJoinAddress(`${JOIN_HOST}:${port}`);
   }
 
   return 0;

@@ -16,6 +16,12 @@ import { readInstanceMcVersion } from "./detect.js";
 import type { ClientLauncherMode } from "./adapters/types.js";
 import type { ClientAdapterContext, LauncherAdapter } from "./adapters/types.js";
 
+/**
+ * Prefer IPv4 loopback for Quick Play. On Windows, `localhost` often resolves to
+ * `::1` while Paper binds IPv4 only — that yields "Connection refused: getsockopt".
+ */
+export const JOIN_HOST = "127.0.0.1";
+
 export interface LaunchClientOptions {
   config: ResolvedConfig;
   host?: string;
@@ -64,7 +70,7 @@ async function launchWithAdapter(
 }
 
 export async function launchClient(opts: LaunchClientOptions): Promise<void> {
-  const host = opts.host ?? "localhost";
+  const host = opts.host ?? JOIN_HOST;
   const port = opts.port ?? opts.config.port;
   const address = `${host}:${port}`;
   const client = opts.config.client;
@@ -76,8 +82,10 @@ export async function launchClient(opts: LaunchClientOptions): Promise<void> {
     return;
   }
 
+  // Always confirm the game port accepts TCP before Quick Play (log "Done" can
+  // fire slightly before the listener is up; avoids Failed to Quick Play / refused).
   if (opts.waitForServer !== false) {
-    info("Waiting for server...");
+    info(`Waiting for server on ${address}...`);
     const ready = await waitForPortOpen(port, host, 120_000);
     if (!ready) {
       warn("Server did not become ready in time; launching client anyway");

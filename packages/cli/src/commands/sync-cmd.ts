@@ -12,6 +12,7 @@ import {
 import { runMavenBuild } from "../build/maven.js";
 import { projectRunDir, bootstrapCacheDir } from "../paths.js";
 import { prepareRunDirectory, writeReloadTrigger } from "../cache/run-template.js";
+import { installPlugTraceJar, writePlugDevIdentity } from "../deps/plugtrace.js";
 import { heading, info, success } from "../util/log.js";
 import { isJsonMode, emitJson } from "../util/output.js";
 import { formatError, formatErrorJson, getExitCode } from "../util/errors.js";
@@ -53,10 +54,24 @@ export async function runSync(cwd: string, jarPath?: string): Promise<number> {
     }
 
     await prepareRunDirectory(cwd, config);
-    const pluginsDir = join(projectRunDir(cwd), "plugins");
+    const runDir = projectRunDir(cwd);
+    const pluginsDir = join(runDir, "plugins");
     const devJar = await deployPluginJar(builtJar, pluginsDir, project.pluginName);
     const bootstrap = await resolveBootstrapJar();
     await deployBootstrapJar(bootstrap, pluginsDir);
+
+    if (config.integrations.plugtrace.enabled) {
+      await installPlugTraceJar(cwd, pluginsDir, config.integrations.plugtrace, config.server);
+    }
+    await writePlugDevIdentity({
+      cwd,
+      runDir,
+      projectName: project.pluginName,
+      buildSystem: config.build.system,
+      buildTask: config.build.task,
+      projectJarPath: builtJar,
+    });
+
     await writeReloadTrigger(cwd, [devJar]);
 
     if (isJsonMode()) {
