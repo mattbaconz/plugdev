@@ -10,8 +10,10 @@ import { theme } from "./theme.js";
 import { HomeScreen, type HomeAction } from "./screens/Home.js";
 import { ConfigureScreen } from "./screens/Configure.js";
 import { InstancePickerScreen } from "./screens/InstancePicker.js";
+import { ModulePickerScreen } from "./screens/ModulePicker.js";
+import { DepsScreen } from "./screens/Deps.js";
 
-type Screen = "home" | "configure" | "instances";
+type Screen = "home" | "configure" | "instances" | "modules" | "deps";
 
 export function App(props: {
   cwd: string;
@@ -19,11 +21,13 @@ export function App(props: {
 }): React.ReactElement {
   const { exit } = useApp();
   const [screen, setScreen] = useState<Screen>("home");
+  const [modulesReturn, setModulesReturn] = useState<"home" | "configure">("home");
   const [status, setStatus] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [projectName, setProjectName] = useState("project");
   const [config, setConfig] = useState<ResolvedConfig | null>(null);
   const [raw, setRaw] = useState<PlugDevConfig>({});
+  const [showModule, setShowModule] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
   const reload = useCallback(async () => {
@@ -33,6 +37,7 @@ export function App(props: {
       const yml = await readPlugdevYml(props.cwd);
       setConfig(resolved);
       setRaw(yml?.raw ?? {});
+      setShowModule((project.modules?.length ?? 0) > 1);
       setProjectName(
         project.pluginName ??
           project.loader ??
@@ -74,6 +79,17 @@ export function App(props: {
     }
     if (action === "configure") {
       setScreen("configure");
+      setStatus(undefined);
+      return;
+    }
+    if (action === "module") {
+      setModulesReturn("home");
+      setScreen("modules");
+      setStatus(undefined);
+      return;
+    }
+    if (action === "deps") {
+      setScreen("deps");
       setStatus(undefined);
       return;
     }
@@ -143,17 +159,57 @@ export function App(props: {
     );
   }
 
-  if (screen === "configure") {
+  if (screen === "modules") {
     return (
-      <ConfigureScreen
+      <ModulePickerScreen
+        cwd={props.cwd}
+        raw={raw}
+        onBack={() => {
+          setScreen(modulesReturn);
+          void reload();
+        }}
+        onPicked={(msg) => {
+          setStatus(msg);
+          setScreen(modulesReturn);
+          void reload();
+        }}
+      />
+    );
+  }
+
+  if (screen === "deps") {
+    return (
+      <DepsScreen
         cwd={props.cwd}
         raw={raw}
         onBack={() => {
           setScreen("home");
           void reload();
         }}
+        onChanged={(msg) => {
+          setStatus(msg);
+          void reload();
+        }}
+      />
+    );
+  }
+
+  if (screen === "configure") {
+    return (
+      <ConfigureScreen
+        cwd={props.cwd}
+        raw={raw}
+        showModule={showModule}
+        onBack={() => {
+          setScreen("home");
+          void reload();
+        }}
         onPickInstance={() => {
           setScreen("instances");
+        }}
+        onPickModule={() => {
+          setModulesReturn("configure");
+          setScreen("modules");
         }}
       />
     );
@@ -169,6 +225,7 @@ export function App(props: {
       instance={instance}
       offlineName={offlineName}
       secondPlayer={secondPlayer}
+      showModule={showModule}
       status={busy ? "Working…" : status}
       onAction={(a) => {
         void handleHome(a);

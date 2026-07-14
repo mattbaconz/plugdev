@@ -13,6 +13,8 @@ import {
   ensureEmbeddedClient,
   isEmbeddedClientReady,
 } from "../client/prefetch.js";
+import { isJsonMode, emitJson } from "../util/output.js";
+import { readPlugdevYml } from "../deps/config-write.js";
 
 async function dirSize(path: string): Promise<number> {
   let total = 0;
@@ -111,17 +113,47 @@ export async function runCachePrefetch(opts: {
     await prefetchServer();
   }
 
+  if (isJsonMode()) {
+    emitJson({
+      ok: true,
+      data: {
+        version: mcVersion,
+        server: wantServer ? serverProject : undefined,
+        client: wantClient,
+      },
+    });
+  }
   return 0;
 }
 
 export async function runCacheStatus(): Promise<number> {
-  heading("PlugDev Cache\n");
   const home = plugdevHome();
+  const sizes = {
+    home,
+    servers: await dirSize(join(home, "servers")),
+    client: await dirSize(embeddedClientDir()),
+    bootstrap: await dirSize(bootstrapCacheDir()),
+    deps: await dirSize(depsCacheDir()),
+  };
+  if (isJsonMode()) {
+    emitJson({
+      ok: true,
+      data: {
+        ...sizes,
+        serversFormatted: formatBytes(sizes.servers),
+        clientFormatted: formatBytes(sizes.client),
+        bootstrapFormatted: formatBytes(sizes.bootstrap),
+        depsFormatted: formatBytes(sizes.deps),
+      },
+    });
+    return 0;
+  }
+  heading("PlugDev Cache\n");
   info(`Home: ${home}`);
-  info(`Servers: ${formatBytes(await dirSize(join(home, "servers")))}`);
-  info(`Client: ${formatBytes(await dirSize(embeddedClientDir()))}`);
-  info(`Bootstrap: ${formatBytes(await dirSize(bootstrapCacheDir()))}`);
-  info(`Deps: ${formatBytes(await dirSize(depsCacheDir()))}`);
+  info(`Servers: ${formatBytes(sizes.servers)}`);
+  info(`Client: ${formatBytes(sizes.client)}`);
+  info(`Bootstrap: ${formatBytes(sizes.bootstrap)}`);
+  info(`Deps: ${formatBytes(sizes.deps)}`);
   return 0;
 }
 
@@ -191,7 +223,13 @@ export async function runDepsAdd(
 
   const project = await detectProject(cwd);
   const config = await loadConfig(cwd, project);
-  const source = opts.source ?? "hangar";
+  const { findPreset } = await import("../deps/presets.js");
+  const preset = findPreset(name);
+  const source =
+    opts.source ??
+    (preset?.source === "modrinth" || (!preset?.author && preset?.modrinthSlug)
+      ? "modrinth"
+      : "hangar");
   const pluginsDir = join(projectRunDir(cwd), "plugins");
   await mkdir(pluginsDir, { recursive: true });
 
@@ -199,8 +237,9 @@ export async function runDepsAdd(
   let label: string;
 
   if (source === "modrinth") {
-    jar = await downloadModrinthPlugin(name, config.version, opts.version, config.server);
-    label = `modrinth:${name}`;
+    const modrinthSlug = preset?.modrinthSlug ?? name;
+    jar = await downloadModrinthPlugin(modrinthSlug, config.version, opts.version, config.server);
+    label = `modrinth:${modrinthSlug}`;
   } else if (source === "url") {
     if (!opts.url) {
       warn("URL source requires --url <https://...>");
@@ -228,17 +267,30 @@ export async function runDepsAdd(
     source === "url"
       ? { name, source: "url" as const, url: opts.url }
       : source === "modrinth"
-        ? { name, source: "modrinth" as const, slug: name, version: opts.version }
+        ? {
+            name,
+            source: "modrinth" as const,
+            slug: preset?.modrinthSlug ?? name,
+            version: opts.version,
+          }
         : {
             name,
             source: "hangar" as const,
             version: opts.version,
+            author: preset?.author,
+            slug: preset?.slug,
           };
   const wrote = await appendDepToYml(cwd, entry);
   if (wrote) {
     info("Added to plugdev.yml deps");
   }
 
+  if (isJsonMode()) {
+    emitJson({
+      ok: true,
+      data: { name, source, label, wroteToYml: wrote, entry },
+    });
+  }
   return 0;
 }
 
@@ -246,12 +298,11 @@ export async function runDepsRemove(cwd: string, name: string): Promise<number> 
   const pluginsDir = join(projectRunDir(cwd), "plugins");
   const terms = depSearchTerms(name);
 
-  let files: string[];
+  let files: string[] = [];
   try {
     files = await readdir(pluginsDir);
   } catch {
-    warn(`Plugins directory not found: ${pluginsDir}`);
-    return 1;
+    // plugins dir may not exist yet
   }
 
   const matches = files.filter((file) => {
@@ -259,24 +310,68 @@ export async function runDepsRemove(cwd: string, name: string): Promise<number> 
     return terms.some((term) => lower.includes(term));
   });
 
-  if (matches.length === 0) {
-    warn(`No plugin JAR matching "${name}" in ${pluginsDir}`);
-    return 1;
-  }
-
   for (const file of matches) {
     await unlink(join(pluginsDir, file));
     success(`Removed ${file}`);
   }
 
+  const { removeDepFromYml } = await import("../deps/config-write.js");
+  const removed = await removeDepFromYml(cwd, name);
+  if (removed) info("Removed from plugdev.yml deps");
+
+  if (matches.length === 0 && !removed) {
+    if (isJsonMode()) {
+      emitJson({ ok: false, error: `No dep matching "${name}"` });
+    } else {
+      warn(`No plugin JAR or plugdev.yml dep matching "${name}"`);
+    }
+    return 1;
+  }
+
+  if (isJsonMode()) {
+    emitJson({
+      ok: true,
+      data: { name, removedJars: matches, removedFromYml: removed },
+    });
+  }
   return 0;
 }
 
-export async function runDepsList(): Promise<number> {
+export async function runDepsList(cwd = process.cwd()): Promise<number> {
+  const loaded = await readPlugdevYml(cwd);
+  const configured = loaded?.raw.deps ?? [];
+  const presets = DEP_PRESETS.map((p) => ({
+    alias: p.aliases[0],
+    slug: p.slug,
+    author: p.author,
+    source: p.source ?? (p.author ? "hangar" : "modrinth"),
+    modrinthSlug: p.modrinthSlug,
+    description: p.description,
+  }));
+
+  if (isJsonMode()) {
+    emitJson({
+      ok: true,
+      data: { configured, presets },
+    });
+    return 0;
+  }
+
   heading("Dependency presets\n");
   for (const preset of DEP_PRESETS) {
-    info(`${preset.aliases[0].padEnd(16)} ${preset.description}`);
-    info(`                 Hangar: ${preset.author}/${preset.slug}`);
+    info(`${preset.aliases[0]!.padEnd(16)} ${preset.description}`);
+    if (preset.source === "modrinth" || (!preset.author && preset.modrinthSlug)) {
+      info(`                 Modrinth: ${preset.modrinthSlug ?? preset.slug}`);
+    } else {
+      info(`                 Hangar: ${preset.author}/${preset.slug}`);
+    }
+  }
+  if (configured.length > 0) {
+    heading("\nConfigured in plugdev.yml\n");
+    for (const d of configured) {
+      const on = d.enabled === false ? "off" : "on";
+      info(`[${on}] ${d.name}${d.slug ? ` (${d.slug})` : ""}`);
+    }
   }
   info("\nUsage:");
   info("  plugdev deps add <name> [--version]");

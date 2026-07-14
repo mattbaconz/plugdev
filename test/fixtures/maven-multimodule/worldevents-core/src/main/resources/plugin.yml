@@ -1,0 +1,4 @@
+name: WorldEvents
+main: com.example.WorldEventsPlugin
+api-version: "1.21"
+softdepend: [Vault, WorldGuard, LuckPerms]

@@ -37,10 +37,16 @@ async function resolveBootstrapJar(): Promise<string> {
   throw new Error("Bootstrap plugin JAR not found. Run npm run build in plugdev repo.");
 }
 
-export async function runSync(cwd: string, jarPath?: string): Promise<number> {
+export async function runSync(
+  cwd: string,
+  jarPath?: string,
+  overrides: { module?: string } = {},
+): Promise<number> {
   try {
     const project = await detectProject(cwd);
-    const config = await loadConfig(cwd, project);
+    const config = await loadConfig(cwd, project, {
+      module: overrides.module,
+    });
 
     if (!isJsonMode()) heading("PlugDev sync\n");
 

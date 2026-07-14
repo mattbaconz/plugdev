@@ -272,7 +272,7 @@ async function runPluginDev(
   }
 
   if (config.server === "folia") {
-    const folia = await detectFoliaSupport(cwd);
+    const folia = await detectFoliaSupport(cwd, config.build.module);
     if (folia !== "declared") {
       warn(
         "Folia: plugin metadata does not declare Folia support — prefer watch.reloadJava: restart",

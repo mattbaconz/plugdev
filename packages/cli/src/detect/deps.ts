@@ -5,8 +5,8 @@ import { DEP_PRESETS, DEFAULT_COMPAT_DEPS } from "../deps/presets.js";
 
 export interface DetectedHangarDep {
   name: string;
-  source: "hangar";
-  author: string;
+  source: "hangar" | "modrinth";
+  author?: string;
   slug: string;
 }
 
@@ -45,7 +45,7 @@ function normalizeName(raw: string): string {
   return raw.trim().replace(/^['"]|['"]$/g, "").toLowerCase().replace(/[\s_-]+/g, "");
 }
 
-/** Map a plugin.yml / build dependency name to a Hangar preset, if known. */
+/** Map a plugin.yml / build dependency name to a Hangar/Modrinth preset, if known. */
 export function mapDepNameToPreset(raw: string): DetectedHangarDep | undefined {
   const key = normalizeName(raw);
   if (!key) return undefined;
@@ -54,12 +54,7 @@ export function mapDepNameToPreset(raw: string): DetectedHangarDep | undefined {
   for (const preset of DEP_PRESETS) {
     const slugKey = normalizeName(preset.slug);
     if (preset.aliases.some((a) => normalizeName(a) === key) || slugKey === key) {
-      return {
-        name: preset.slug,
-        source: "hangar",
-        author: preset.author,
-        slug: preset.slug,
-      };
+      return presetToDetected(preset);
     }
   }
 
@@ -77,18 +72,22 @@ export function mapDepNameToPreset(raw: string): DetectedHangarDep | undefined {
     viaversion: "viaversion",
     viabackwards: "viabackwards",
     viarewind: "viarewind",
+    worldguard: "worldguard",
+    worldedit: "worldedit",
+    griefprevention: "griefprevention",
+    towny: "towny",
+    floodgate: "floodgate",
+    mythicmobs: "mythicmobs",
+    protocollib: "protocollib",
+    multiverse: "multiverse",
+    multiversecore: "multiverse",
+    coreprotect: "coreprotect",
+    discordsrv: "discordsrv",
   };
   const alias = aliases[key];
   if (alias) {
     const preset = DEP_PRESETS.find((p) => p.aliases.includes(alias));
-    if (preset) {
-      return {
-        name: preset.slug,
-        source: "hangar",
-        author: preset.author,
-        slug: preset.slug,
-      };
-    }
+    if (preset) return presetToDetected(preset);
   }
 
   // Prefix/contains only for multi-char slugs (avoid "via" false positives)
@@ -96,16 +95,27 @@ export function mapDepNameToPreset(raw: string): DetectedHangarDep | undefined {
     const slugKey = normalizeName(preset.slug);
     if (slugKey.length < 4) continue;
     if (key.includes(slugKey) || (key.length >= 4 && slugKey.includes(key))) {
-      return {
-        name: preset.slug,
-        source: "hangar",
-        author: preset.author,
-        slug: preset.slug,
-      };
+      return presetToDetected(preset);
     }
   }
 
   return undefined;
+}
+
+function presetToDetected(preset: (typeof DEP_PRESETS)[number]): DetectedHangarDep {
+  if (preset.source === "modrinth" || (!preset.author && preset.modrinthSlug)) {
+    return {
+      name: preset.slug,
+      source: "modrinth",
+      slug: preset.modrinthSlug ?? preset.slug,
+    };
+  }
+  return {
+    name: preset.slug,
+    source: "hangar",
+    author: preset.author!,
+    slug: preset.slug,
+  };
 }
 
 /** Parse depend / softdepend / loadbefore lists from plugin.yml-style YAML. */
@@ -158,6 +168,20 @@ export function parseBuildDepTokens(content: string): string[] {
     /viaversion/gi,
     /viabackwards/gi,
     /viarewind/gi,
+    /worldguard/gi,
+    /worldedit/gi,
+    /griefprevention/gi,
+    /\btowny\b/gi,
+    /\blands\b/gi,
+    /itemsadder/gi,
+    /\bnexo\b/gi,
+    /floodgate/gi,
+    /mythicmobs/gi,
+    /protocollib/gi,
+    /citizens/gi,
+    /multiverse/gi,
+    /coreprotect/gi,
+    /discordsrv/gi,
   ];
   for (const re of patterns) {
     const matches = content.match(re);
@@ -183,8 +207,12 @@ function dedupeDeps(deps: DetectedHangarDep[]): DetectedHangarDep[] {
 /**
  * Detect test-server Hangar deps from plugin metadata + build files.
  * Always includes Via*; adds mapped depend/softdepend and compileOnly signals.
+ * When `opts.module` is set, reads that module's plugin.yml / pom / build.gradle.
  */
-export async function detectProjectDeps(cwd: string): Promise<DetectedDepsResult> {
+export async function detectProjectDeps(
+  cwd: string,
+  opts: { module?: string } = {},
+): Promise<DetectedDepsResult> {
   const mapped: DetectedHangarDep[] = [];
   const unmapped: string[] = [];
   const sources: DetectedDepsResult["sources"] = [];
@@ -203,9 +231,20 @@ export async function detectProjectDeps(cwd: string): Promise<DetectedDepsResult
     sources.push({ slug: dep.slug, from });
   };
 
+  const base = opts.module
+    ? join(cwd, ...opts.module.replace(/\\/g, "/").split("/"))
+    : cwd;
+
   const pluginPaths = [
-    join(cwd, "src", "main", "resources", "plugin.yml"),
-    join(cwd, "src", "main", "resources", "paper-plugin.yml"),
+    join(base, "src", "main", "resources", "plugin.yml"),
+    join(base, "src", "main", "resources", "paper-plugin.yml"),
+    // Also scan root for hybrid layouts
+    ...(opts.module
+      ? [
+          join(cwd, "src", "main", "resources", "plugin.yml"),
+          join(cwd, "src", "main", "resources", "paper-plugin.yml"),
+        ]
+      : []),
   ];
 
   for (const p of pluginPaths) {
@@ -220,6 +259,9 @@ export async function detectProjectDeps(cwd: string): Promise<DetectedDepsResult
   }
 
   const buildFiles = [
+    join(base, "build.gradle.kts"),
+    join(base, "build.gradle"),
+    join(base, "pom.xml"),
     join(cwd, "build.gradle.kts"),
     join(cwd, "build.gradle"),
     join(cwd, "pom.xml"),
@@ -247,8 +289,10 @@ export function formatDepsYaml(deps: DetectedHangarDep[]): string {
   const lines: string[] = [];
   for (const d of deps) {
     lines.push(`  - name: ${d.name}`);
-    lines.push(`    source: hangar`);
-    lines.push(`    author: ${d.author}`);
+    lines.push(`    source: ${d.source}`);
+    if (d.source === "hangar" && d.author) {
+      lines.push(`    author: ${d.author}`);
+    }
     lines.push(`    slug: ${d.slug}`);
   }
   return lines.join("\n");

@@ -7,6 +7,8 @@ import { theme } from "../theme.js";
 export type HomeAction =
   | "run"
   | "configure"
+  | "module"
+  | "deps"
   | "open"
   | "open-second"
   | "setup"
@@ -22,6 +24,7 @@ export function HomeScreen(props: {
   instance?: string;
   offlineName: string;
   secondPlayer: string;
+  showModule?: boolean;
   status?: string;
   onAction: (action: HomeAction) => void;
 }): React.ReactElement {
@@ -35,6 +38,22 @@ export function HomeScreen(props: {
       id: "configure",
       label: "Configure",
       hint: "version · server · client",
+    },
+  ];
+
+  if (props.showModule) {
+    items.push({
+      id: "module",
+      label: "Module",
+      hint: "pick build module",
+    });
+  }
+
+  items.push(
+    {
+      id: "deps",
+      label: "Dependencies",
+      hint: "presets · toggle · remove",
     },
     {
       id: "open",
@@ -57,7 +76,7 @@ export function HomeScreen(props: {
       hint: "check toolchain",
     },
     { id: "quit", label: "Quit" },
-  ];
+  );
 
   return (
     <Box flexDirection="column">

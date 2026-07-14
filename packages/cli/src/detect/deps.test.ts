@@ -21,7 +21,10 @@ test("VIA_COMPAT_DEPS is Via* only", () => {
 
 test("mapDepNameToPreset maps Vault and LuckPerms", () => {
   assert.equal(mapDepNameToPreset("Vault")?.slug, "VaultUnlocked");
-  assert.equal(mapDepNameToPreset("LuckPerms")?.slug, "LuckPerms");
+  const luck = mapDepNameToPreset("LuckPerms");
+  assert.ok(luck);
+  assert.equal(luck!.source, "modrinth");
+  assert.equal(luck!.slug, "luckperms");
   assert.equal(mapDepNameToPreset("PlaceholderAPI")?.slug, "PlaceholderAPI");
   assert.equal(mapDepNameToPreset("SomeCustomPlugin"), undefined);
 });
@@ -65,7 +68,7 @@ softdepend: [Vault, LuckPerms, WeirdLib]
     assert.ok(slugs.includes("ViaBackwards"));
     assert.ok(slugs.includes("ViaRewind"));
     assert.ok(slugs.includes("VaultUnlocked"));
-    assert.ok(slugs.includes("LuckPerms"));
+    assert.ok(slugs.includes("luckperms") || slugs.includes("LuckPerms"));
     assert.ok(!slugs.includes("EssentialsX"));
     assert.ok(!slugs.includes("MineConomy"));
     assert.ok(result.unmapped.includes("WeirdLib"));

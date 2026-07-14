@@ -11,14 +11,17 @@ type FieldId =
   | "port"
   | "launcher"
   | "instance"
+  | "module"
   | "offlineName"
   | "players"
   | "joinOnReady"
   | "world"
   | "gamemode"
-  | "memory";
+  | "memory"
+  | "reloadJava"
+  | "cleanup";
 
-type FieldKind = "text" | "enum" | "instance";
+type FieldKind = "text" | "enum" | "instance" | "module";
 
 interface FieldDef {
   id: FieldId;
@@ -33,11 +36,14 @@ const LAUNCHERS = ["auto", "embedded", "prism", "multimc", "none"] as const;
 const WORLDS = ["void", "flat", "default"] as const;
 const BOOLS = ["true", "false"] as const;
 const GAMEMODES = ["creative", "survival", "adventure", "spectator"] as const;
+const RELOAD_JAVA = ["safe", "restart", "hotswap"] as const;
+const CLEANUP = ["never", "on-exit", "worlds"] as const;
 
 const ALL_FIELDS: FieldDef[] = [
   { id: "version", label: "Minecraft version", kind: "text", hint: "e.g. 1.20.6 · 1.21.4" },
   { id: "server", label: "Server", kind: "enum", options: SERVERS, hint: "←→ cycle" },
   { id: "port", label: "Port", kind: "text", hint: "25565" },
+  { id: "module", label: "Build module", kind: "module", hint: "Enter to pick" },
   { id: "launcher", label: "Client launcher", kind: "enum", options: LAUNCHERS, hint: "←→ cycle" },
   { id: "instance", label: "Prism instance", kind: "instance", hint: "Enter to pick" },
   { id: "offlineName", label: "Offline name", kind: "text", hint: "primary player" },
@@ -46,6 +52,8 @@ const ALL_FIELDS: FieldDef[] = [
   { id: "world", label: "World", kind: "enum", options: WORLDS, hint: "←→ cycle" },
   { id: "gamemode", label: "Gamemode", kind: "enum", options: GAMEMODES, hint: "←→ cycle" },
   { id: "memory", label: "JVM memory", kind: "text", hint: "e.g. 1G" },
+  { id: "reloadJava", label: "Reload (java)", kind: "enum", options: RELOAD_JAVA, hint: "←→ cycle" },
+  { id: "cleanup", label: "Run cleanup", kind: "enum", options: CLEANUP, hint: "←→ cycle" },
 ];
 
 export function valuesFromConfig(raw: PlugDevConfig): Record<FieldId, string> {
@@ -54,6 +62,7 @@ export function valuesFromConfig(raw: PlugDevConfig): Record<FieldId, string> {
     version: raw.version ?? "",
     server: raw.server ?? "paper",
     port: String(raw.port ?? 25565),
+    module: raw.build?.module ?? "",
     launcher: raw.client?.launcher ?? "auto",
     instance: raw.client?.instance ?? "",
     offlineName: raw.client?.offlineName ?? "DevPlayer",
@@ -65,6 +74,8 @@ export function valuesFromConfig(raw: PlugDevConfig): Record<FieldId, string> {
     world: raw.dev?.world ?? "void",
     gamemode: raw.dev?.gamemode ?? "creative",
     memory: raw.jvm?.memory ?? "1G",
+    reloadJava: raw.watch?.reload?.java ?? "safe",
+    cleanup: raw.run?.cleanup ?? "never",
   };
 }
 
@@ -78,11 +89,17 @@ export function patchFromValues(
   const port = Number.parseInt(values.port, 10);
   const joinOnReady = /^(true|1|yes)$/i.test(values.joinOnReady.trim());
   const instance = values.instance.trim();
+  const module = values.module.trim();
 
   return {
     version: values.version.trim() || undefined,
     server: (values.server.trim() || "paper") as PlugDevConfig["server"],
     port: Number.isFinite(port) ? port : 25565,
+    build: module
+      ? {
+          module,
+        }
+      : undefined,
     client: {
       launcher: (values.launcher.trim() || "auto") as NonNullable<
         PlugDevConfig["client"]
@@ -99,6 +116,16 @@ export function patchFromValues(
     jvm: {
       memory: values.memory.trim() || "1G",
     },
+    watch: {
+      reload: {
+        java: values.reloadJava.trim() || "safe",
+      },
+    },
+    run: {
+      cleanup: (values.cleanup.trim() || "never") as NonNullable<
+        PlugDevConfig["run"]
+      >["cleanup"],
+    },
   };
 }
 
@@ -109,18 +136,25 @@ function cycleOption(options: readonly string[], current: string, dir: 1 | -1): 
   return options[next]!;
 }
 
-function visibleFields(launcher: string): FieldDef[] {
+function visibleFields(launcher: string, showModule: boolean): FieldDef[] {
   const showInstance =
     launcher === "prism" || launcher === "multimc" || launcher === "auto";
-  return ALL_FIELDS.filter((f) => f.id !== "instance" || showInstance);
+  return ALL_FIELDS.filter((f) => {
+    if (f.id === "instance" && !showInstance) return false;
+    if (f.id === "module" && !showModule) return false;
+    return true;
+  });
 }
 
 export function ConfigureScreen(props: {
   cwd: string;
   raw: PlugDevConfig;
+  showModule?: boolean;
   onBack: () => void;
   onPickInstance: () => void;
+  onPickModule?: () => void;
 }): React.ReactElement {
+  const showModule = props.showModule === true;
   const initial = useMemo(() => valuesFromConfig(props.raw), [props.raw]);
   const [values, setValues] = useState(initial);
   const [fieldIndex, setFieldIndex] = useState(0);
@@ -131,7 +165,10 @@ export function ConfigureScreen(props: {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
-  const fields = useMemo(() => visibleFields(values.launcher), [values.launcher]);
+  const fields = useMemo(
+    () => visibleFields(values.launcher, showModule),
+    [values.launcher, showModule],
+  );
   const field = fields[Math.min(fieldIndex, fields.length - 1)]!;
 
   const persist = useCallback(
@@ -156,12 +193,11 @@ export function ConfigureScreen(props: {
     async (patch: Partial<Record<FieldId, string>>, label?: string) => {
       const next = { ...values, ...patch };
       setValues(next);
-      // Clamp index if instance row disappears
-      const nextFields = visibleFields(next.launcher);
+      const nextFields = visibleFields(next.launcher, showModule);
       setFieldIndex((i) => Math.min(i, nextFields.length - 1));
       await persist(next, label);
     },
-    [values, persist],
+    [values, persist, showModule],
   );
 
   useInput(
@@ -194,6 +230,10 @@ export function ConfigureScreen(props: {
       } else if (key.return) {
         if (field.kind === "instance") {
           props.onPickInstance();
+          return;
+        }
+        if (field.kind === "module") {
+          props.onPickModule?.();
           return;
         }
         if (field.kind === "enum" && field.options) {
@@ -236,7 +276,9 @@ export function ConfigureScreen(props: {
           const display =
             f.id === "instance"
               ? values.instance || "—"
-              : values[f.id] || "—";
+              : f.id === "module"
+                ? values.module || "—"
+                : values[f.id] || "—";
           return (
             <Box key={f.id} flexDirection="column" marginBottom={editingThis ? 1 : 0}>
               <Box>
@@ -252,7 +294,7 @@ export function ConfigureScreen(props: {
                     {f.kind === "enum" && selected ? (
                       <Text color={theme.muted}>  ←→</Text>
                     ) : null}
-                    {f.kind === "instance" && selected ? (
+                    {(f.kind === "instance" || f.kind === "module") && selected ? (
                       <Text color={theme.muted}>  Enter</Text>
                     ) : null}
                   </Text>

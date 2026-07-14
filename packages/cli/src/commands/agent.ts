@@ -4,6 +4,11 @@ import { constants } from "node:fs";
 import { heading, success, info, warn } from "../util/log.js";
 import { isJsonMode, emitJson } from "../util/output.js";
 import { SKILL_MD, SKILL_AGENTS_MD } from "../bundled-skill.js";
+import {
+  renderClaudeSnippet,
+  renderCodexAgents,
+  renderCursorRule,
+} from "../agent-content.js";
 
 export type AgentTarget = "cursor" | "claude" | "codex";
 
@@ -15,94 +20,9 @@ const PLUGDEV_MCP_SERVER = {
   },
 };
 
-const CURSOR_RULE = `---
-description: PlugDev Minecraft plugin test loop
-globs:
-alwaysApply: true
----
-
-# PlugDev
-
-Use the PlugDev CLI for Paper plugin test loops in this project. Prefer \`plug run\` over manually starting Paper.
-
-## Commands
-
-- \`plug run\` or \`plugdev run\` — boot Paper, watch \`src/\`, auto-join client
-- \`plug doctor\` — check Java/Node detection and project toolchain when boot fails
-- \`plug clean\` / \`plug clean --all\` — wipe worlds or \`.plugdev/run\`
-- \`plugdev deps add|remove|list\` — modular test plugins
-- Headless: \`plugdev server start|stop|status|command|logs\` (agents; pair with \`--json\` when scripting)
-- After server ready: type console commands in the same terminal (RCON), e.g. \`op DevPlayer\`, \`list\`
-- If MCP is configured (\`.cursor/mcp.json\`), prefer \`plugdev_*\` MCP tools for headless control
-
-## Install
-
-\`\`\`powershell
-npm install -g @plugdev/cli
-plugdev init --setup --agents --mcp
-plug run
-\`\`\`
-
-## Config
-
-- \`plugdev.yml\` at project root
-- Default deps: Via*, VaultUnlocked, EssentialsX, MineConomy (remove with \`plugdev deps remove <name>\`)
-- Global cache: \`~/.plugdev/\` (never auto-deleted)
-- Project run dir: \`.plugdev/run/\` (kept by default for fast restarts)
-
-## Do not
-
-- Do not use Bukkit \`/reload\` — PlugDev uses safe JAR reload via bootstrap
-- On Folia, prefer full restart over safe reload (\`server: folia\` in \`plugdev.yml\`)
-- Optional \`--hotswap\` / \`watch.reload.java: hotswap\` is method-body JDWP redefine only; structural changes fall back to safe reload
-- Do not delete \`~/.plugdev\` unless the user asks (\`plugdev cache clear\`)
-`;
-
-const CLAUDE_SNIPPET = `## PlugDev
-
-This project uses [PlugDev](https://github.com/mattbaconz/plugdev) for the Minecraft plugin test loop.
-
-- Prefer \`plug run\` over manually starting Paper
-- Run: \`plug run\` (or \`plugdev run\`) after \`npm i -g @plugdev/cli\` and \`plugdev init --setup --agents --mcp\`
-- Doctor: \`plug doctor\` when detection or boot fails
-- Console: type server commands in the PlugDev terminal after ready (RCON)
-- Clean: \`plug clean\` / \`plug clean --all\`
-- Deps: \`plugdev deps add|remove|list\` (defaults include Via*, VaultUnlocked, EssentialsX, MineConomy)
-- Headless: \`plugdev server start|stop|status|command|logs\`
-- If MCP is configured (\`.mcp.json\`), prefer \`plugdev_*\` tools for headless control
-- Optional hotswap (\`--hotswap\`): method bodies only; falls back to safe reload
-
-Do not use Bukkit \`/reload\`. On Folia, prefer full restart over safe reload.
-`;
-
-const CODEX_AGENTS = `# AGENTS — PlugDev project
-
-This is a Minecraft Paper plugin developed with PlugDev. Prefer \`plug run\` over manually starting Paper.
-
-## Loop
-
-1. \`npm install -g @plugdev/cli\` (once)
-2. \`plugdev init --setup --agents --mcp\` (once per project)
-3. \`plug run\` — server + watch + client
-4. Type console commands in the same terminal after ready (\`op DevPlayer\`, \`list\`, …)
-5. \`plug doctor\` if boot or detection fails
-6. \`plug clean\` when you need a fresh world; \`plug clean --all\` for a cold \`.plugdev/run\`
-
-## Facts
-
-| Item | Value |
-|------|--------|
-| Bins | \`plug\` and \`plugdev\` (same CLI) |
-| Config | \`plugdev.yml\` |
-| Run dir | \`.plugdev/run/\` |
-| Cache | \`~/.plugdev/\` |
-| Reload | Safe JAR reload (not \`/reload\`); optional \`--hotswap\` for method bodies |
-| Folia | Prefer full restart over safe reload |
-| Headless | \`plugdev server start|stop|status|command|logs\` + \`--json\` |
-| MCP | Optional structured tools via \`npx @plugdev/mcp\` — same loop for agents |
-
-Optional MCP: \`plugdev agent install --mcp\` writes \`.cursor/mcp.json\` and \`.mcp.json\`. Prefer MCP tools for headless control when configured; otherwise use CLI \`--json\`.
-`;
+const CURSOR_RULE = renderCursorRule();
+const CLAUDE_SNIPPET = renderClaudeSnippet();
+const CODEX_AGENTS = renderCodexAgents();
 
 async function exists(path: string): Promise<boolean> {
   try {

@@ -30,6 +30,7 @@ import {
 } from "./commands/cache.js";
 import { runClean } from "./cache/run-cleanup.js";
 import { runAgentInstall } from "./commands/agent.js";
+import { runModuleList, runModuleUse } from "./commands/module-cmd.js";
 import {
   runTui,
   handoffRun,
@@ -65,6 +66,7 @@ function devOptions() {
     hotswap: false,
     watch: true,
     quiet: false,
+    module: undefined as string | undefined,
   };
 }
 
@@ -88,6 +90,7 @@ function parseDevOpts(opts: ReturnType<typeof devOptions>) {
     hotswap: opts.hotswap,
     watch: opts.watch !== false,
     quiet: opts.quiet,
+    module: opts.module,
   };
 }
 
@@ -227,6 +230,7 @@ program
   .option("--config <path>", "config file path")
   .option("--debug", "enable JDWP debug port (5005)")
   .option("--hotswap", "plugins: JDWP redefine for method bodies (falls back to safe reload)")
+  .option("--module <name>", "multi-module: Maven/Gradle module to build (build.module)")
   .action(async (opts) => {
     process.exit(
       await runDev(process.cwd(), {
@@ -315,16 +319,18 @@ cache
 program
   .command("build")
   .description("Build plugin JAR (Gradle/Maven)")
-  .action(async () => {
-    process.exit(await runBuild(process.cwd()));
+  .option("--module <name>", "multi-module: Maven/Gradle module to build")
+  .action(async (opts: { module?: string }) => {
+    process.exit(await runBuild(process.cwd(), { module: opts.module }));
   });
 
 program
   .command("sync")
   .description("Build and sync plugin JAR to .plugdev/run/plugins")
   .option("--jar <path>", "use existing JAR instead of building")
-  .action(async (opts: { jar?: string }) => {
-    process.exit(await runSync(process.cwd(), opts.jar));
+  .option("--module <name>", "multi-module: Maven/Gradle module to build")
+  .action(async (opts: { jar?: string; module?: string }) => {
+    process.exit(await runSync(process.cwd(), opts.jar, { module: opts.module }));
   });
 
 const serverCmd = program.command("server").description("Headless dev server (for agents/MCP)");
@@ -338,6 +344,7 @@ function serverStartOverrides(cmd: Command): CliOverrides {
     folia: o.folia === true,
     purpur: o.purpur === true,
     detach: o.detach !== false,
+    module: typeof o.module === "string" ? o.module : undefined,
   };
 }
 
@@ -350,6 +357,7 @@ serverCmd
   .option("--folia", "use Folia server")
   .option("--purpur", "use Purpur server")
   .option("--no-detach", "block until server exits")
+  .option("--module <name>", "multi-module: Maven/Gradle module to build")
   .action(async function (this: Command) {
     process.exit(await runServerStart(process.cwd(), serverStartOverrides(this)));
   });
@@ -415,12 +423,28 @@ program
       process.exit(await runDepsRemove(process.cwd(), name));
     }
     if (action === "list") {
-      process.exit(await runDepsList());
+      process.exit(await runDepsList(process.cwd()));
     }
     console.error(
       "Usage: plugdev deps add <name> | plugdev deps remove <name> | plugdev deps list",
     );
     process.exit(1);
+  });
+
+const moduleCmd = program.command("module").description("Multi-module Maven/Gradle reactor");
+
+moduleCmd
+  .command("list")
+  .description("List reactor modules (plugin vs library)")
+  .action(async () => {
+    process.exit(await runModuleList(process.cwd()));
+  });
+
+moduleCmd
+  .command("use <name>")
+  .description("Set build.module (+ jarPattern / watch.paths) in plugdev.yml")
+  .action(async (name: string) => {
+    process.exit(await runModuleUse(process.cwd(), name));
   });
 
 program
@@ -455,6 +479,7 @@ program
   .option("--config <path>", "config file path")
   .option("--debug", "enable JDWP debug port (5005)")
   .option("--hotswap", "plugins: JDWP redefine for method bodies (falls back to safe reload)")
+  .option("--module <name>", "multi-module: Maven/Gradle module to build")
   .action(async (opts) => {
     const bin = invokedAsPlug() ? "plug" : "plugdev";
     const globals = program.opts<{ json?: boolean }>();
@@ -474,7 +499,8 @@ program
         opts.noWatch ||
         opts.config ||
         opts.debug ||
-        opts.hotswap,
+        opts.hotswap ||
+        opts.module,
     );
 
     // Explicit legacy flags on bare command still start the loop

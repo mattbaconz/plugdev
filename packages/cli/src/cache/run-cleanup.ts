@@ -5,6 +5,7 @@ import { projectRunDir } from "../paths.js";
 import { readSession, isProcessRunning } from "../session.js";
 import { isPortAvailable } from "../util/port.js";
 import { info, success, warn } from "../util/log.js";
+import { isJsonMode, emitJson } from "../util/output.js";
 
 export type RunCleanupMode = "never" | "on-exit" | "worlds";
 
@@ -101,14 +102,24 @@ export async function runClean(
   const port = opts.port ?? 25565;
   const busy = await isDevServerBusy(cwd, port);
   if (busy && !opts.force) {
-    warn("Dev server looks busy (session or port in use).");
-    info("Stop it first (Ctrl+C / plugdev server stop), or pass --force");
+    if (isJsonMode()) {
+      emitJson({
+        ok: false,
+        error: "Dev server looks busy (session or port in use)",
+        hint: "Stop it first or pass --force",
+      });
+    } else {
+      warn("Dev server looks busy (session or port in use).");
+      info("Stop it first (Ctrl+C / plugdev server stop), or pass --force");
+    }
     return 1;
   }
 
   if (opts.all) {
     const wiped = await wipeRunDir(cwd);
-    if (wiped) success("Removed .plugdev/run");
+    if (isJsonMode()) {
+      emitJson({ ok: true, data: { mode: "all", wiped } });
+    } else if (wiped) success("Removed .plugdev/run");
     else info("Nothing to clean — .plugdev/run missing");
     return 0;
   }
@@ -116,11 +127,17 @@ export async function runClean(
   // Default and --worlds: wipe world folders only
   const runDir = projectRunDir(cwd);
   if (!(await exists(runDir))) {
-    info("Nothing to clean — .plugdev/run missing");
+    if (isJsonMode()) {
+      emitJson({ ok: true, data: { mode: "worlds", removed: [], missing: true } });
+    } else {
+      info("Nothing to clean — .plugdev/run missing");
+    }
     return 0;
   }
   const removed = await wipeWorldDirs(runDir);
-  if (removed.length === 0) {
+  if (isJsonMode()) {
+    emitJson({ ok: true, data: { mode: "worlds", removed } });
+  } else if (removed.length === 0) {
     info("No world folders to remove");
   } else {
     success(`Removed: ${removed.join(", ")}`);

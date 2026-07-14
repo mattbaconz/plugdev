@@ -56,6 +56,15 @@ Manual config:
 | `plugdev_run_server_command` | RCON console command |
 | `plugdev_op_player` | `op <name>` |
 | `plugdev_run_test_loop` | doctor → setup → build → sync → start → OP |
+| `plugdev_list_modules` | List Maven/Gradle reactor modules |
+| `plugdev_use_module` | Set `build.module` in plugdev.yml |
+| `plugdev_list_deps` | Configured deps + presets |
+| `plugdev_add_dep` | Add Hangar/Modrinth/URL dep |
+| `plugdev_remove_dep` | Remove dep JAR + yml entry |
+| `plugdev_agent_install` | Write Cursor/Claude/Codex rules (+ MCP) |
+| `plugdev_cache_prefetch` | Warm server/client cache |
+| `plugdev_cache_status` | Cache sizes under `~/.plugdev` |
+| `plugdev_clean` | Wipe worlds or `.plugdev/run` |
 
 ## Cursor plugin
 

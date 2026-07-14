@@ -114,3 +114,46 @@ export async function writeClientInstanceToYml(
   });
   return result.ok;
 }
+
+/** Set build.module (+ jarPattern / watch.paths) for multi-module projects. */
+export async function writeModuleToYml(
+  cwd: string,
+  opts: {
+    module: string;
+    system: "maven" | "gradle";
+    jarPattern?: string;
+    watchPaths?: string[];
+  },
+): Promise<{ ok: true; path: string } | { ok: false; reason: string }> {
+  const id = opts.module.replace(/^:/, "").replace(/\\/g, "/").replace(/\/$/, "");
+  const jarPattern =
+    opts.jarPattern ??
+    (opts.system === "maven" ? `${id}/target/*.jar` : `${id}/build/libs/*.jar`);
+  const patch: DeepPartial<PlugDevConfig> = {
+    build: {
+      system: opts.system,
+      module: id,
+      jarPattern,
+    },
+  };
+  if (opts.watchPaths?.length) {
+    patch.watch = { paths: opts.watchPaths };
+  }
+  return updatePlugdevYml(cwd, patch);
+}
+
+/** Remove a dep from plugdev.yml by name/slug (does not delete JARs). */
+export async function removeDepFromYml(cwd: string, name: string): Promise<boolean> {
+  const loaded = await readPlugdevYml(cwd);
+  if (!loaded) return false;
+  const key = name.toLowerCase().replace(/\s+/g, "");
+  const before = loaded.raw.deps?.length ?? 0;
+  loaded.raw.deps = (loaded.raw.deps ?? []).filter((d) => {
+    const n = d.name.toLowerCase().replace(/\s+/g, "");
+    const s = (d.slug ?? "").toLowerCase();
+    return n !== key && s !== key;
+  });
+  if ((loaded.raw.deps?.length ?? 0) === before) return false;
+  await writeFile(loaded.path, stringifyYaml(loaded.raw, { lineWidth: 0 }));
+  return true;
+}

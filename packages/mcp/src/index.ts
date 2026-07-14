@@ -5,7 +5,7 @@ import { z } from "zod";
 import { parsePlugdevJson, type JsonResult } from "./json.js";
 import { resolvePlugdevInvocation } from "./resolve-cli.js";
 
-const MCP_VERSION = "0.2.0";
+const MCP_VERSION = "0.3.0";
 const projectRoot = process.env.PLUGDEV_PROJECT_ROOT ?? process.cwd();
 
 async function plugdev(args: string[]): Promise<JsonResult> {
@@ -240,6 +240,152 @@ server.tool(
       player: playerName ?? "DevPlayer",
       steps,
     });
+  },
+);
+
+server.tool(
+  "plugdev_list_modules",
+  "List Maven/Gradle reactor modules (plugin vs library, active, Folia)",
+  {},
+  async () => {
+    const result = await plugdev(["module", "list"]);
+    if (!result.data && !result.ok) return { ...textResult(result), isError: true };
+    return textResult(result.data ?? result);
+  },
+);
+
+server.tool(
+  "plugdev_use_module",
+  "Set build.module (and jarPattern / watch.paths) in plugdev.yml",
+  {
+    name: z.string().describe("Module id e.g. worldevents-core"),
+  },
+  async ({ name }) => {
+    const result = await plugdev(["module", "use", name]);
+    if (!result.ok) return { ...textResult(result), isError: true };
+    return textResult(result.data ?? result);
+  },
+);
+
+server.tool(
+  "plugdev_list_deps",
+  "List configured plugdev.yml deps and available presets",
+  {},
+  async () => {
+    const result = await plugdev(["deps", "list"]);
+    if (!result.data && !result.ok) return { ...textResult(result), isError: true };
+    return textResult(result.data ?? result);
+  },
+);
+
+server.tool(
+  "plugdev_add_dep",
+  "Add a test dependency (Hangar preset, Modrinth, or URL) and install the JAR",
+  {
+    name: z.string().describe("Preset alias or project slug"),
+    version: z.string().optional(),
+    source: z.enum(["hangar", "modrinth", "url"]).optional(),
+    url: z.string().optional().describe("Required when source is url"),
+  },
+  async ({ name, version, source, url }) => {
+    const args = ["deps", "add", name];
+    if (version) args.push("--version", version);
+    if (source) args.push("--source", source);
+    if (url) args.push("--url", url);
+    const result = await plugdev(args);
+    if (!result.ok) return { ...textResult(result), isError: true };
+    return textResult(result.data ?? result);
+  },
+);
+
+server.tool(
+  "plugdev_remove_dep",
+  "Remove a dependency JAR and plugdev.yml entry",
+  {
+    name: z.string(),
+  },
+  async ({ name }) => {
+    const result = await plugdev(["deps", "remove", name]);
+    if (!result.ok) return { ...textResult(result), isError: true };
+    return textResult(result.data ?? result);
+  },
+);
+
+server.tool(
+  "plugdev_agent_install",
+  "Write Cursor/Claude/Codex agent rules (and optional MCP config)",
+  {
+    cursor: z.boolean().optional(),
+    claude: z.boolean().optional(),
+    codex: z.boolean().optional(),
+    all: z.boolean().optional().describe("Install all targets (default if none selected)"),
+    mcp: z.boolean().optional().describe("Write MCP config files"),
+    force: z.boolean().optional(),
+  },
+  async ({ cursor, claude, codex, all, mcp, force }) => {
+    const args = ["agent", "install"];
+    if (cursor) args.push("--cursor");
+    if (claude) args.push("--claude");
+    if (codex) args.push("--codex");
+    if (all) args.push("--all");
+    if (mcp) args.push("--mcp");
+    if (force) args.push("--force");
+    const result = await plugdev(args);
+    if (!result.ok) return { ...textResult(result), isError: true };
+    return textResult(result.data ?? result);
+  },
+);
+
+server.tool(
+  "plugdev_cache_prefetch",
+  "Warm ~/.plugdev server and/or embedded client cache",
+  {
+    version: z.string().optional(),
+    paper: z.boolean().optional(),
+    folia: z.boolean().optional(),
+    client: z.boolean().optional(),
+    force: z.boolean().optional(),
+  },
+  async ({ version, paper, folia, client, force }) => {
+    const args = ["cache", "prefetch"];
+    if (version) args.push("--version", version);
+    if (paper) args.push("--paper");
+    if (folia) args.push("--folia");
+    if (client) args.push("--client");
+    if (force) args.push("--force");
+    const result = await plugdev(args);
+    if (!result.ok && result.error) return { ...textResult(result), isError: true };
+    return textResult(result.data ?? { ok: true, message: "prefetch complete" });
+  },
+);
+
+server.tool(
+  "plugdev_cache_status",
+  "Show ~/.plugdev cache sizes",
+  {},
+  async () => {
+    const result = await plugdev(["cache", "status"]);
+    if (!result.data && !result.ok) return { ...textResult(result), isError: true };
+    return textResult(result.data ?? result);
+  },
+);
+
+server.tool(
+  "plugdev_clean",
+  "Remove .plugdev/run worlds or the whole run folder",
+  {
+    worlds: z.boolean().optional().describe("Wipe world folders only (default)"),
+    all: z.boolean().optional().describe("Remove entire .plugdev/run"),
+    force: z.boolean().optional().describe("Clean even if server looks busy"),
+  },
+  async ({ worlds, all, force }) => {
+    const args = ["clean"];
+    if (all) args.push("--all");
+    else if (worlds !== false) args.push("--worlds");
+    if (force) args.push("--force");
+    const result = await plugdev(args);
+    if (!result.ok) return { ...textResult(result), isError: true };
+    return textResult(result.data ?? result);
   },
 );
 

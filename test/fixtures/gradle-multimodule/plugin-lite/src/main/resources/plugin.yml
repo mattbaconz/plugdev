@@ -1,0 +1,3 @@
+name: LitePlugin
+main: com.example.LitePlugin
+api-version: "1.21"

@@ -2,6 +2,12 @@ import { readFile, access } from "node:fs/promises";
 import { join } from "node:path";
 import { constants } from "node:fs";
 import { info } from "../util/log.js";
+import {
+  detectModules,
+  needsModuleSelection,
+  autoSelectModule,
+  type ModuleCandidate,
+} from "./modules.js";
 
 export type ProjectType =
   | "plugin"
@@ -31,6 +37,12 @@ export interface DetectedProject {
   botEntry?: string;
   botTokenEnv?: string;
   configPath?: string;
+  /** Multi-module reactor candidates (Maven/Gradle). */
+  modules?: ModuleCandidate[];
+  /** True when 2+ plugin-kind modules exist and user should pick one. */
+  needsModuleSelection?: boolean;
+  /** Suggested build.module when auto-selected (single plugin module or first of many). */
+  suggestedModule?: string;
 }
 
 export type FoliaSupport = "declared" | "unknown" | "absent";
@@ -38,26 +50,14 @@ export type FoliaSupport = "declared" | "unknown" | "absent";
 /**
  * Best-effort Folia support signal from plugin metadata.
  * Does not prove the plugin is Folia-safe — only whether authors declared support.
+ * When `moduleId` is set, reads that module's resources (multi-module reactors).
  */
-export async function detectFoliaSupport(cwd: string): Promise<FoliaSupport> {
-  const paths = [
-    join(cwd, "src", "main", "resources", "paper-plugin.yml"),
-    join(cwd, "src", "main", "resources", "plugin.yml"),
-  ];
-  let sawMetadata = false;
-  for (const p of paths) {
-    const content = await readText(p);
-    if (!content) continue;
-    sawMetadata = true;
-    if (
-      /folia-supported:\s*true/i.test(content) ||
-      /folia:\s*true/i.test(content) ||
-      /supports-folia:\s*true/i.test(content)
-    ) {
-      return "declared";
-    }
-  }
-  return sawMetadata ? "absent" : "unknown";
+export async function detectFoliaSupport(
+  cwd: string,
+  moduleId?: string,
+): Promise<FoliaSupport> {
+  const { detectFoliaSupportForModule } = await import("./modules.js");
+  return detectFoliaSupportForModule(cwd, moduleId);
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -188,7 +188,9 @@ export async function detectProject(cwd: string): Promise<DetectedProject> {
 
   const hasGradle =
     (await exists(join(cwd, "build.gradle"))) ||
-    (await exists(join(cwd, "build.gradle.kts")));
+    (await exists(join(cwd, "build.gradle.kts"))) ||
+    (await exists(join(cwd, "settings.gradle"))) ||
+    (await exists(join(cwd, "settings.gradle.kts")));
   const hasMaven = await exists(join(cwd, "pom.xml"));
   const hasGradlew =
     (await exists(join(cwd, "gradlew"))) ||
@@ -332,6 +334,67 @@ export async function detectProject(cwd: string): Promise<DetectedProject> {
       result.minecraftVersion = parsePaperApiVersionFromPom(pom);
       if (pom.includes("maven-shade-plugin")) result.hasShadowJar = true;
       if (pom.includes("run-paper-maven-plugin")) result.hasRunPaperMaven = true;
+    }
+  }
+
+  // Multi-module reactor: scan submodules when root has no plugin signal
+  if (
+    result.type === "unknown" ||
+    (result.type === "plugin" && !result.pluginName)
+  ) {
+    const buildSys =
+      result.buildSystem === "maven" || result.buildSystem === "gradle"
+        ? result.buildSystem
+        : hasMaven
+          ? "maven"
+          : hasGradle || hasGradlew
+            ? "gradle"
+            : "none";
+    if (buildSys === "maven" || buildSys === "gradle") {
+      const modules = await detectModules(cwd, buildSys);
+      if (modules.length > 0) {
+        result.modules = modules;
+        result.needsModuleSelection = needsModuleSelection(modules);
+        const selected = autoSelectModule(modules);
+        if (selected) {
+          result.type = "plugin";
+          result.buildSystem = buildSys;
+          result.suggestedModule = selected.id;
+          if (!result.pluginName) result.pluginName = selected.pluginName;
+          if (!result.mainClass) result.mainClass = selected.mainClass;
+          if (!result.minecraftVersion) result.minecraftVersion = selected.apiVersion;
+          if (selected.foliaSupported) {
+            result.foliaSupported = true;
+            result.suggestedServer = "folia";
+          }
+          if (selected.hasShade) result.hasShadowJar = true;
+        } else if (modules.some((m) => m.hasShade)) {
+          result.hasShadowJar = true;
+        }
+
+        // Root pom paper-api version as fallback
+        if (!result.minecraftVersion && pomContent) {
+          result.minecraftVersion = parsePaperApiVersionFromPom(pomContent);
+        }
+        if (
+          !result.minecraftVersion &&
+          (hasGradle || hasGradlew) &&
+          gradleContent
+        ) {
+          result.minecraftVersion = parsePaperApiVersionFromGradle(gradleContent);
+        }
+      }
+    }
+  } else if (result.buildSystem === "maven" || result.buildSystem === "gradle") {
+    // Still attach module list when root already detected as plugin (single-module or hybrid)
+    const modules = await detectModules(cwd, result.buildSystem);
+    if (modules.length > 0) {
+      result.modules = modules;
+      result.needsModuleSelection = needsModuleSelection(modules);
+      if (!result.suggestedModule) {
+        const selected = autoSelectModule(modules);
+        if (selected) result.suggestedModule = selected.id;
+      }
     }
   }
 

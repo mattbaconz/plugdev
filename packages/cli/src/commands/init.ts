@@ -7,6 +7,11 @@ import {
   formatDepsYaml,
   type DetectedHangarDep,
 } from "../detect/deps.js";
+import {
+  defaultJarPatternForModule,
+  defaultWatchPathsForModule,
+  autoSelectModule,
+} from "../detect/modules.js";
 import { loadConfig } from "../config/loader.js";
 import { CLI_VERSION } from "../constants.js";
 import { heading, success, info, warn } from "../util/log.js";
@@ -21,18 +26,41 @@ function buildPluginTemplate(opts: {
   jarTask: string;
   deps: DetectedHangarDep[];
   reloadJava: string;
+  module?: string;
+  jarPattern?: string;
+  watchPaths?: string[];
 }): string {
   const depsBlock = formatDepsYaml(opts.deps);
-  const buildBlock =
-    opts.buildSystem === "maven"
-      ? `build:
-  system: maven
-  task: package
-  jarPattern: "target/*.jar"`
-      : `build:
-  system: gradle
-  task: build
-  jarTask: ${opts.jarTask}`;
+  const watchPaths = opts.watchPaths?.length ? opts.watchPaths : ["src/"];
+  const watchBlock = watchPaths.map((p) => `    - ${p}`).join("\n");
+
+  let buildBlock: string;
+  if (opts.buildSystem === "maven") {
+    const lines = [
+      "build:",
+      "  system: maven",
+      "  task: package",
+    ];
+    if (opts.module) lines.push(`  module: ${opts.module}`);
+    lines.push(
+      `  jarPattern: "${opts.jarPattern ?? (opts.module ? `${opts.module}/target/*.jar` : "target/*.jar")}"`,
+    );
+    buildBlock = lines.join("\n");
+  } else {
+    const lines = [
+      "build:",
+      "  system: gradle",
+      "  task: build",
+      `  jarTask: ${opts.jarTask}`,
+    ];
+    if (opts.module) {
+      lines.push(`  module: ${opts.module}`);
+      lines.push(
+        `  jarPattern: "${opts.jarPattern ?? `${opts.module}/build/libs/*.jar`}"`,
+      );
+    }
+    buildBlock = lines.join("\n");
+  }
 
   return `# PlugDev configuration — auto-generated
 type: plugin
@@ -68,7 +96,7 @@ ${depsBlock}
 
 watch:
   paths:
-    - src/
+${watchBlock}
   debounceMs: 300
   reload:
     java: ${opts.reloadJava}
@@ -126,7 +154,13 @@ export async function runInit(
 
   const project = await detectProject(cwd);
   const config = await loadConfig(cwd, project);
-  const detectedDeps = await detectProjectDeps(cwd);
+  const selectedModule =
+    config.build.module ??
+    project.suggestedModule ??
+    autoSelectModule(project.modules ?? [])?.id;
+  const detectedDeps = await detectProjectDeps(cwd, {
+    module: selectedModule,
+  });
   const configPath = join(cwd, "plugdev.yml");
 
   const jarTask = project.hasShadowJar ? "shadowJar" : "jar";
@@ -148,6 +182,23 @@ export async function runInit(
         ? undefined
         : server,
   });
+
+  if (project.modules?.length) {
+    const plugins = project.modules.filter((m) => m.kind === "plugin");
+    info(
+      `Modules: ${project.modules
+        .map((m) => `${m.id}[${m.kind}]`)
+        .join(", ")}`,
+    );
+    if (project.needsModuleSelection) {
+      info(
+        `Selected module (first plugin): ${selectedModule} — switch with: plugdev module use <name>`,
+      );
+      info(`Plugin modules: ${plugins.map((m) => m.id).join(", ")}`);
+    } else if (selectedModule) {
+      info(`Build module: ${selectedModule}`);
+    }
+  }
 
   if (
     detectedDeps.deps.length > 0 &&
@@ -188,13 +239,29 @@ export async function runInit(
   } else if (project.type === "discord-bot") {
     content = DISCORD_BOT_TEMPLATE;
   } else {
+    const buildSystem = project.buildSystem === "maven" ? "maven" : "gradle";
+    const moduleMeta = (project.modules ?? []).find((m) => m.id === selectedModule);
+    const watchPaths =
+      selectedModule && project.modules?.length
+        ? defaultWatchPathsForModule(project.modules, selectedModule)
+        : undefined;
+    const jarPattern = selectedModule
+      ? defaultJarPatternForModule(
+          selectedModule,
+          buildSystem,
+          moduleMeta?.finalName,
+        )
+      : undefined;
     content = buildPluginTemplate({
       server,
       version: config.version,
-      buildSystem: project.buildSystem === "maven" ? "maven" : "gradle",
+      buildSystem,
       jarTask,
       deps: detectedDeps.deps,
       reloadJava,
+      module: selectedModule,
+      jarPattern,
+      watchPaths,
     });
   }
 

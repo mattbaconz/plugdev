@@ -160,6 +160,8 @@ export interface CliOverrides {
   /** Alias for server mode / headless test (mods). */
   test?: boolean;
   loader?: string;
+  /** Override build.module for one-off runs (multi-module Maven/Gradle). */
+  module?: string;
   configPath?: string;
   detach?: boolean;
   quiet?: boolean;
@@ -300,16 +302,32 @@ export async function loadConfig(
           : "build"),
       jarTask:
         raw.build?.jarTask ?? (project.hasShadowJar ? "shadowJar" : "jar"),
-      module: raw.build?.module,
+      module: (() => {
+        const fromOverride = overrides.module?.trim();
+        if (fromOverride) return fromOverride.replace(/^:/, "");
+        if (raw.build?.module) return raw.build.module;
+        // Auto-select single plugin module when config omits build.module
+        if (project.suggestedModule && !project.needsModuleSelection) {
+          return project.suggestedModule;
+        }
+        return undefined;
+      })(),
       jarPattern: (() => {
-        if (raw.build?.jarPattern) return raw.build.jarPattern;
+        if (raw.build?.jarPattern && !overrides.module) return raw.build.jarPattern;
+        const module =
+          overrides.module?.trim().replace(/^:/, "") ||
+          raw.build?.module ||
+          (project.suggestedModule && !project.needsModuleSelection
+            ? project.suggestedModule
+            : undefined);
         const isMaven =
           project.buildSystem === "maven" || raw.build?.system === "maven";
-        if (!isMaven) return undefined;
-        if (raw.build?.module) {
-          return `${raw.build.module.replace(/\\/g, "/").replace(/\/$/, "")}/target/*.jar`;
+        if (module) {
+          const id = module.replace(/\\/g, "/").replace(/\/$/, "");
+          return isMaven ? `${id}/target/*.jar` : `${id}/build/libs/*.jar`;
         }
-        return "target/*.jar";
+        if (isMaven) return "target/*.jar";
+        return undefined;
       })(),
     },
     watch: {

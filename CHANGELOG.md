@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.12.0 — 2026-07-14
+
+### [added]
+- Multi-module Maven/Gradle detection (`detect/modules.ts`): classify plugin vs library, Folia flags, auto-select when one plugin module
+- Reactor-root fallback: `type: plugin` detected when `plugin.yml` lives only in a submodule
+- `plugdev module list|use` (+ `--json`) and `--module` on `run` / `build` / `sync` / `server start`
+- Gradle plugin builds honor `build.module` (`:module:jarTask`)
+- TUI: Module picker, Dependencies manager; Configure adds reload.java, run.cleanup, jump-to-module
+- Expanded Hangar/Modrinth dep presets (WorldGuard, WorldEdit, Towny, ProtocolLib, LuckPerms, …)
+- Module-aware `detectProjectDeps` / Folia checks
+- `@plugdev/mcp` 0.3.0: `plugdev_list_modules`, `plugdev_use_module`, `plugdev_list_deps`, `plugdev_add_dep`, `plugdev_remove_dep`, `plugdev_agent_install`, `plugdev_cache_prefetch`, `plugdev_cache_status`, `plugdev_clean`
+- Shared `agent-content.ts` for Cursor / Claude / Codex / bundled skill
+
+### [changed]
+- `doctor` / `init` surface real module candidates; `init` sets `watch.paths` across library + selected plugin modules
+- Agent skill/rules mention `module`, deps TUI, and new MCP tools
+
 ## 0.11.2 — 2026-07-14
 
 ### [fixed]

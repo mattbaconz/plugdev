@@ -1,7 +1,7 @@
 {
   "name": "plugdev",
   "displayName": "PlugDev",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Minecraft plugin test loop for agents — PlugDev skill plus MCP tools for Paper/Folia setup, build, server, and RCON",
   "author": {
     "name": "PLUG Labs",

@@ -20,6 +20,8 @@ plug run
 
 - `plug run` over manually starting Paper and copying JARs
 - `plug doctor` when detection or boot fails
+- `plugdev module list|use` on multi-module Maven/Gradle reactors
+- `plugdev deps add|remove|list` / TUI Dependencies for test plugins
 - MCP tools (`plugdev_*`) for headless server control when MCP is configured
 - Safe JAR reload — never Bukkit `/reload`
 - Full restart on Folia

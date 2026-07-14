@@ -2,35 +2,65 @@
 
 <img src="brand/plugdev-logo.png" alt="PlugDev" width="128" />
 
-# PlugDev · v0.11.2
+# PlugDev · v0.12.0
 
 ---
 
-**Test Minecraft plugins and mods in one command.**
+**One command for the local Paper plugin test loop.**
 
-Paper-family plugins get a real server, client join, and reload on save. Fabric / NeoForge / Quilt / Forge mods hand off to Gradle `runClient`.
+Detect your project, boot a real server, deploy the JAR, reload on save, and join from Minecraft. Works with Gradle and Maven. No Gradle plugin required.
 
-**[Watch the demo](https://www.youtube.com/watch?v=IFrxqWrVrLY)** · [pluglabs.app/plugdev](https://pluglabs.app/plugdev)
+**[Watch the demo](https://www.youtube.com/watch?v=IFrxqWrVrLY)** · [Docs](https://pluglabs.app/plugdev) · [Discord](https://discord.gg/C4X3rThtAM)
 
 [![npm](https://img.shields.io/npm/v/@plugdev/cli.svg)](https://www.npmjs.com/package/@plugdev/cli)
 [![license](https://img.shields.io/npm/l/@plugdev/cli.svg)](https://github.com/mattbaconz/plugdev/blob/main/LICENSE)
 [![release](https://img.shields.io/github/v/release/mattbaconz/plugdev?display_name=tag&label=release)](https://github.com/mattbaconz/plugdev/releases)
 [![site](https://img.shields.io/badge/site-pluglabs.app%2Fplugdev-0ea5e9)](https://pluglabs.app/plugdev)
+[![discord](https://img.shields.io/badge/discord-PLUG%20Labs-5865F2)](https://discord.gg/C4X3rThtAM)
 
 </div>
 
-## Why
+## The problem
 
 ```text
-Before: build → copy JAR → restart → open launcher → join
-After:  plugdev / plug run
+build JAR → copy into plugins/ → restart server → open launcher → join localhost
+→ find one stupid mistake → do it all again
 ```
 
-Same idea as `npm run dev`, for Minecraft plugin and mod projects.
+PlugDev is `npm run dev` for that loop.
+
+```powershell
+npm i -g @plugdev/cli
+cd your-plugin
+plugdev init --setup --agents --mcp
+plug run
+```
+
+Paper, Folia, Purpur, Pufferfish, Spigot. Multi-module Maven/Gradle reactors. Safe JAR reload (not Bukkit `/reload`). Optional hotswap for method-body edits. Client join via embedded launcher or Prism.
+
+Fabric / NeoForge / Quilt / Forge mods: PlugDev detects the loader and runs Gradle `runClient`. No plugin-style JAR reload for mod Java.
+
+## Compared to what you already use
+
+**Already happy with jpenilla run-paper / run-task?** Stay there. `./gradlew runServer` is fine for boot-with-your-JAR. PlugDev is for when you also want watch + safe reload, client auto-join, Maven, or a global `~/.plugdev` cache without editing `build.gradle`.
+
+**Using PaperMake?** Closest Gradle peer for safe reload + IDE debug. PlugDev does the same kind of loop as a standalone CLI: no Gradle plugin, works on Maven, can open Prism/embedded and join localhost.
+
+**Just hotswap?** Hotswap is faster for method bodies. It does not download Paper, install deps, or launch a client. PlugDev can do `--hotswap` for the inner loop and falls back to safe reload when redefine fails (new methods/fields, `plugin.yml`, etc.).
+
+**MockBukkit / Plugwright?** Unit tests and bot E2E. Keep them. They prove logic in CI; PlugDev is the human-in-the-loop play session.
+
+**pluggy?** Another standalone CLI. It rebuilds and restarts the server on save. PlugDev aims for safe JAR reload + client join.
+
+### Skip PlugDev if…
+
+- run-paper already feels good and you do not care about client join or safe reload
+- You need paperweight NMS remapping as the product (use paperweight + run-paper; PlugDev does not replace that)
+- You only want automated tests (MockBukkit / Plugwright), not a local play loop
 
 ## Quick start
 
-### Plugin (Paper / Folia / Purpur / …)
+### Plugin
 
 ```powershell
 npm install -g @plugdev/cli
@@ -40,72 +70,67 @@ plugdev          # TUI
 # or: plug run
 ```
 
-### Mod (Fabric / NeoForge / Quilt / Forge)
+### Mod
 
 ```powershell
 cd your-mod
 plugdev init --setup --agents
 plugdev run          # → Gradle runClient
 # plugdev --loader neoforge
-# plugdev --server
 ```
 
-`plug` and `plugdev` are the same CLI.
-
-`--agents` writes Cursor / Claude / Codex project rules. Skip it for a human-only loop.
+`plug` and `plugdev` are the same binary. `--agents` writes Cursor / Claude / Codex rules; skip it for a human-only loop.
 
 | Prefer… | Same as |
 |---------|---------|
 | `plug` / `plugdev` | Interactive TUI (TTY) |
 | `plug run` | `plugdev run` |
-| `plug setup` | `plugdev setup` |
 | `plug doctor` | `plugdev doctor` |
 | `plug clean` | `plugdev clean` |
 
-**Without a global install:** `npx @plugdev/cli@latest init --setup --agents` then `npx @plugdev/cli@latest` or `… run`.
+**Without a global install:** `npx @plugdev/cli@latest init --setup --agents --mcp` then `npx @plugdev/cli@latest run`.
 
 ### What happens (plugins)
 
-Paper + Via* cache under `~/.plugdev/`. Project server in `.plugdev/run/`. Embedded client joins `localhost:25565`. Edit `src/` → save → safe reload (or optional hotswap; see below).
+Server + Via* + deps cache under `~/.plugdev/`. Project run folder: `.plugdev/run/`. Client joins `127.0.0.1:25565`. Edit `src/` → save → safe reload (or hotswap when enabled).
 
 First boot remaps plugins (~10–30s). Later boots are faster. **Ctrl+C** stops the server; closing Minecraft does not.
 
-### What happens (mods)
+### Multi-module
 
-PlugDev detects the loader and runs Gradle (`runClient` by default). No Paper cache, no plugin safe-reload. Java changes usually need a client restart (or IDE/debug hotswap). Assets: F3+T. Data: `/reload`.
+```powershell
+plugdev module list
+plugdev module use worldevents-core
+# or: plug run --module worldevents-core
+```
+
+Reactor roots without a root `plugin.yml` still detect as `type: plugin` when a submodule has one. Library modules (no deployable shade/finalName) are classified separately from plugins.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
 | `plug` / `plugdev` | Interactive TUI |
-| `plugdev tui` | Same TUI |
-| `plug run` / `plugdev run` | Full loop (plugin or mod path) |
-| `plug setup` | Prefetch (plugins) or toolchain check (mods) |
-| `plug clean` | Wipe worlds or `.plugdev/run` |
+| `plug run` | Full loop (plugin or mod path) |
+| `plug setup` | Prefetch server/client (plugins) |
 | `plug doctor` | Detect project + toolchain |
-| `plug init` | Create `plugdev.yml` + scripts |
-| `plugdev init --setup --agents` | Init + prefetch + agent rules |
-| `plugdev agent install --all` | Cursor / Claude / Codex rules |
-| `plugdev demo` | Built-in demo fixture |
-| `plugdev server start` | Headless server (agents/MCP) |
-| `plugdev deps add viaversion` | Hangar test dep (plugins) |
+| `plug clean` | Wipe worlds or `.plugdev/run` |
+| `plugdev module list\|use` | Multi-module pick |
+| `plugdev deps add\|remove\|list` | Test plugins (Hangar/Modrinth) |
+| `plugdev init --setup --agents --mcp` | Config + prefetch + agent/MCP wiring |
+| `plugdev server start\|stop\|command\|logs` | Headless (agents) |
 
-### Global flags
+### Useful flags
 
 | Flag | Description |
 |------|-------------|
-| `--quiet` | Suppress server logs |
-| `--json` | Structured JSON output |
+| `--hotswap` | JDWP method-body redefine; falls back to safe reload |
+| `--module <name>` | Build/run a reactor submodule |
 | `--join` | Auto-join client |
-| `--no-watch` | One-shot boot |
-| `--hotswap` | Plugins: JDWP + method-body redefine (falls back to safe reload) |
-| `--loader <name>` | Mods: fabric / neoforge / forge subproject |
-| `--debug` | Enable JDWP on port 5005 |
+| `--quiet` / `--json` | Less noise / structured output |
+| `--loader <name>` | Mods: fabric / neoforge / forge |
 
-## Hotswap (optional, plugins)
-
-Default reload is **safe** (JAR + bootstrap). For method-body edits only:
+## Hotswap (optional)
 
 ```powershell
 plug run --hotswap
@@ -117,103 +142,32 @@ watch:
     java: hotswap
 ```
 
-Hotswap starts JDWP, compiles classes, and tries redefine. New methods/fields, `plugin.yml`, or a failed redefine fall back to safe reload (or restart). PlugDev still sets up the server and client; hotswap is the fast inner loop.
+Default is still safe JAR reload. Hotswap is the fast path for method bodies only.
 
-## Dev server on disk (plugins)
-
-| Path | Kept? |
-|------|--------|
-| `~/.plugdev/` (Paper, Via*, client) | Yes — global cache |
-| `<project>/.plugdev/run/` | Yes by default |
-
-```yaml
-run:
-  cleanup: never    # default
-  # cleanup: on-exit
-  # cleanup: worlds
-```
+## Agents + MCP
 
 ```powershell
-plug clean           # wipe worlds only
-plug clean --all     # delete entire .plugdev/run
-```
-
-## Client options (plugins)
-
-**Default (`launcher: auto`):** embedded client matching server MC version.
-
-**Prism:**
-
-```powershell
-plug client list
-plug setup --instance "FO 26.1.2"
-plug run
-```
-
-```yaml
-client:
-  launcher: prism
-  instance: "FO 26.1.2"
-  offline: false
-```
-
-## Agents
-
-```powershell
-# Install skill (any ADE)
 npx skills add mattbaconz/plugdev --skill plugdev
-
-# Wire this project (rules + skill copy + MCP)
 plugdev init --setup --agents --mcp
-# or later:
-plugdev agent install --all --mcp
 ```
 
-Portable skill: [`skills/plugdev`](skills/plugdev) · Cursor plugin: [skills/plugdev/references/cursor-plugin.md](skills/plugdev/references/cursor-plugin.md)
-
-## PlugDev MCP
-
-Optional structured tools for headless control of the same loop (`npx -y @plugdev/mcp`). Prefer CLI `plug run` for interactive sessions. Wire with `plugdev agent install --mcp`:
-
-```json
-{
-  "mcpServers": {
-    "plugdev": {
-      "command": "npx",
-      "args": ["-y", "@plugdev/mcp"],
-      "env": { "PLUGDEV_PROJECT_ROOT": "${workspaceFolder}" }
-    }
-  }
-}
-```
+MCP (`npx -y @plugdev/mcp`) exposes the same loop for headless control: doctor, build, sync, server, RCON, modules, deps, cache, clean. Prefer `plug run` when you want watch + client join in a terminal.
 
 ## Demos
 
-Recorded on `plugdev-test-plugin-1` (Paper **26.1.2**, Prism **FO 26.1.2**, `plug run --hotswap`).
+Recorded on Paper **26.1.2** with Prism + `plug run --hotswap`.
 
-### Detect + Prism FO 26.1.2
+<img src="brand/demos/detect-26.1.2.gif" alt="Detect MC version and Prism instance, then launch" width="800" />
 
-Auto-detects plugin MC version and matches a Prism instance.
+<img src="brand/demos/hotswap-plugtest.gif" alt="HotSwap method-body edit applies in-game" width="800" />
 
-<img src="brand/demos/detect-26.1.2.gif" alt="PlugDev detects MC 26.1.2 and Prism FO 26.1.2, then launches" width="800" />
-
-### HotSwap — method body edit
-
-Edit → save → instant `/plugtest` (no server restart).
-
-<img src="brand/demos/hotswap-plugtest.gif" alt="HotSwap: edit sendMessage literal, save, instant in-game result" width="800" />
-
-### HotSwap — honest fallback
-
-Structural change (new private method) → hotswap fails → safe reload.
-
-<img src="brand/demos/hotswap-fallback.gif" alt="HotSwap fails on new method, falls back to safe reload" width="800" />
+<img src="brand/demos/hotswap-fallback.gif" alt="Structural change falls back to safe reload" width="800" />
 
 ## Status
 
-**v0.11.2** — Live server console after ready + Quick Play join fix. See [CHANGELOG.md](CHANGELOG.md).
+**v0.12.0** — multi-module pick, deps TUI, MCP 0.3. See [CHANGELOG.md](CHANGELOG.md).
 
-Site: [pluglabs.app/plugdev](https://pluglabs.app/plugdev) · npm: [`@plugdev/cli`](https://www.npmjs.com/package/@plugdev/cli)
+[Docs](https://pluglabs.app/plugdev) · [Discord](https://discord.gg/C4X3rThtAM) · [npm](https://www.npmjs.com/package/@plugdev/cli)
 
 ## Star History
 

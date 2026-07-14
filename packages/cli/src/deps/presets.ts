@@ -1,8 +1,14 @@
 export interface DepPreset {
   aliases: string[];
-  author: string;
+  /** Hangar author (required when source is hangar). */
+  author?: string;
+  /** Hangar slug or display name. */
   slug: string;
   description: string;
+  /** Default download source. Hangar unless set to modrinth. */
+  source?: "hangar" | "modrinth";
+  /** Modrinth project slug/id when source is modrinth (or Hangar missing). */
+  modrinthSlug?: string;
 }
 
 export const DEP_PRESETS: DepPreset[] = [
@@ -26,9 +32,10 @@ export const DEP_PRESETS: DepPreset[] = [
   },
   {
     aliases: ["essentials", "essentialsx"],
-    author: "EssentialsX",
     slug: "EssentialsX",
     description: "EssentialsX — commands, homes, economy base",
+    source: "modrinth",
+    modrinthSlug: "essentialsx",
   },
   {
     aliases: ["vault", "vaultunlocked"],
@@ -38,9 +45,10 @@ export const DEP_PRESETS: DepPreset[] = [
   },
   {
     aliases: ["luckperms"],
-    author: "LuckPerms",
     slug: "LuckPerms",
     description: "LuckPerms — permissions",
+    source: "modrinth",
+    modrinthSlug: "luckperms",
   },
   {
     aliases: ["placeholderapi", "papi"],
@@ -50,9 +58,71 @@ export const DEP_PRESETS: DepPreset[] = [
   },
   {
     aliases: ["mineconomy"],
-    author: "piyushkadam",
-    slug: "MineConomy",
+    author: "Guayand0",
+    slug: "Mineconomy",
     description: "MineConomy — standalone economy",
+  },
+  {
+    aliases: ["worldguard"],
+    slug: "WorldGuard",
+    description: "WorldGuard — region protection",
+    source: "modrinth",
+    modrinthSlug: "worldguard",
+  },
+  {
+    aliases: ["worldedit"],
+    author: "EngineHub",
+    slug: "WorldEdit",
+    description: "WorldEdit — world editing",
+  },
+  {
+    aliases: ["griefprevention"],
+    author: "GriefPrevention",
+    slug: "GriefPrevention",
+    description: "GriefPrevention — claim-based protection",
+  },
+  {
+    aliases: ["towny"],
+    author: "TownyAdvanced",
+    slug: "Towny",
+    description: "Towny — town/nation protection",
+  },
+  {
+    aliases: ["floodgate"],
+    author: "GeyserMC",
+    slug: "Floodgate",
+    description: "Floodgate — Bedrock player support (with Geyser)",
+  },
+  {
+    aliases: ["mythicmobs"],
+    author: "Lumine",
+    slug: "MythicMobs",
+    description: "MythicMobs — custom mobs/skills",
+  },
+  {
+    aliases: ["protocollib"],
+    author: "dmulloy2",
+    slug: "ProtocolLib",
+    description: "ProtocolLib — packet API",
+  },
+  {
+    aliases: ["multiverse", "multiversecore"],
+    author: "Multiverse",
+    slug: "Multiverse-Core",
+    description: "Multiverse-Core — multi-world management",
+  },
+  {
+    aliases: ["coreprotect"],
+    author: "CORE",
+    slug: "CoreProtect",
+    description: "CoreProtect — block logging / rollback",
+  },
+  {
+    aliases: ["discordsrv"],
+    slug: "DiscordSRV",
+    description: "DiscordSRV — Discord bridge",
+    source: "modrinth",
+    modrinthSlug: "discordsrv",
   },
 ];
 
@@ -62,27 +132,36 @@ export const DEP_PRESETS: DepPreset[] = [
  */
 export const DEFAULT_COMPAT_DEPS: Array<{
   name: string;
-  source: "hangar";
-  author: string;
+  source: "hangar" | "modrinth";
+  author?: string;
   slug: string;
 }> = [
   { name: "ViaVersion", source: "hangar", author: "ViaVersion", slug: "ViaVersion" },
   { name: "ViaBackwards", source: "hangar", author: "ViaVersion", slug: "ViaBackwards" },
   { name: "ViaRewind", source: "hangar", author: "ViaVersion", slug: "ViaRewind" },
   { name: "VaultUnlocked", source: "hangar", author: "TNE", slug: "VaultUnlocked" },
-  { name: "EssentialsX", source: "hangar", author: "EssentialsX", slug: "EssentialsX" },
-  { name: "MineConomy", source: "hangar", author: "piyushkadam", slug: "MineConomy" },
+  { name: "EssentialsX", source: "modrinth", slug: "essentialsx" },
+  { name: "MineConomy", source: "hangar", author: "Guayand0", slug: "Mineconomy" },
 ];
 
 export const DEP_ALIASES: Record<string, { author: string; slug: string }> =
   Object.fromEntries(
-    DEP_PRESETS.flatMap((p) =>
-      p.aliases.map((a) => [a, { author: p.author, slug: p.slug }]),
+    DEP_PRESETS.filter((p) => p.author).flatMap((p) =>
+      p.aliases.map((a) => [a, { author: p.author!, slug: p.slug }]),
     ),
   );
 
 export function listPresetNames(): string[] {
   return DEP_PRESETS.map((p) => p.aliases[0]);
+}
+
+export function findPreset(name: string): DepPreset | undefined {
+  const key = name.toLowerCase().replace(/[\s_-]+/g, "");
+  return DEP_PRESETS.find(
+    (p) =>
+      p.aliases.some((a) => a.toLowerCase().replace(/[\s_-]+/g, "") === key) ||
+      p.slug.toLowerCase().replace(/[\s_-]+/g, "") === key,
+  );
 }
 
 export function hangarPlatform(server: string): "PAPER" | "FOLIA" {

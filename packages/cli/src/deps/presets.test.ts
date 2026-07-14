@@ -9,9 +9,10 @@ import {
 } from "./presets.js";
 
 test("DEP_ALIASES includes essentials and mineconomy", () => {
-  assert.equal(DEP_ALIASES.essentials.author, "EssentialsX");
-  assert.equal(DEP_ALIASES.mineconomy.slug, "MineConomy");
+  assert.equal(DEP_ALIASES.mineconomy.slug, "Mineconomy");
   assert.equal(DEP_ALIASES.papi.author, "HelpChat");
+  // EssentialsX is Modrinth-only — not in Hangar DEP_ALIASES
+  assert.equal(DEP_ALIASES.essentials, undefined);
 });
 
 test("DEP_ALIASES includes Via* presets", () => {
@@ -31,10 +32,28 @@ test("DEFAULT_COMPAT_DEPS includes Via* plus Vault/Essentials/MineConomy", () =>
       "ViaBackwards",
       "ViaRewind",
       "VaultUnlocked",
-      "EssentialsX",
-      "MineConomy",
+      "essentialsx",
+      "Mineconomy",
     ],
   );
+});
+
+test("listPresetNames includes expanded ecosystem presets", () => {
+  const names = listPresetNames();
+  assert.ok(names.includes("worldguard"));
+  assert.ok(names.includes("protocollib"));
+  assert.ok(names.includes("luckperms"));
+  assert.ok(names.includes("discordsrv"));
+  assert.ok(!names.includes("citizens"));
+  assert.ok(!names.includes("lands"));
+});
+
+test("findPreset resolves modrinth luckperms", async () => {
+  const { findPreset } = await import("./presets.js");
+  const p = findPreset("luckperms");
+  assert.ok(p);
+  assert.equal(p!.source, "modrinth");
+  assert.equal(p!.modrinthSlug, "luckperms");
 });
 
 test("hasViaCompatDeps detects Via*", () => {

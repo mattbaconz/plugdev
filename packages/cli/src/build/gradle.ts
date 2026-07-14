@@ -61,6 +61,15 @@ export async function runGradleTask(
   });
 }
 
+/** Gradle task args for a plugin module: `:module:shadowJar` or bare `shadowJar`. */
+export function pluginGradleTaskArgs(module: string | undefined, task: string): string[] {
+  if (!module) return [task, "-x", "test", "--quiet"];
+  const sub = module.replace(/^:/, "").replace(/\\/g, "/");
+  // Nested paths use Gradle path syntax: module:sub:task
+  const pathTask = `${sub.replace(/\//g, ":")}:${task}`;
+  return [pathTask, "-x", "test", "--quiet"];
+}
+
 export async function runGradleBuild(
   cwd: string,
   config: ResolvedConfig,
@@ -68,6 +77,7 @@ export async function runGradleBuild(
 ): Promise<BuildResult> {
   const gradlew = gradlewCommand(cwd);
   const task = config.build.jarTask;
+  const module = config.build.module;
 
   if (project.type === "mod") {
     const result = await runModGradle(cwd, config, project);
@@ -79,12 +89,21 @@ export async function runGradleBuild(
   let lastError: unknown;
   for (const t of tasks) {
     try {
-      await execa(gradlew, [t, "-x", "test", "--quiet"], {
+      const args = pluginGradleTaskArgs(module, t);
+      if (module) {
+        info(`Gradle: :${module.replace(/^:/, "")}:${t}`);
+      }
+      await execa(gradlew, args, {
         cwd,
         stdio: "inherit",
         env: gradleEnv(),
       });
-      const jarPath = await findBuiltJar(cwd, t, config.build.jarPattern);
+      const jarPattern =
+        config.build.jarPattern ??
+        (module
+          ? `${module.replace(/\\/g, "/").replace(/\/$/, "")}/build/libs/*.jar`
+          : undefined);
+      const jarPath = await findBuiltJar(cwd, t, jarPattern);
       return { jarPath, task: t };
     } catch (e) {
       lastError = e;

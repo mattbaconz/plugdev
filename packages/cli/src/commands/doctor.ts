@@ -1,7 +1,6 @@
 import { detectProject, detectFoliaSupport } from "../detect/project.js";
 import { loadConfig } from "../config/loader.js";
 import { checkGradle, checkJava, checkMaven, minJavaMajorForServerVersion, parseJavaMajor } from "../util/tools.js";
-import { pomHasModules } from "../build/maven.js";
 import {
   detectLauncher,
   instanceExists,
@@ -104,7 +103,9 @@ export async function runDoctor(cwd: string): Promise<number> {
   const client = await resolveClientTier(config);
   const bootstrap = await checkBootstrapJar();
   const foliaSupport =
-    config.server === "folia" ? await detectFoliaSupport(cwd) : undefined;
+    config.server === "folia"
+      ? await detectFoliaSupport(cwd, config.build.module)
+      : undefined;
 
   const spigotJarPath =
     config.server === "spigot"
@@ -128,11 +129,13 @@ export async function runDoctor(cwd: string): Promise<number> {
     ? "run-paper-maven-plugin detected — PlugDev uses its own watch/reload loop (IDE hotswap still optional)"
     : undefined;
 
-  const multiModule =
-    project.buildSystem === "maven" && (await pomHasModules(cwd));
+  const modules = project.modules ?? [];
   const multiModuleHint =
-    multiModule && !config.build.module
-      ? 'Multi-module pom detected — set build.module (e.g. "plugin-module") for mvn -pl … -am'
+    modules.length > 0 && !config.build.module && project.needsModuleSelection
+      ? `Multi-module reactor — pick a plugin module: plugdev module use <name> (${modules
+          .filter((m) => m.kind === "plugin")
+          .map((m) => m.id)
+          .join(", ")})`
       : undefined;
 
   const isMod = project.type === "mod" || config.type === "mod";
@@ -193,6 +196,14 @@ export async function runDoctor(cwd: string): Promise<number> {
         jarTask: config.build.jarTask,
         jarPattern: config.build.jarPattern,
         module: config.build.module,
+        modules: modules.map((m) => ({
+          id: m.id,
+          kind: m.kind,
+          pluginName: m.pluginName,
+          foliaSupported: m.foliaSupported === true,
+          active: m.id === config.build.module,
+        })),
+        needsModuleSelection: project.needsModuleSelection === true,
         hasShadowJar: project.hasShadowJar,
         hasRunPaperMaven: project.hasRunPaperMaven,
         jarTaskHint,
@@ -274,7 +285,23 @@ export async function runDoctor(cwd: string): Promise<number> {
     info(`Server software: ${serverLabel}`);
     info(`Config jar task: ${config.build.jarTask}`);
     if (config.build.jarPattern) info(`JAR pattern: ${config.build.jarPattern}`);
-    if (config.build.module) info(`Maven module: ${config.build.module}`);
+    if (config.build.module) info(`Build module: ${config.build.module}`);
+    if (modules.length > 0 && !isDiscordBot) {
+      info(
+        `Modules: ${modules
+          .map((m) => {
+            const mark = m.id === config.build.module ? "*" : "";
+            const kind =
+              m.kind === "plugin"
+                ? m.foliaSupported
+                  ? "plugin+folia"
+                  : "plugin"
+                : m.kind;
+            return `${mark}${m.id}[${kind}]`;
+          })
+          .join(", ")}`,
+      );
+    }
   } else {
     info(`Bot entry: ${config.bot?.entry ?? "auto"}`);
     info(`Token env: ${tokenEnvName ?? "DISCORD_TOKEN"}`);

@@ -4,7 +4,7 @@ import { constants } from "node:fs";
 import { HANGAR_API_BASE, USER_AGENT } from "../constants.js";
 import { depsCacheDir } from "../paths.js";
 import { info, success } from "../util/log.js";
-import { DEP_ALIASES, hangarPlatform } from "./presets.js";
+import { DEP_ALIASES, findPreset, hangarPlatform } from "./presets.js";
 import { downloadModrinthPlugin } from "./modrinth.js";
 
 interface HangarVersion {
@@ -138,14 +138,15 @@ export async function prefetchDeps(
   const platform = hangarPlatform(server);
   for (const dep of deps) {
     if (dep.enabled === false) continue;
-    const source = dep.source ?? "hangar";
-    if (source === "url") {
+    const resolvedSource = resolveDepSource(dep);
+    if (resolvedSource === "url") {
       if (!dep.url) continue;
       await downloadUrlPlugin(dep.url, dep.name);
       continue;
     }
-    if (source === "modrinth") {
-      const slug = dep.slug ?? dep.name;
+    if (resolvedSource === "modrinth") {
+      const preset = findPreset(dep.name);
+      const slug = dep.slug ?? preset?.modrinthSlug ?? dep.name;
       await downloadModrinthPlugin(slug, mcVersion, dep.version, server);
       continue;
     }
@@ -184,9 +185,9 @@ export async function installDeps(
 
   for (const dep of deps) {
     if (dep.enabled === false) continue;
-    const source = dep.source ?? "hangar";
+    const resolvedSource = resolveDepSource(dep);
 
-    if (source === "url") {
+    if (resolvedSource === "url") {
       if (!dep.url) {
         throw new Error(`Dep "${dep.name}" uses source url but has no url field.`);
       }
@@ -195,8 +196,9 @@ export async function installDeps(
       continue;
     }
 
-    if (source === "modrinth") {
-      const slug = dep.slug ?? dep.name;
+    if (resolvedSource === "modrinth") {
+      const preset = findPreset(dep.name);
+      const slug = dep.slug ?? preset?.modrinthSlug ?? dep.name;
       const jar = await downloadModrinthPlugin(slug, mcVersion, dep.version, server);
       await installJarToPlugins(jar, pluginsDir);
       continue;
@@ -221,12 +223,29 @@ export async function installDeps(
   }
 }
 
+function resolveDepSource(dep: {
+  name: string;
+  source?: "hangar" | "modrinth" | "url";
+}): "hangar" | "modrinth" | "url" {
+  if (dep.source) return dep.source;
+  const preset = findPreset(dep.name);
+  if (preset?.source === "modrinth" || (!preset?.author && preset?.modrinthSlug)) {
+    return "modrinth";
+  }
+  return "hangar";
+}
+
 export function depSearchTerms(name: string): string[] {
   const key = name.toLowerCase().replace(/\s+/g, "");
   const alias = DEP_ALIASES[key];
+  const preset = findPreset(name);
   const terms = [name.toLowerCase(), key];
   if (alias) {
     terms.push(alias.slug.toLowerCase(), alias.author.toLowerCase());
+  }
+  if (preset) {
+    terms.push(preset.slug.toLowerCase());
+    if (preset.modrinthSlug) terms.push(preset.modrinthSlug.toLowerCase());
   }
   return [...new Set(terms)];
 }

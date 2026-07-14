@@ -41,6 +41,18 @@ Detection runs top-to-bottom; first strong match wins. Explicit `plugdev.yml` `t
 | 21 | `server.toml` (mcman-style) | pack | serverpack | — | — |
 | 22 | `data/` namespace at repo root (datapack) | pack | datapack | — | — |
 
+## Multi-module plugin reactors (after type=plugin signals)
+
+| Signal | Result |
+|--------|--------|
+| Root `pom.xml` `<modules>` | Enumerate Maven modules; classify each via submodule `plugin.yml` |
+| `settings.gradle(.kts)` `include(...)` | Enumerate Gradle subprojects; same classification |
+| Exactly one `kind: plugin` module | Auto-set suggested `build.module` |
+| Two or more `kind: plugin` modules | `needsModuleSelection: true` — require `plugdev module use` |
+| Root has no `plugin.yml` but a submodule does | Still `type: plugin` (reactor-root fallback) |
+
+CLI: `plugdev module list` / `plugdev module use <id>`. Config: `build.module`, optional `build.jarPattern`.
+
 ## Version detection
 
 | Source | Field | Example |
