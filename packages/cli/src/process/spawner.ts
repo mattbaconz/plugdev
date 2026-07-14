@@ -7,11 +7,14 @@ import {
   javaChildEnv,
   type ResolvedJava,
 } from "../util/tools.js";
+import { createServerLogWriter } from "./server-log-stream.js";
 
 export interface ServerProcess {
   proc: ChildProcess;
   waitForReady: Promise<void>;
   logRing: string[];
+  /** Detach stdout/stderr listeners (call on stop / exit). */
+  detachLogs: () => void;
 }
 
 export interface JavaProcessOptions {
@@ -57,12 +60,6 @@ function pushRing(ring: string[], text: string): void {
   while (ring.length > RING_MAX_LINES) ring.shift();
 }
 
-function writeServerOutput(chunk: Buffer, logMode: LogMode, stream: NodeJS.WriteStream): void {
-  if (logMode === "verbose") {
-    stream.write(chunk);
-  }
-}
-
 export function startJavaProcess(
   runDir: string,
   serverJar: string,
@@ -71,6 +68,7 @@ export function startJavaProcess(
 ): ServerProcess {
   const logMode = opts.logMode ?? "verbose";
   const logRing: string[] = [];
+  const logWriter = createServerLogWriter(logMode);
   // JVM flags first, then -jar, then server args (nogui)
   const jvmExtra = opts.jvmArgs ?? [];
   const serverArgs = opts.args ?? ["nogui"];
@@ -104,72 +102,91 @@ export function startJavaProcess(
   });
 
   let pluginError: string | undefined;
+  let readySettled = false;
+  let listenersAttached = true;
+
+  const detachLogs = () => {
+    if (!listenersAttached) return;
+    listenersAttached = false;
+    logWriter.flush();
+    proc.stdout?.off("data", onData);
+    proc.stderr?.off("data", onErr);
+  };
+
+  const onData = (chunk: Buffer) => {
+    const text = chunk.toString();
+    pushRing(logRing, text);
+    logWriter.writeChunk(chunk, process.stdout);
+    if (pluginName && text.includes(`Error occurred while enabling ${pluginName}`)) {
+      pluginError = pluginName;
+    }
+    if (!readySettled && readyPattern.test(text)) {
+      readySettled = true;
+      clearTimeout(timeout);
+      logWriter.markReady();
+      // Keep streaming — do not detach stdout/stderr on ready
+      if (pluginError) {
+        if (logMode === "quiet") dumpLogTail(logRing);
+        rejectReady(Errors.pluginEnableFailed(pluginError));
+      } else {
+        resolveReady();
+      }
+    }
+  };
+
+  const onErr = (chunk: Buffer) => {
+    const text = chunk.toString();
+    pushRing(logRing, text);
+    logWriter.writeChunk(chunk, process.stderr);
+    if (pluginName && text.includes(`Error occurred while enabling ${pluginName}`)) {
+      pluginError = pluginName;
+    }
+    if (!readySettled && readyPattern.test(text)) {
+      readySettled = true;
+      clearTimeout(timeout);
+      logWriter.markReady();
+      if (pluginError) {
+        if (logMode === "quiet") dumpLogTail(logRing);
+        rejectReady(Errors.pluginEnableFailed(pluginError));
+      } else {
+        resolveReady();
+      }
+    }
+  };
+
+  let resolveReady!: () => void;
+  let rejectReady!: (err: Error) => void;
+  const timeout = setTimeout(() => {
+    if (readySettled) return;
+    readySettled = true;
+    if (logMode === "quiet") dumpLogTail(logRing);
+    rejectReady(Errors.serverStartFailed("Timed out waiting for server (240s)."));
+  }, 240_000);
 
   const waitForReady = new Promise<void>((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      if (logMode === "quiet") dumpLogTail(logRing);
-      reject(Errors.serverStartFailed("Timed out waiting for server (240s)."));
-    }, 240_000);
-
-    const onData = (chunk: Buffer) => {
-      const text = chunk.toString();
-      pushRing(logRing, text);
-      writeServerOutput(chunk, logMode, process.stdout);
-      if (pluginName && text.includes(`Error occurred while enabling ${pluginName}`)) {
-        pluginError = pluginName;
-      }
-      if (readyPattern.test(text)) {
-        clearTimeout(timeout);
-        cleanup();
-        if (pluginError) {
-          if (logMode === "quiet") dumpLogTail(logRing);
-          reject(Errors.pluginEnableFailed(pluginError));
-        } else {
-          resolve();
-        }
-      }
-    };
-
-    const onErr = (chunk: Buffer) => {
-      const text = chunk.toString();
-      pushRing(logRing, text);
-      writeServerOutput(chunk, logMode, process.stderr);
-      if (pluginName && text.includes(`Error occurred while enabling ${pluginName}`)) {
-        pluginError = pluginName;
-      }
-      if (readyPattern.test(text)) {
-        clearTimeout(timeout);
-        cleanup();
-        if (pluginError) {
-          if (logMode === "quiet") dumpLogTail(logRing);
-          reject(Errors.pluginEnableFailed(pluginError));
-        } else {
-          resolve();
-        }
-      }
-    };
-
-    const onExit = (code: number | null) => {
-      clearTimeout(timeout);
-      cleanup();
-      if (code !== 0 && code !== null) {
-        if (logMode === "quiet") dumpLogTail(logRing);
-        reject(Errors.serverStartFailed(`Server exited with code ${code}.`));
-      }
-    };
-
-    const cleanup = () => {
-      proc.stdout?.off("data", onData);
-      proc.stderr?.off("data", onErr);
-      proc.off("exit", onExit);
-    };
-
-    proc.stdout?.on("data", onData);
-    proc.stderr?.on("data", onErr);
-    proc.on("exit", onExit);
+    resolveReady = resolve;
+    rejectReady = reject;
   });
 
-  return { proc, waitForReady, logRing };
+  const onExit = (code: number | null) => {
+    clearTimeout(timeout);
+    detachLogs();
+    if (!readySettled) {
+      readySettled = true;
+      if (code !== 0 && code !== null) {
+        if (logMode === "quiet") dumpLogTail(logRing);
+        rejectReady(Errors.serverStartFailed(`Server exited with code ${code}.`));
+      } else {
+        resolveReady();
+      }
+    }
+  };
+
+  proc.stdout?.on("data", onData);
+  proc.stderr?.on("data", onErr);
+  proc.on("exit", onExit);
+
+  return { proc, waitForReady, logRing, detachLogs };
 }
 
 export function startPaperServer(
@@ -265,6 +282,5 @@ export function printReadyBanner(
   }
   info(`Join: 127.0.0.1:${port}`);
   info("Tip: first boot remaps plugins (~10–30s); later boots are much faster.");
-  info("Type server commands below (e.g. op DevPlayer). Ctrl+C stops PlugDev.");
   info("Ctrl+C stops the server — closing Minecraft does not.");
 }

@@ -27,6 +27,7 @@ import {
   printReadyBanner,
   stopPaperServer,
 } from "../process/spawner.js";
+import { printServerConsoleSeparator } from "../process/server-log-stream.js";
 import { attachInteractiveConsole, type InteractiveConsole } from "../process/interactive-console.js";
 import { installDeps } from "../deps/hangar.js";
 import { installPlugTraceJar, writePlugDevIdentity } from "../deps/plugtrace.js";
@@ -357,6 +358,7 @@ async function runPluginDev(
   const bootstrap = await resolveBootstrapJar();
 
   let currentProc: ChildProcess | undefined;
+  let currentDetachLogs: (() => void) | undefined;
   let closeWatcher: (() => void) | undefined;
   let consoleHandle: InteractiveConsole | undefined;
 
@@ -364,6 +366,8 @@ async function runPluginDev(
     consoleHandle?.pause();
 
     if (currentProc) {
+      currentDetachLogs?.();
+      currentDetachLogs = undefined;
       await stopPaperServer(currentProc);
       currentProc = undefined;
     }
@@ -406,7 +410,7 @@ async function runPluginDev(
     phase("Sync plugin JAR to server");
 
     phase(`Start ${serverLabel}`, "active");
-    const { proc, waitForReady } = startPaperServer(
+    const { proc, waitForReady, detachLogs } = startPaperServer(
       runDir,
       serverJar,
       config.jvm.memory,
@@ -417,6 +421,7 @@ async function runPluginDev(
       config.jvm.args,
     );
     currentProc = proc;
+    currentDetachLogs = detachLogs;
     attachShutdownHooks(proc);
 
     await waitForReady;
@@ -460,6 +465,7 @@ async function runPluginDev(
         onlineMode: config.dev?.onlineMode === true,
         op: config.dev?.op !== false,
       });
+      printServerConsoleSeparator();
     }
 
     if (!consoleHandle) {
@@ -517,12 +523,14 @@ async function runPluginDev(
     });
     closeWatcher?.();
     consoleHandle?.close();
+    currentDetachLogs?.();
     await clearSession(cwd);
     await applyExitCleanup(cwd, config.run.cleanup);
     return 0;
   } catch (e) {
     closeWatcher?.();
     consoleHandle?.close();
+    currentDetachLogs?.();
     if (currentProc) await stopPaperServer(currentProc);
     await clearSession(cwd);
     await applyExitCleanup(cwd, config.run.cleanup);

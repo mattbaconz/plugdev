@@ -2,7 +2,7 @@
 
 <img src="brand/plugdev-logo.png" alt="PlugDev" width="128" />
 
-# PlugDev · v0.11.1
+# PlugDev · v0.11.2
 
 ---
 
@@ -211,7 +211,7 @@ Structural change (new private method) → hotswap fails → safe reload.
 
 ## Status
 
-**v0.11.0** — Agent skills + MCP install plumbing. See [CHANGELOG.md](CHANGELOG.md).
+**v0.11.2** — Live server console after ready + Quick Play join fix. See [CHANGELOG.md](CHANGELOG.md).
 
 Site: [pluglabs.app/plugdev](https://pluglabs.app/plugdev) · npm: [`@plugdev/cli`](https://www.npmjs.com/package/@plugdev/cli)
 

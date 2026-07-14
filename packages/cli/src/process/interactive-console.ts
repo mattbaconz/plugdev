@@ -1,4 +1,5 @@
 import * as readline from "node:readline";
+import pc from "picocolors";
 import { sendRconCommand } from "./rcon.js";
 import { info, warn } from "../util/log.js";
 import { isJsonMode } from "../util/output.js";
@@ -13,6 +14,11 @@ export interface InteractiveConsole {
   pause(): void;
   resume(): void;
   close(): void;
+}
+
+/** Shared empty-RCON hint (also used in tests). */
+export function emptyRconHint(): string {
+  return "RCON: (no output — if the command failed, check ERROR lines above)";
 }
 
 /**
@@ -45,6 +51,7 @@ export function attachInteractiveConsole(
     if (closed || paused) return;
     const cmd = line.trim();
     if (!cmd) return;
+    process.stdout.write(pc.dim(`> ${cmd}\n`));
     try {
       const response = await sendRconCommand(
         opts.host,
@@ -54,7 +61,11 @@ export function attachInteractiveConsole(
       );
       if (response.trim()) {
         process.stdout.write(response.endsWith("\n") ? response : `${response}\n`);
+      } else {
+        warn(emptyRconHint());
       }
+      // Brief pause so any ERROR lines from the command can flush on the log stream
+      await new Promise((r) => setTimeout(r, 400));
     } catch (e) {
       warn(`RCON: ${e instanceof Error ? e.message : String(e)}`);
     }

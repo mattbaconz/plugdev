@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.11.2 — 2026-07-14
+
+### [fixed]
+- Live Paper console after ready: stdout/stderr stay attached so command ERROR/stacktraces show in the PlugDev terminal (no more silent post-boot console)
+- `--quiet` still suppresses boot noise but streams ERROR/WARN/stack lines after ready
+
+### [changed]
+- Server log lines after ready are prefixed with `│` and color-coded (ERROR red, WARN yellow)
+- RCON console echoes `> command` and warns when the response is empty
+- Ready banner shows `── server console ──` separator; duplicate “type commands” tip removed from banner
+
 ## 0.11.1 — 2026-07-14
 
 ### [fixed]
