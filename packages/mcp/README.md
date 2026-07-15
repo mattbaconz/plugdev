@@ -1,6 +1,6 @@
 # @plugdev/mcp
 
-MCP server for [PlugDev](https://pluglabs.app/plugdev). Agents drive the same plugin test loop as `plug run` (build, sync, server, RCON). Not an AI plugin generator.
+Structured, headless control for the same plugin test loop as `plug run`: build, sync, server, RCON, and logs.
 
 ## Config
 
@@ -9,7 +9,7 @@ MCP server for [PlugDev](https://pluglabs.app/plugdev). Agents drive the same pl
   "mcpServers": {
     "plugdev": {
       "command": "npx",
-      "args": ["-y", "@plugdev/mcp@0.3.0"],
+      "args": ["-y", "@plugdev/mcp@0.3.1"],
       "env": {
         "PLUGDEV_PROJECT_ROOT": "${workspaceFolder}"
       }
@@ -18,9 +18,9 @@ MCP server for [PlugDev](https://pluglabs.app/plugdev). Agents drive the same pl
 }
 ```
 
-Or: `plugdev agent install --mcp`
+Or: `plugdev init --mcp`
 
-## Tools (0.3.0)
+## Tools (0.3.1)
 
 | Tool | Purpose |
 |------|---------|
@@ -30,7 +30,7 @@ Or: `plugdev agent install --mcp`
 | `plugdev_run_server_command` / `plugdev_op_player` | RCON |
 | `plugdev_list_modules` / `plugdev_use_module` | Multi-module |
 | `plugdev_list_deps` / `plugdev_add_dep` / `plugdev_remove_dep` | Test deps |
-| `plugdev_agent_install` / `plugdev_cache_*` / `plugdev_clean` | Agents, cache, clean |
+| `plugdev_agent_install` / `plugdev_cache_*` / `plugdev_clean` | Setup, cache, clean |
 | `plugdev_run_test_loop` | Build → sync → start → OP |
 
 Requires Node 20+ and `@plugdev/cli` (PATH, local build, or `npx`).

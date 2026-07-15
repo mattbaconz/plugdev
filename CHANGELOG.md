@@ -1,15 +1,34 @@
 # Changelog
 
+Release entries use `[added]`, `[changed]`, `[fixed]`, and `[removed]` in that order. Empty sections are omitted.
+
+## Unreleased
+
+_No changes yet._
+
+## 0.12.4 — 2026-07-15
+
+### [added]
+- Automated changelog format validation now runs as part of `npm test`
+
+### [changed]
+- Made the public quick start human-first and moved MCP to an optional headless-control section
+- Updated the pluggy comparison to match its current project format, toolchain provisioning, and hotswap workflow
+- Updated `@plugdev/mcp` 0.3.1 metadata and docs around structured headless control
+
+### [removed]
+- Removed the editor marketplace wrapper and repository-level MCP launcher config
+
 ## 0.12.3 — 2026-07-15
+
+### [changed]
+- `doctor` shade tip suggests finalName / plugin.yml pick instead of `target/*-shaded.jar`
+- `plugdev sync` only bumps `.reload-trigger` when a live server session exists
 
 ### [fixed]
 - JAR pick no longer prefers `*-shaded.jar` over finalName plugins (e.g. `WorldEvents-*.jar` wins over `worldevents-core-*-shaded.jar` when both match `target/*.jar`)
 - Boot no longer writes `.reload-trigger`, so Paper’s first load is not race-reloaded by bootstrap ~1s later
 - Bootstrap seeds `ReloadWatcher` from any leftover `.reload-trigger` stamp so stale triggers are ignored
-
-### [changed]
-- `doctor` shade tip suggests finalName / plugin.yml pick instead of `target/*-shaded.jar`
-- `plugdev sync` only bumps `.reload-trigger` when a live server session exists
 
 ## 0.12.2 — 2026-07-15
 
@@ -17,7 +36,7 @@
 - Instant OP on join when `dev.op` is true (default): bootstrap reads `plugdev-dev.json` and grants OP to every joining player (offline DevPlayer and online Prism accounts)
 
 ### [changed]
-- Ready console tip no longer suggests `op DevPlayer`; agent rules note auto-OP
+- Ready console tip no longer suggests `op DevPlayer`; automation guidance notes auto-OP
 - Schema describes `dev.op` as auto-OP on join
 
 ## 0.12.1 — 2026-07-15
@@ -38,22 +57,22 @@
 - Expanded Hangar/Modrinth dep presets (WorldGuard, WorldEdit, Towny, ProtocolLib, LuckPerms, …)
 - Module-aware `detectProjectDeps` / Folia checks
 - `@plugdev/mcp` 0.3.0: `plugdev_list_modules`, `plugdev_use_module`, `plugdev_list_deps`, `plugdev_add_dep`, `plugdev_remove_dep`, `plugdev_agent_install`, `plugdev_cache_prefetch`, `plugdev_cache_status`, `plugdev_clean`
-- Shared `agent-content.ts` for Cursor / Claude / Codex / bundled skill
+- Shared automation guidance for editor integrations and the bundled skill
 
 ### [changed]
 - `doctor` / `init` surface real module candidates; `init` sets `watch.paths` across library + selected plugin modules
-- Agent skill/rules mention `module`, deps TUI, and new MCP tools
+- Automation guidance mentions `module`, the dependency TUI, and new MCP tools
 
 ## 0.11.2 — 2026-07-14
-
-### [fixed]
-- Live Paper console after ready: stdout/stderr stay attached so command ERROR/stacktraces show in the PlugDev terminal (no more silent post-boot console)
-- `--quiet` still suppresses boot noise but streams ERROR/WARN/stack lines after ready
 
 ### [changed]
 - Server log lines after ready are prefixed with `│` and color-coded (ERROR red, WARN yellow)
 - RCON console echoes `> command` and warns when the response is empty
 - Ready banner shows `── server console ──` separator; duplicate “type commands” tip removed from banner
+
+### [fixed]
+- Live Paper console after ready: stdout/stderr stay attached so command ERROR/stacktraces show in the PlugDev terminal (no more silent post-boot console)
+- `--quiet` still suppresses boot noise but streams ERROR/WARN/stack lines after ready
 
 ## 0.11.1 — 2026-07-14
 
@@ -66,12 +85,12 @@
 - `plugdev init --mcp` and `plugdev agent install --mcp` write `.cursor/mcp.json` and `.mcp.json`
 - Agent install copies portable skill into `.agents/skills/plugdev` and `.cursor/skills/plugdev`
 - skills.sh-ready package under `skills/plugdev/` (`npx skills add mattbaconz/plugdev --skill plugdev`)
-- Cursor plugin manifest (`.cursor-plugin/plugin.json` + root `mcp.json`)
+- Editor marketplace wrapper (`.cursor-plugin/plugin.json` + root `mcp.json`)
 - `@plugdev/mcp` 0.2.0: `plugdev_init` tool; falls back to `npx -y @plugdev/cli` when `plugdev` is not on PATH
 
 ### [changed]
-- Canonical agent setup: `plugdev init --setup --agents --mcp`
-- Agent rule templates mention MCP tools for headless control when configured
+- Canonical automation setup: `plugdev init --setup --agents --mcp`
+- Automation templates mention MCP tools for headless control when configured
 
 ## 0.10.2 — 2026-07-13
 
@@ -94,7 +113,7 @@
 - Optional Java hotswap fast path: `watch.reload.java: hotswap` or `plug run --hotswap` (JDWP redefine for method bodies; falls back to safe reload)
 - Experimental Discord bot loop: detect `discord.js` / similar, `type: discord-bot`, run + watch + process restart
 - Smarter project detection: deps from `plugin.yml` / `compileOnly`, Prism instance recommend, Folia signals
-- Agent snippets mention hotswap limits and Discord bot experimental path
+- Automation snippets mention hotswap limits and the Discord bot experimental path
 
 ### [changed]
 - README positions PlugDev for plugins + mods; Discord bots experimental
@@ -106,21 +125,16 @@
 
 ## 0.9.2 — 2026-07-10
 
+### [changed]
+- Client install splits core (jar + libraries, required) from assets (retried, then best-effort)
+- If assets still fail, PlugDev warns and continues when jar/libs are ready — retry with `plugdev cache prefetch --client --force`
+
 ### [fixed]
 - Embedded client asset downloads no longer crash the run with a huge AggregateError dump when Mojang CDN times out
 - Empty (0-byte) asset files from failed downloads are purged before retry
 - Connect timeout raised to 60s with undici retries; BMCLAPI mirror tried before Mojang assets CDN
 
-### [changed]
-- Client install splits core (jar + libraries, required) from assets (retried, then best-effort)
-- If assets still fail, PlugDev warns and continues when jar/libs are ready — retry with `plugdev cache prefetch --client --force`
-
 ## 0.9.1 — 2026-07-10
-
-### [fixed]
-- Ctrl+C no longer crashes with unhandled `EPIPE` when writing stop to a closed server stdin
-- SIGINT/SIGTERM handlers no longer stack on every server restart
-- Configure now auto-saves on field commit (Enter) — offline name and other fields persist without pressing S
 
 ### [added]
 - Configure: ←→ cycle for server, launcher, world, gamemode, join-on-ready
@@ -130,6 +144,11 @@
 ### [changed]
 - Home header shows launcher instance when set
 - Clearer Configure footer (auto-save status)
+
+### [fixed]
+- Ctrl+C no longer crashes with unhandled `EPIPE` when writing stop to a closed server stdin
+- SIGINT/SIGTERM handlers no longer stack on every server restart
+- Configure now auto-saves on field commit (Enter) — offline name and other fields persist without pressing S
 
 ## 0.9.0 — 2026-07-10
 
@@ -151,11 +170,6 @@
 
 ## 0.8.0 — 2026-07-10
 
-### [fixed]
-- Embedded client “Missing N libraries” after false cache hit — integrity check via `@xmcl/core` `diagnose()`, repair with `installLibraries` / full reinstall
-- `plugdev setup` / `cache prefetch --client` no longer treat version JSON alone as ready
-- Launch retries once after repairing corrupt libraries
-
 ### [added]
 - `ensureEmbeddedClient` / `isEmbeddedClientReady`; `plugdev cache clear --client`; `cache prefetch --client --force`
 - Multi-player: `client.players` in `plugdev.yml`; `plugdev open --name <player>`
@@ -166,15 +180,20 @@
 - Doctor reports client **ready** (integrity) not merely cached
 - Client-launch docs: Prism Microsoft account default; multi-player flow
 
-## 0.7.6 — 2026-07-09
-
 ### [fixed]
-- Embedded client launch (`gamePath` via `folder.path`)
+- Embedded client “Missing N libraries” after false cache hit — integrity check via `@xmcl/core` `diagnose()`, repair with `installLibraries` / full reinstall
+- `plugdev setup` / `cache prefetch --client` no longer treat version JSON alone as ready
+- Launch retries once after repairing corrupt libraries
+
+## 0.7.6 — 2026-07-09
 
 ### [added]
 - Interactive server console on `plug run` (RCON readline)
 - Default deps: Via* + VaultUnlocked, EssentialsX, MineConomy
 - `plugdev agent install [--cursor|--claude|--codex|--all]`
+
+### [fixed]
+- Embedded client launch (`gamePath` via `folder.path`)
 
 ## 0.7.5 — 2026-07-09
 
@@ -258,25 +277,17 @@
 
 ## 0.5.0 — 2026-07-09
 
-### [fixed]
-- Bootstrap reload hardening (stable `reload.list`, timestamped JAR names, clearer markers)
-- Reload feedback matches `[PlugDev] Loaded dev plugin:` (fewer false positives)
-
 ### [added]
 - Folia warnings in bootstrap, doctor, and boot
 - `plugdev doctor` bootstrap JAR / Spigot / Folia / shadowJar hints
 - Shared `resolveBootstrapJar()` for CLI + doctor + server
 - CI: Maven fixture doctor/build; watch→reload smoke
 
-## 0.4.4 — 2026-07-09
-
 ### [fixed]
-- `checkGradle` / `checkMaven` respect process exit codes
-- `plugdev doctor` only prints "Ready" when toolchain + setup are ready
-- `plugdev client setup --force` actually reprovisions instances
-- `client.executable` uses correct launcher data dir (Prism vs MultiMC)
-- `init` no longer overwrites package.json scripts without `--force`
-- Schema no longer emits `format: uri` warnings
+- Bootstrap reload hardening (stable `reload.list`, timestamped JAR names, clearer markers)
+- Reload feedback matches `[PlugDev] Loaded dev plugin:` (fewer false positives)
+
+## 0.4.4 — 2026-07-09
 
 ### [added]
 - Cross-platform Prism/MultiMC detection (Windows, macOS, Linux/Flatpak)
@@ -287,6 +298,14 @@
 - `cache status` reports embedded client cache size
 - MCP: `plugdev_doctor`, `plugdev_setup`; `@plugdev/mcp@0.1.1`
 - CI: prefetch + unit tests + MCP smoke
+
+### [fixed]
+- `checkGradle` / `checkMaven` respect process exit codes
+- `plugdev doctor` only prints "Ready" when toolchain + setup are ready
+- `plugdev client setup --force` actually reprovisions instances
+- `client.executable` uses correct launcher data dir (Prism vs MultiMC)
+- `init` no longer overwrites package.json scripts without `--force`
+- Schema no longer emits `format: uri` warnings
 
 ## 0.4.3 — 2026-07-09
 
@@ -323,4 +342,4 @@
 ### [added]
 - `--quiet` / `--verbose` phased terminal output
 - `plugdev demo` for recordings
-- `plugdev server start|stop|status|command|logs` for headless/agent use
+- `plugdev server start|stop|status|command|logs` for headless use

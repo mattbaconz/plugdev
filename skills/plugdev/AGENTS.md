@@ -28,7 +28,6 @@ plug run
 
 ## Do not
 
-- Treat PlugDev as an AI plugin generator
 - Delete `~/.plugdev` unless the user asks
 
 See [SKILL.md](./SKILL.md) and [references/mcp.md](./references/mcp.md).

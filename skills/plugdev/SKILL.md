@@ -9,7 +9,7 @@ description: >-
 
 # PlugDev test loop
 
-PlugDev is the local **test environment** for Minecraft plugins (not an AI plugin generator). Prefer it over manually starting Paper and copying JARs.
+PlugDev is the local **test environment** for Minecraft plugins. Prefer it over manually starting Paper and copying JARs.
 
 ## First moves (agent: set up the best env)
 
@@ -69,7 +69,7 @@ When `.cursor/mcp.json` or `.mcp.json` includes PlugDev (via `init --mcp` / `age
 - `plugdev_agent_install`, `plugdev_cache_prefetch`, `plugdev_cache_status`, `plugdev_clean`
 - `plugdev_run_test_loop` — build → sync → start → OP
 
-CLI remains primary for interactive `plug run` (server + watch + client join). MCP is the same loop without a TTY — not an AI plugin generator.
+CLI remains primary for interactive `plug run` (server + watch + client join). MCP is the same loop without a TTY.
 
 Install MCP alone: `npx -y @plugdev/mcp` (stdio).
 
@@ -80,7 +80,6 @@ Install MCP alone: `npx -y @plugdev/mcp` (stdio).
 - On **Folia**, prefer full restart over safe reload.
 - Optional `--hotswap` / `watch.reload.java: hotswap` is method-body JDWP redefine only; structural changes fall back to safe reload.
 - Do not delete `~/.plugdev` unless the user asks (`plugdev cache clear`).
-- Do not treat PlugDev as an AI plugin generator.
 
 ## Facts
 

@@ -345,6 +345,6 @@ export async function runInit(
   info(formatNextSteps(initNextSteps({ agents: opts.agents, mcp: opts.mcp })));
   info("Or with npx only:");
   info(formatNextSteps(initNextSteps({ usedNpx: true, agents: opts.agents, mcp: opts.mcp })));
-  info("Faster one-shot: npx @plugdev/cli@latest init --setup --agents --mcp");
+  info("Faster one-shot: npx @plugdev/cli@latest init --setup");
   return 0;
 }

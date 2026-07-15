@@ -333,7 +333,7 @@ program
     process.exit(await runSync(process.cwd(), opts.jar, { module: opts.module }));
   });
 
-const serverCmd = program.command("server").description("Headless dev server (for agents/MCP)");
+const serverCmd = program.command("server").description("Headless dev server control");
 
 function serverStartOverrides(cmd: Command): CliOverrides {
   const o = cmd.optsWithGlobals() as Record<string, unknown>;

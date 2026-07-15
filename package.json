@@ -1,7 +1,7 @@
 {
   "name": "plugdev",
   "private": true,
-  "version": "0.12.3",
+  "version": "0.12.4",
   "description": "Test Minecraft plugins in one command. Starts a real server with your plugin, opens Minecraft, and reloads when you save. Works with Paper, Folia, Purpur, Pufferfish, and Spigot.",
   "workspaces": [
     "packages/cli",
@@ -14,7 +14,8 @@
     "dev": "npm run start -w @plugdev/cli",
     "plugdev": "node packages/cli/dist/cli.js",
     "doctor": "npm run plugdev -- doctor",
-    "test": "npm run test -w @plugdev/cli && npm run test -w @plugdev/mcp",
+    "check:changelog": "node scripts/check-changelog.mjs",
+    "test": "npm run check:changelog && npm run test -w @plugdev/cli && npm run test -w @plugdev/mcp",
     "publish:cli": "npm publish -w @plugdev/cli",
     "publish:mcp": "npm publish -w @plugdev/mcp"
   },

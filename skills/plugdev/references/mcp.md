@@ -1,6 +1,6 @@
 # PlugDev MCP
 
-Structured tools for agents that control the same loop as `plugdev run` — without treating PlugDev as an AI plugin generator.
+Structured tools for headless control of the same loop as `plugdev run`.
 
 ## When to use MCP vs CLI
 
@@ -65,12 +65,3 @@ Manual config:
 | `plugdev_cache_prefetch` | Warm server/client cache |
 | `plugdev_cache_status` | Cache sizes under `~/.plugdev` |
 | `plugdev_clean` | Wipe worlds or `.plugdev/run` |
-
-## Cursor plugin
-
-The PlugDev Cursor plugin bundles this skill + MCP. Local test: copy/symlink the repo into `~/.cursor/plugins/local/plugdev`. Marketplace: submit at https://cursor.com/marketplace/publish.
-
-## Positioning
-
-Say: “agents control the Minecraft test environment through MCP.”  
-Do not say: “PlugDev generates plugins with AI.”

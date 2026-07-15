@@ -1,7 +1,7 @@
 {
   "name": "@plugdev/mcp",
-  "version": "0.3.0",
-  "description": "MCP server for PlugDev — Minecraft Paper plugin test loop for agents (doctor, setup, build, server, RCON)",
+  "version": "0.3.1",
+  "description": "MCP server for headless PlugDev build, server, command, and log control",
   "author": "PLUG Labs",
   "homepage": "https://github.com/mattbaconz/plugdev#readme",
   "repository": {
@@ -19,9 +19,7 @@
     "plugin",
     "mcp",
     "model-context-protocol",
-    "plugdev",
-    "cursor",
-    "claude"
+    "plugdev"
   ],
   "type": "module",
   "bin": {

@@ -2,6 +2,8 @@ node_modules/
 dist/
 .plugdev/
 .cursor/
+/.cursor-plugin/
+/mcp.json
 
 # Private docs (local only — not published to GitHub)
 docs/

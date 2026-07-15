@@ -2,7 +2,7 @@
 
 <img src="brand/plugdev-logo.png" alt="PlugDev" width="128" />
 
-# PlugDev · v0.12.3
+# PlugDev · v0.12.4
 
 ---
 
@@ -32,7 +32,7 @@ PlugDev is `npm run dev` for that loop.
 ```powershell
 npm i -g @plugdev/cli
 cd your-plugin
-plugdev init --setup --agents --mcp
+plugdev init --setup
 plug run
 ```
 
@@ -42,15 +42,15 @@ Fabric / NeoForge / Quilt / Forge mods: PlugDev detects the loader and runs Grad
 
 ## Compared to what you already use
 
-**Already happy with jpenilla run-paper / run-task?** Stay there. `./gradlew runServer` is fine for boot-with-your-JAR. PlugDev is for when you also want watch + safe reload, client auto-join, Maven, or a global `~/.plugdev` cache without editing `build.gradle`.
+**Already happy with [jpenilla run-paper / run-task](https://github.com/jpenilla/run-task)?** Stay there. `./gradlew runServer` is fine for boot-with-your-JAR. PlugDev is for when you also want watch + safe reload, client auto-join, Maven, or a global `~/.plugdev` cache without editing `build.gradle`.
 
-**Using PaperMake?** Closest Gradle peer for safe reload + IDE debug. PlugDev does the same kind of loop as a standalone CLI: no Gradle plugin, works on Maven, can open Prism/embedded and join localhost.
+**Using [PaperMake](https://github.com/Rikonardo/PaperMake)?** Closest Gradle peer for safe reload + IDE debug. PlugDev does the same kind of loop as a standalone CLI: no Gradle plugin, works on Maven, can open Prism/embedded and join localhost.
 
 **Just hotswap?** Hotswap is faster for method bodies. It does not download Paper, install deps, or launch a client. PlugDev can do `--hotswap` for the inner loop and falls back to safe reload when redefine fails (new methods/fields, `plugin.yml`, etc.).
 
-**MockBukkit / Plugwright?** Unit tests and bot E2E. Keep them. They prove logic in CI; PlugDev is the human-in-the-loop play session.
+**[MockBukkit](https://github.com/MockBukkit/MockBukkit) / [Plugwright](https://github.com/drownek/plugwright)?** Unit tests and bot E2E. Keep them. They prove logic in CI; PlugDev is the human-in-the-loop play session.
 
-**pluggy?** Another standalone CLI. It rebuilds and restarts the server on save. PlugDev aims for safe JAR reload + client join.
+**[pluggy](https://github.com/pluggy-sh/pluggy)?** Probably the closest standalone alternative. pluggy uses its own `project.json`-based build stack, provisions a JDK, resolves dependencies, builds, tests, supports workspaces, and runs a development server with hotswap. PlugDev keeps your existing Maven or Gradle project and focuses on the playable local loop: project/module detection, targeted safe reload fallback, and launching or joining the client.
 
 ### Skip PlugDev if…
 
@@ -65,7 +65,7 @@ Fabric / NeoForge / Quilt / Forge mods: PlugDev detects the loader and runs Grad
 ```powershell
 npm install -g @plugdev/cli
 cd your-plugin
-plugdev init --setup --agents --mcp
+plugdev init --setup
 plugdev          # TUI
 # or: plug run
 ```
@@ -74,12 +74,12 @@ plugdev          # TUI
 
 ```powershell
 cd your-mod
-plugdev init --setup --agents
+plugdev init --setup
 plugdev run          # → Gradle runClient
 # plugdev --loader neoforge
 ```
 
-`plug` and `plugdev` are the same binary. `--agents` writes Cursor / Claude / Codex rules; skip it for a human-only loop.
+`plug` and `plugdev` are the same binary.
 
 | Prefer… | Same as |
 |---------|---------|
@@ -88,7 +88,7 @@ plugdev run          # → Gradle runClient
 | `plug doctor` | `plugdev doctor` |
 | `plug clean` | `plugdev clean` |
 
-**Without a global install:** `npx @plugdev/cli@latest init --setup --agents --mcp` then `npx @plugdev/cli@latest run`.
+**Without a global install:** `npx @plugdev/cli@latest init --setup` then `npx @plugdev/cli@latest run`.
 
 ### What happens (plugins)
 
@@ -117,8 +117,8 @@ Reactor roots without a root `plugin.yml` still detect as `type: plugin` when a 
 | `plug clean` | Wipe worlds or `.plugdev/run` |
 | `plugdev module list\|use` | Multi-module pick |
 | `plugdev deps add\|remove\|list` | Test plugins (Hangar/Modrinth) |
-| `plugdev init --setup --agents --mcp` | Config + prefetch + agent/MCP wiring |
-| `plugdev server start\|stop\|command\|logs` | Headless (agents) |
+| `plugdev init --setup` | Config + prefetch |
+| `plugdev server start\|stop\|command\|logs` | Headless server control |
 
 ### Useful flags
 
@@ -144,14 +144,9 @@ watch:
 
 Default is still safe JAR reload. Hotswap is the fast path for method bodies only.
 
-## Agents + MCP
+## Headless control (optional)
 
-```powershell
-npx skills add mattbaconz/plugdev --skill plugdev
-plugdev init --setup --agents --mcp
-```
-
-MCP (`npx -y @plugdev/mcp`) exposes the same loop for headless control: doctor, build, sync, server, RCON, modules, deps, cache, clean. Prefer `plug run` when you want watch + client join in a terminal.
+MCP (`npx -y @plugdev/mcp`) exposes the same loop for headless control: doctor, build, sync, server, RCON, modules, dependencies, cache, and clean. Interactive users can ignore it and use `plug run`.
 
 ## Demos
 
@@ -165,7 +160,7 @@ Recorded on Paper **26.1.2** with Prism + `plug run --hotswap`.
 
 ## Status
 
-**v0.12.3** — correct JAR pick + no boot auto-reload race. See [CHANGELOG.md](CHANGELOG.md).
+**v0.12.4** — cleaner public setup, accurate tool comparisons, and consistent release checks. See [CHANGELOG.md](CHANGELOG.md).
 
 [Docs](https://pluglabs.app/plugdev) · [Discord](https://discord.gg/C4X3rThtAM) · [npm](https://www.npmjs.com/package/@plugdev/cli)
 

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { parsePlugdevJson, type JsonResult } from "./json.js";
 import { resolvePlugdevInvocation } from "./resolve-cli.js";
 
-const MCP_VERSION = "0.3.0";
+const MCP_VERSION = "0.3.1";
 const projectRoot = process.env.PLUGDEV_PROJECT_ROOT ?? process.cwd();
 
 async function plugdev(args: string[]): Promise<JsonResult> {
