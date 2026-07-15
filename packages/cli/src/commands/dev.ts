@@ -345,15 +345,15 @@ async function runPluginDev(
   const rconPassword = generateRconPassword();
   const rconHost = "127.0.0.1";
 
-  const runDir = await prepareRunDirectory(cwd, config, {
+  const runDir = projectRunDir(cwd);
+  const serverJar = await copyPaperToRun(runDir, serverJarInfo.jarPath);
+  await prepareRunDirectory(cwd, config, {
     rconPort,
     rconPassword,
   });
   phase("Prepare dev server (.plugdev/run)");
 
   await applyStartWorldCleanup(cwd, config.run.cleanup);
-
-  const serverJar = await copyPaperToRun(runDir, serverJarInfo.jarPath);
   const pluginsDir = join(runDir, "plugins");
   const bootstrap = await resolveBootstrapJar();
 

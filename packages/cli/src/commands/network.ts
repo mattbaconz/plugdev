@@ -198,10 +198,10 @@ export async function runNetwork(
     };
 
     const jarInfo = await ensureServerJar(backend.version, "paper");
+    const serverJar = await copyPaperToRun(backendDir, jarInfo.jarPath);
     await prepareRunDirectoryAt(backendDir, backendConfig);
     await writeBackendPaperConfig(backendDir, secret);
     await copyTemplateFiles(await ensurePaperDevTemplate(), backendDir);
-    const serverJar = await copyPaperToRun(backendDir, jarInfo.jarPath);
 
     step(`Starting backend "${backend.name}" (:${backend.port})...`, "active");
     const { proc, waitForReady } = startJavaProcess(backendDir, serverJar, config.jvm.memory, {

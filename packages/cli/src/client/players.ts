@@ -37,7 +37,7 @@ export async function launchPlayers(
     if (i > 0) {
       info(`Launching extra player: ${name}`);
     }
-    await launchClient({
+    const launched = await launchClient({
       ...opts,
       offlineName: name,
       // Force offline profiles for multi-player (embedded always offline; Prism needs offline)
@@ -48,5 +48,6 @@ export async function launchPlayers(
             : "embedded"
           : opts.launcher,
     });
+    if (!launched) return;
   }
 }

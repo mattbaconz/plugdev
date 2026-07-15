@@ -173,12 +173,12 @@ export function startJavaProcess(
     detachLogs();
     if (!readySettled) {
       readySettled = true;
-      if (code !== 0 && code !== null) {
-        if (logMode === "quiet") dumpLogTail(logRing);
-        rejectReady(Errors.serverStartFailed(`Server exited with code ${code}.`));
-      } else {
-        resolveReady();
-      }
+      if (logMode === "quiet") dumpLogTail(logRing);
+      const detail =
+        code === null
+          ? "Server exited before becoming ready."
+          : `Server exited with code ${code} before becoming ready.`;
+      rejectReady(Errors.serverStartFailed(detail));
     }
   };
 

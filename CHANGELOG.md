@@ -6,6 +6,13 @@ Release entries use `[added]`, `[changed]`, `[fixed]`, and `[removed]` in that o
 
 _No changes yet._
 
+## 0.12.6 — 2026-07-15
+
+### [fixed]
+- Changing server versions now archives incompatible generated server configuration and dev worlds before creating clean state, while preserving plugin data
+- A server process that exits before its ready line is now treated as a failed boot even when Java exits with code 0
+- Auto-join now skips launching Minecraft when the configured game port never opens instead of guaranteeing a connection-refused screen
+
 ## 0.12.5 — 2026-07-15
 
 ### [fixed]

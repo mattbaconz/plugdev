@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, writeFile, readFile, rm, access } from "node:fs/promises";
+import { mkdir, writeFile, readFile, rm, access, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { constants } from "node:fs";
@@ -106,8 +106,89 @@ describe("server JAR selection", () => {
       const runJar = await copyPaperToRun(runDir, oldJar);
       assert.equal(await readFile(runJar, "utf8"), "paper-1.21.4");
 
+      await mkdir(join(runDir, "config"), { recursive: true });
+      await mkdir(join(runDir, "world"), { recursive: true });
+      await mkdir(join(runDir, "plugins", "WorldEvents"), { recursive: true });
+      await writeFile(
+        join(runDir, "config", "paper-world-defaults.yml"),
+        "max-leash-distance: default\n",
+      );
+      await writeFile(join(runDir, "world", "level.dat"), "newer-world");
+      await writeFile(
+        join(runDir, "plugins", "WorldEvents", "config.yml"),
+        "kept: true\n",
+      );
+
       await copyPaperToRun(runDir, configuredJar);
       assert.equal(await readFile(runJar, "utf8"), "paper-1.20.6");
+      await assert.rejects(
+        () => access(join(runDir, "config"), constants.F_OK),
+      );
+      await assert.rejects(
+        () => access(join(runDir, "world"), constants.F_OK),
+      );
+      assert.equal(
+        await readFile(join(runDir, "plugins", "WorldEvents", "config.yml"), "utf8"),
+        "kept: true\n",
+      );
+      const backups = await readdir(join(runDir, ".plugdev-version-backups"));
+      assert.equal(backups.length, 1);
+      assert.equal(
+        await readFile(
+          join(runDir, ".plugdev-version-backups", backups[0]!, "world", "level.dat"),
+          "utf8",
+        ),
+        "newer-world",
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("repairs config created before prepared-source tracking without deleting worlds", async () => {
+    const root = join(tmpdir(), `plugdev-server-config-upgrade-${Date.now()}`);
+    const runDir = join(root, "run");
+    const jar = join(root, "paper-1.20.6.jar");
+    await mkdir(join(runDir, "config"), { recursive: true });
+    await mkdir(join(runDir, "world"), { recursive: true });
+    await writeFile(jar, "paper-1.20.6");
+
+    try {
+      await copyPaperToRun(runDir, jar);
+      const markerPath = join(runDir, ".plugdev-server-jar.json");
+      const marker = JSON.parse(await readFile(markerPath, "utf8")) as Record<string, unknown>;
+      delete marker.preparedSource;
+      await writeFile(markerPath, JSON.stringify(marker));
+      await writeFile(
+        join(runDir, "config", "paper-world-defaults.yml"),
+        "max-leash-distance: default\n",
+      );
+      await writeFile(join(runDir, "world", "level.dat"), "existing-world");
+
+      await copyPaperToRun(runDir, jar);
+
+      await assert.rejects(
+        () => access(join(runDir, "config"), constants.F_OK),
+      );
+      assert.equal(
+        await readFile(join(runDir, "world", "level.dat"), "utf8"),
+        "existing-world",
+      );
+      const backups = await readdir(join(runDir, ".plugdev-version-backups"));
+      assert.equal(backups.length, 1);
+      assert.equal(
+        await readFile(
+          join(
+            runDir,
+            ".plugdev-version-backups",
+            backups[0]!,
+            "config",
+            "paper-world-defaults.yml",
+          ),
+          "utf8",
+        ),
+        "max-leash-distance: default\n",
+      );
     } finally {
       await rm(root, { recursive: true, force: true });
     }

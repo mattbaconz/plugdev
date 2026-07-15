@@ -70,11 +70,12 @@ export async function runServerStart(
     const rconPassword = generateRconPassword();
     const serverProject = resolveServerProject(config.server);
     const serverJarInfo = await ensureServerJar(config.version, serverProject);
-    const runDir = await prepareRunDirectory(cwd, config, {
+    const runDir = projectRunDir(cwd);
+    const serverJar = await copyPaperToRun(runDir, serverJarInfo.jarPath);
+    await prepareRunDirectory(cwd, config, {
       rconPort,
       rconPassword,
     });
-    const serverJar = await copyPaperToRun(runDir, serverJarInfo.jarPath);
     const pluginsDir = join(runDir, "plugins");
 
     const build =

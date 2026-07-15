@@ -28,6 +28,8 @@ export interface LaunchClientOptions {
   port?: number;
   launcher?: ClientLauncherMode;
   waitForServer?: boolean;
+  /** Internal/test override; production default remains 120 seconds. */
+  serverWaitTimeoutMs?: number;
   /** Override offline player name (multi-player / open --name). */
   offlineName?: string;
 }
@@ -69,7 +71,7 @@ async function launchWithAdapter(
   });
 }
 
-export async function launchClient(opts: LaunchClientOptions): Promise<void> {
+export async function launchClient(opts: LaunchClientOptions): Promise<boolean> {
   const host = opts.host ?? JOIN_HOST;
   const port = opts.port ?? opts.config.port;
   const address = `${host}:${port}`;
@@ -79,16 +81,21 @@ export async function launchClient(opts: LaunchClientOptions): Promise<void> {
 
   if (mode === "none") {
     await copyJoinAddress(address);
-    return;
+    return false;
   }
 
   // Always confirm the game port accepts TCP before Quick Play (log "Done" can
   // fire slightly before the listener is up; avoids Failed to Quick Play / refused).
   if (opts.waitForServer !== false) {
     info(`Waiting for server on ${address}...`);
-    const ready = await waitForPortOpen(port, host, 120_000);
+    const ready = await waitForPortOpen(
+      port,
+      host,
+      opts.serverWaitTimeoutMs ?? 120_000,
+    );
     if (!ready) {
-      warn("Server did not become ready in time; launching client anyway");
+      warn(`Server did not open ${address}; skipping client launch`);
+      return false;
     }
   }
 
@@ -97,7 +104,7 @@ export async function launchClient(opts: LaunchClientOptions): Promise<void> {
   if (!adapter) {
     await copyJoinAddress(address);
     warn(`Launcher "${mode}" not found — run: plugdev setup`);
-    return;
+    return false;
   }
 
   let instanceId = client?.instance ?? defaultInstanceId(opts.config.version);
@@ -153,6 +160,7 @@ export async function launchClient(opts: LaunchClientOptions): Promise<void> {
   try {
     await tryLaunch(adapter, { offlineName, useOffline });
     phase(await labelFor(adapter));
+    return true;
   } catch (err) {
     // Corrupt/incomplete libraries: repair once and retry embedded launch
     if (
@@ -169,7 +177,7 @@ export async function launchClient(opts: LaunchClientOptions): Promise<void> {
         });
         const ready = await isEmbeddedClientReady(opts.config.version);
         phase(clientPhaseLabel(embeddedAdapter, opts.config.version, ready));
-        return;
+        return true;
       } catch (repairErr) {
         warn(
           `Client repair failed: ${repairErr instanceof Error ? repairErr.message : String(repairErr)}`,
@@ -186,7 +194,7 @@ export async function launchClient(opts: LaunchClientOptions): Promise<void> {
         await tryLaunch(embeddedAdapter, { offlineName, useOffline: true });
         const ready = await isEmbeddedClientReady(opts.config.version);
         phase(clientPhaseLabel(embeddedAdapter, opts.config.version, ready));
-        return;
+        return true;
       } catch (embeddedErr) {
         warn(
           `Embedded client launch failed: ${embeddedErr instanceof Error ? embeddedErr.message : String(embeddedErr)}`,
@@ -198,6 +206,7 @@ export async function launchClient(opts: LaunchClientOptions): Promise<void> {
     if (mode === "auto" || adapter.id === "embedded") {
       info("Tip: plugdev cache prefetch --client --force");
     }
+    return false;
   }
 }
 

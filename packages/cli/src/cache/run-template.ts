@@ -1,4 +1,4 @@
-import { mkdir, writeFile, access, symlink, cp, readFile, rm, stat } from "node:fs/promises";
+import { mkdir, writeFile, access, symlink, cp, readFile, rm, stat, rename } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { constants } from "node:fs";
 import { projectRunDir } from "../paths.js";
@@ -19,6 +19,46 @@ interface ServerJarMarker {
   source: string;
   size: number;
   mtimeMs: number;
+  /** Server-generated config/world state has been prepared for this artifact. */
+  preparedSource?: string;
+}
+
+async function resetServerGeneratedState(
+  runDir: string,
+  resetWorlds: boolean,
+): Promise<void> {
+  const names = [
+    "config",
+    "bukkit.yml",
+    "spigot.yml",
+    "paper.yml",
+    "purpur.yml",
+    "pufferfish.yml",
+    ...(resetWorlds ? ["world", "world_nether", "world_the_end"] : []),
+  ];
+  const existing: string[] = [];
+
+  for (const name of names) {
+    try {
+      await access(join(runDir, name), constants.F_OK);
+      existing.push(name);
+    } catch {
+      // Nothing to preserve.
+    }
+  }
+
+  if (existing.length === 0) return;
+
+  const backupDir = join(
+    runDir,
+    ".plugdev-version-backups",
+    String(Date.now()),
+  );
+  await mkdir(backupDir, { recursive: true });
+  for (const name of existing) {
+    await rename(join(runDir, name), join(backupDir, name));
+  }
+  info(`Backed up incompatible server state to ${backupDir}`);
 }
 
 /** Normalized world type used for marker + banner. */
@@ -195,42 +235,68 @@ export async function copyPaperToRun(
   runDir: string,
   paperJarPath: string,
 ): Promise<string> {
+  await mkdir(runDir, { recursive: true });
   const dest = join(runDir, "server.jar");
   const markerPath = join(runDir, SERVER_JAR_MARKER);
   const source = resolve(paperJarPath);
   const sourceStat = await stat(source);
+  let marker: ServerJarMarker | undefined;
+  let destStat: Awaited<ReturnType<typeof stat>> | undefined;
 
   try {
-    const marker = JSON.parse(
+    marker = JSON.parse(
       await readFile(markerPath, "utf8"),
     ) as ServerJarMarker;
-    const destStat = await stat(dest);
-    if (
+  } catch {
+    // Missing or stale marker; rebuild it below.
+  }
+  try {
+    destStat = await stat(dest);
+  } catch {
+    // No persistent server JAR yet.
+  }
+
+  const jarMatches = Boolean(
+    marker &&
+      destStat &&
       resolve(marker.source) === source &&
       marker.size === sourceStat.size &&
       marker.mtimeMs === sourceStat.mtimeMs &&
-      destStat.size === sourceStat.size
-    ) {
-      return dest;
+      destStat.size === sourceStat.size,
+  );
+  const preparedMatches = Boolean(
+    marker?.preparedSource && resolve(marker.preparedSource) === source,
+  );
+  const sourceChanged = Boolean(
+    marker?.source && resolve(marker.source) !== source,
+  );
+
+  if (destStat && !preparedMatches) {
+    info(
+      sourceChanged
+        ? "Server version changed — archiving incompatible config and dev worlds"
+        : "Refreshing generated server config for the selected version",
+    );
+    await resetServerGeneratedState(runDir, sourceChanged);
+  }
+
+  if (!jarMatches) {
+    await rm(dest, { force: true });
+
+    try {
+      await symlink(source, dest);
+    } catch {
+      await cp(source, dest);
     }
-  } catch {
-    // Missing or stale marker/JAR — replace it from the selected cache entry.
   }
 
-  await rm(dest, { force: true });
-
-  try {
-    await symlink(source, dest);
-  } catch {
-    await cp(source, dest);
-  }
-
-  const marker: ServerJarMarker = {
+  const nextMarker: ServerJarMarker = {
     source,
     size: sourceStat.size,
     mtimeMs: sourceStat.mtimeMs,
+    preparedSource: source,
   };
-  await writeFile(markerPath, JSON.stringify(marker, null, 2) + "\n");
+  await writeFile(markerPath, JSON.stringify(nextMarker, null, 2) + "\n");
   return dest;
 }
 
