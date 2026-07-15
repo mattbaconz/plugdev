@@ -1,19 +1,28 @@
 package dev.plugdev.bootstrap;
 
 import org.bukkit.Bukkit;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandMap;
+import org.bukkit.command.PluginCommand;
+import org.bukkit.command.SimpleCommandMap;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.PluginManager;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.logging.Level;
@@ -69,6 +78,7 @@ public final class PluginReloader {
         if (loaded == 0) {
             throw new IllegalStateException("No JARs from reload.list could be loaded");
         }
+        syncPaperCommands();
         bootstrap.getLogger().info("[PlugDev] Reload complete (" + loaded + " plugin(s))");
     }
 
@@ -191,6 +201,10 @@ public final class PluginReloader {
         // Paper disablePlugin closes the classloader and unregisters schedulers/events
         Bukkit.getPluginManager().disablePlugin(plugin);
 
+        // Stale PluginCommands keep pointing at the disabled instance — /we then fails with
+        // "plugin is disabled" even after a successful re-enable of a new instance.
+        unregisterPluginCommands(plugin);
+
         Object instanceManager = resolvePaperInstanceManager();
         if (instanceManager != null) {
             removeFromPaperInstanceManager(plugin, instanceManager);
@@ -201,6 +215,108 @@ public final class PluginReloader {
 
         removeFromPaperProviderStorage(plugin);
         System.gc();
+    }
+
+    /**
+     * Remove PluginCommands owned by {@code plugin} from SimpleCommandMap.knownCommands
+     * so the next loadPlugin can re-bind aliases (e.g. /we) to the new instance.
+     */
+    @SuppressWarnings("unchecked")
+    private void unregisterPluginCommands(Plugin plugin) {
+        try {
+            CommandMap commandMap = resolveCommandMap();
+            if (commandMap == null) {
+                bootstrap.getLogger().warning("[PlugDev] Could not resolve CommandMap for command cleanup");
+                return;
+            }
+
+            Map<String, Command> known = resolveKnownCommands(commandMap);
+            if (known == null) {
+                bootstrap.getLogger().warning("[PlugDev] Could not resolve knownCommands for command cleanup");
+                return;
+            }
+
+            Set<String> keysToRemove = new HashSet<>();
+            Set<Command> commandsToUnregister = new HashSet<>();
+            for (Map.Entry<String, Command> entry : known.entrySet()) {
+                Command cmd = entry.getValue();
+                if (!(cmd instanceof PluginCommand pluginCommand)) continue;
+                Plugin owner = pluginCommand.getPlugin();
+                if (owner == null) continue;
+                if (!owner.getName().equalsIgnoreCase(plugin.getName())) continue;
+                keysToRemove.add(entry.getKey());
+                commandsToUnregister.add(cmd);
+            }
+
+            for (Command cmd : commandsToUnregister) {
+                try {
+                    cmd.unregister(commandMap);
+                } catch (Exception ignored) {
+                    // still remove from knownCommands below
+                }
+            }
+            for (String key : keysToRemove) {
+                known.remove(key);
+            }
+
+            bootstrap.getLogger().info(
+                    "[PlugDev] Unregistered " + keysToRemove.size() + " command(s) for " + plugin.getName());
+        } catch (Exception e) {
+            bootstrap.getLogger().log(Level.WARNING, "[PlugDev] Command map cleanup failed", e);
+        }
+    }
+
+    private CommandMap resolveCommandMap() {
+        try {
+            Method getCommandMap = Bukkit.getServer().getClass().getMethod("getCommandMap");
+            Object map = getCommandMap.invoke(Bukkit.getServer());
+            if (map instanceof CommandMap commandMap) return commandMap;
+        } catch (Throwable ignored) {
+            // fall through
+        }
+
+        try {
+            PluginManager pm = Bukkit.getPluginManager();
+            Field field = pm.getClass().getDeclaredField("commandMap");
+            field.setAccessible(true);
+            Object map = field.get(pm);
+            if (map instanceof CommandMap commandMap) return commandMap;
+        } catch (Throwable ignored) {
+            // fall through
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Command> resolveKnownCommands(CommandMap commandMap) {
+        try {
+            if (commandMap instanceof SimpleCommandMap simple) {
+                Field field = SimpleCommandMap.class.getDeclaredField("knownCommands");
+                field.setAccessible(true);
+                return (Map<String, Command>) field.get(simple);
+            }
+        } catch (Throwable ignored) {
+            // try generic field walk
+        }
+
+        try {
+            Field field = commandMap.getClass().getDeclaredField("knownCommands");
+            field.setAccessible(true);
+            return (Map<String, Command>) field.get(commandMap);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    /** Best-effort Paper/CraftBukkit brigadier refresh after command map mutation. */
+    private void syncPaperCommands() {
+        try {
+            Method sync = Bukkit.getServer().getClass().getMethod("syncCommands");
+            sync.invoke(Bukkit.getServer());
+            bootstrap.getLogger().info("[PlugDev] Synced server commands after reload");
+        } catch (Throwable e) {
+            bootstrap.getLogger().log(Level.FINE, "[PlugDev] syncCommands skipped", e);
+        }
     }
 
     private Object resolvePaperInstanceManager() {

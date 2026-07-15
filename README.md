@@ -2,7 +2,7 @@
 
 <img src="brand/plugdev-logo.png" alt="PlugDev" width="128" />
 
-# PlugDev · v0.12.0
+# PlugDev · v0.12.1
 
 ---
 
@@ -165,7 +165,7 @@ Recorded on Paper **26.1.2** with Prism + `plug run --hotswap`.
 
 ## Status
 
-**v0.12.0** — multi-module pick, deps TUI, MCP 0.3. See [CHANGELOG.md](CHANGELOG.md).
+**v0.12.1** — safe-reload command cleanup + prune duplicate plugin JARs. See [CHANGELOG.md](CHANGELOG.md).
 
 [Docs](https://pluglabs.app/plugdev) · [Discord](https://discord.gg/C4X3rThtAM) · [npm](https://www.npmjs.com/package/@plugdev/cli)
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.12.1 — 2026-07-15
+
+### [fixed]
+- Safe reload no longer leaves Bukkit/Paper commands bound to the disabled plugin instance (`/we` → "plugin is disabled" after reload)
+- Bootstrap unregisters PluginCommands on unload and syncs the server command map after reload
+- `deployPluginJar` prunes older same-plugin JARs (version bumps and `-reload-*` copies) so `.plugdev/run/plugins` does not accumulate duplicates
+
 ## 0.12.0 — 2026-07-14
 
 ### [added]

@@ -1,6 +1,6 @@
 import { execa } from "execa";
 import { copyFile, mkdir } from "node:fs/promises";
-import { join, basename } from "node:path";
+import { join } from "node:path";
 import type { ResolvedConfig } from "../config/loader.js";
 import type { DetectedProject } from "../detect/project.js";
 import { info } from "../util/log.js";
@@ -10,6 +10,7 @@ import { findJarByPattern } from "./jars.js";
 import type { BuildResult } from "./types.js";
 
 export type { BuildResult } from "./types.js";
+export { deployPluginJar, pruneStalePluginJars, readPluginNameFromJar } from "./deploy.js";
 
 function gradleEnv(): NodeJS.ProcessEnv {
   return javaChildEnv(getResolvedJava());
@@ -134,21 +135,6 @@ async function findBuiltJar(
   } catch {
     throw Errors.noJarFound(task);
   }
-}
-
-export async function deployPluginJar(
-  jarPath: string,
-  pluginsDir: string,
-  _devPluginName?: string,
-  forReload = false,
-): Promise<string> {
-  await mkdir(pluginsDir, { recursive: true });
-  const baseName = basename(jarPath);
-  const dest = forReload
-    ? join(pluginsDir, baseName.replace(/\.jar$/i, `-reload-${Date.now()}.jar`))
-    : join(pluginsDir, baseName);
-  await copyFile(jarPath, dest);
-  return dest;
 }
 
 export async function deployBootstrapJar(
