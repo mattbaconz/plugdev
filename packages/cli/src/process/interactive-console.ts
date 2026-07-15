@@ -45,7 +45,8 @@ export function attachInteractiveConsole(
     terminal: true,
   });
 
-  info("Type server commands below (e.g. op DevPlayer). Ctrl+C stops PlugDev.");
+  info("Type server commands below (e.g. list, gamemode creative @a). Ctrl+C stops PlugDev.");
+  info("Players are auto-OP on join when dev.op is true (default).");
 
   const onLine = async (line: string) => {
     if (closed || paused) return;

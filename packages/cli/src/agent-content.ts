@@ -122,7 +122,7 @@ Use the PlugDev CLI for Paper plugin test loops in this project. Prefer \`plug r
 - \`plugdev module list|use\` — multi-module Maven/Gradle reactor pick
 - \`plugdev deps add|remove|list\` — modular test plugins (TUI: Dependencies)
 - Headless: \`plugdev server start|stop|status|command|logs\` (agents; pair with \`--json\` when scripting)
-- After server ready: type console commands in the same terminal (RCON), e.g. \`op DevPlayer\`, \`list\`
+- After server ready: players are auto-OP on join when \`dev.op\` is true (default). Type console commands in the same terminal (RCON), e.g. \`list\`, \`gamemode creative @a\`
 - If MCP is configured (\`.cursor/mcp.json\`), prefer \`plugdev_*\` MCP tools for headless control
 
 ## Install
@@ -175,7 +175,7 @@ This is a Minecraft Paper plugin developed with PlugDev. Prefer \`plug run\` ove
 1. \`npm install -g @plugdev/cli\` (once)
 2. \`plugdev init --setup --agents --mcp\` (once per project)
 3. \`plug run\` — server + watch + client
-4. Type console commands in the same terminal after ready (\`op DevPlayer\`, \`list\`, …)
+4. Players are auto-OP on join when \`dev.op\` is true (default). Type console commands in the same terminal after ready (\`list\`, \`gamemode creative @a\`, …)
 5. \`plug doctor\` if boot or detection fails
 6. Multi-module: \`plugdev module list\` / \`plugdev module use <name>\`
 7. Deps: \`plugdev deps add|remove|list\` (or TUI Dependencies)
@@ -238,7 +238,7 @@ When the user asks to test, run, or set up a Minecraft plugin project — or whe
 
 ${dayLoopTable()}
 
-After the server is ready, type console commands in the **same terminal** (RCON), e.g. \`op DevPlayer\`, \`list\`.
+After the server is ready, joining players are **auto-OP** when \`dev.op\` is true (default). Type console commands in the **same terminal** (RCON), e.g. \`list\`, \`gamemode creative @a\`.
 
 ## MCP (optional structured tools)
 

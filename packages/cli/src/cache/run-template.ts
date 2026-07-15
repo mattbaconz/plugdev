@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { constants } from "node:fs";
 import { projectRunDir } from "../paths.js";
 import { ensurePaperDevTemplate, copyTemplateFiles, seedWorldCache } from "./templates.js";
+import { writeDevRunConfig } from "./dev-run-config.js";
 import type { ResolvedConfig } from "../config/loader.js";
 import { info } from "../util/log.js";
 
@@ -151,8 +152,12 @@ export async function prepareRunDirectoryAt(
     );
   }
 
+  // Bootstrap reads this on enable — auto-OP players on join when op is true.
+  const opEnabled = config.dev?.op !== false;
+  await writeDevRunConfig(runDir, opEnabled);
+
   const opsPath = join(runDir, "ops.json");
-  if (config.dev?.op !== false) {
+  if (opEnabled) {
     try {
       await access(opsPath, constants.F_OK);
     } catch {

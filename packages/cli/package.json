@@ -1,6 +1,6 @@
 {
   "name": "@plugdev/cli",
-  "version": "0.12.1",
+  "version": "0.12.2",
   "description": "Test Minecraft plugins in one command — plug / plugdev CLI (Paper, Folia, Purpur, Pufferfish, Spigot)",
   "author": "PLUG Labs",
   "homepage": "https://pluglabs.app/plugdev",

@@ -54,7 +54,7 @@ When the user asks to test, run, or set up a Minecraft plugin project — or whe
 | Headless (agents) | `plugdev server start|stop|status|command|logs` |
 | Scripting | add `--json` |
 
-After the server is ready, type console commands in the **same terminal** (RCON), e.g. `op DevPlayer`, `list`.
+After the server is ready, joining players are **auto-OP** when `dev.op` is true (default). Type console commands in the **same terminal** (RCON), e.g. `list`, `gamemode creative @a`.
 
 ## MCP (optional structured tools)
 

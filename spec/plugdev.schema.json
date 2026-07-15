@@ -25,7 +25,11 @@
           "enum": ["flat", "default", "void"],
           "default": "flat"
         },
-        "op": { "type": "boolean", "default": true },
+        "op": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true (default), PlugDev bootstrap auto-OPs every player on join."
+        },
         "peaceful": { "type": "boolean", "default": true },
         "onlineMode": { "type": "boolean", "default": false }
       },

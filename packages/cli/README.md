@@ -3,7 +3,7 @@
 **`plugdev` opens a TUI; `plug run` starts the test loop.**
 
 ```powershell
-npm install -g @plugdev/cli@0.12.1
+npm install -g @plugdev/cli@0.12.2
 cd your-plugin
 plugdev init --setup --agents --mcp
 plugdev          # TUI: configure + run

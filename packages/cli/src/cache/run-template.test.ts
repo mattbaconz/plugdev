@@ -48,6 +48,26 @@ describe("void world platform", () => {
       );
       const marker = await readFile(join(runDir, ".plugdev-world-type"), "utf8");
       assert.equal(marker.trim(), "void");
+      const devJson = JSON.parse(
+        await readFile(join(runDir, "plugdev-dev.json"), "utf8"),
+      ) as { op: boolean };
+      assert.equal(devJson.op, true);
+    } finally {
+      await rm(runDir, { recursive: true, force: true });
+    }
+  });
+
+  it("writes plugdev-dev.json op false when dev.op is false", async () => {
+    const runDir = join(tmpdir(), `plugdev-noop-${Date.now()}`);
+    await mkdir(runDir, { recursive: true });
+    try {
+      const cfg = baseConfig("flat");
+      cfg.dev = { ...cfg.dev, op: false };
+      await prepareRunDirectoryAt(runDir, cfg);
+      const devJson = JSON.parse(
+        await readFile(join(runDir, "plugdev-dev.json"), "utf8"),
+      ) as { op: boolean };
+      assert.equal(devJson.op, false);
     } finally {
       await rm(runDir, { recursive: true, force: true });
     }

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.12.2 — 2026-07-15
+
+### [added]
+- Instant OP on join when `dev.op` is true (default): bootstrap reads `plugdev-dev.json` and grants OP to every joining player (offline DevPlayer and online Prism accounts)
+
+### [changed]
+- Ready console tip no longer suggests `op DevPlayer`; agent rules note auto-OP
+- Schema describes `dev.op` as auto-OP on join
+
 ## 0.12.1 — 2026-07-15
 
 ### [fixed]
