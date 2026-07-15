@@ -11,12 +11,17 @@ import {
 } from "../build/gradle.js";
 import { runMavenBuild } from "../build/maven.js";
 import { projectRunDir, bootstrapCacheDir } from "../paths.js";
-import { prepareRunDirectory, writeReloadTrigger } from "../cache/run-template.js";
+import {
+  prepareRunDirectory,
+  writeReloadList,
+  writeReloadTrigger,
+} from "../cache/run-template.js";
 import { installPlugTraceJar, writePlugDevIdentity } from "../deps/plugtrace.js";
 import { heading, info, success } from "../util/log.js";
 import { isJsonMode, emitJson } from "../util/output.js";
 import { formatError, formatErrorJson, getExitCode } from "../util/errors.js";
 import { CLI_VERSION } from "../constants.js";
+import { isProcessRunning, readSession } from "../session.js";
 
 async function resolveBootstrapJar(): Promise<string> {
   const cliRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -54,7 +59,7 @@ export async function runSync(
     if (!builtJar) {
       const build =
         project.buildSystem === "maven" || config.build.system === "maven"
-          ? await runMavenBuild(cwd, config)
+          ? await runMavenBuild(cwd, config, project.pluginName)
           : await runGradleBuild(cwd, config, project);
       builtJar = build.jarPath;
     }
@@ -78,14 +83,20 @@ export async function runSync(
       projectJarPath: builtJar,
     });
 
-    await writeReloadTrigger(cwd, [devJar]);
+    const session = await readSession(cwd);
+    const live = session !== null && isProcessRunning(session.pid);
+    if (live) {
+      await writeReloadTrigger(cwd, [devJar]);
+    } else {
+      await writeReloadList(cwd, [devJar]);
+    }
 
     if (isJsonMode()) {
       emitJson({
         ok: true,
         data: {
           syncedPath: devJar,
-          reloadTriggered: true,
+          reloadTriggered: live,
           pluginName: project.pluginName,
         },
       });
@@ -93,7 +104,11 @@ export async function runSync(
     }
 
     success(`Synced: ${devJar}`);
-    info("Reload trigger written (safe reload if server running)");
+    info(
+      live
+        ? "Reload trigger written (safe reload)"
+        : "reload.list updated (no live server session)",
+    );
     return 0;
   } catch (e) {
     if (isJsonMode()) {

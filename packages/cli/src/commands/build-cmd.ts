@@ -18,7 +18,7 @@ export async function runBuild(
 
     let result: { jarPath: string; task: string };
     if (project.buildSystem === "maven" || config.build.system === "maven") {
-      result = await runMavenBuild(cwd, config);
+      result = await runMavenBuild(cwd, config, project.pluginName);
     } else {
       result = await runGradleBuild(cwd, config, project);
     }

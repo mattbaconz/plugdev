@@ -122,7 +122,7 @@ export async function runDoctor(cwd: string): Promise<number> {
       : project.buildSystem === "maven" &&
           project.hasShadowJar &&
           !config.build.jarPattern
-        ? `maven-shade-plugin detected — set build.jarPattern (e.g. target/*-shaded.jar)`
+        ? `maven-shade-plugin detected — set build.jarPattern to your finalName (e.g. target/WorldEvents-*.jar), or omit it and PlugDev picks the JAR with plugin.yml`
         : undefined;
 
   const runPaperHint = project.hasRunPaperMaven

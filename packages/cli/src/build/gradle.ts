@@ -104,7 +104,12 @@ export async function runGradleBuild(
         (module
           ? `${module.replace(/\\/g, "/").replace(/\/$/, "")}/build/libs/*.jar`
           : undefined);
-      const jarPath = await findBuiltJar(cwd, t, jarPattern);
+      const jarPath = await findBuiltJar(
+        cwd,
+        t,
+        jarPattern,
+        project.pluginName,
+      );
       return { jarPath, task: t };
     } catch (e) {
       lastError = e;
@@ -125,13 +130,19 @@ async function findBuiltJar(
   cwd: string,
   task: string,
   jarPattern?: string,
+  preferredPluginName?: string,
 ): Promise<string> {
   if (jarPattern) {
-    return findJarByPattern(cwd, jarPattern, task);
+    return findJarByPattern(cwd, jarPattern, task, preferredPluginName);
   }
 
   try {
-    return await findJarByPattern(cwd, "build/libs/*.jar", task);
+    return await findJarByPattern(
+      cwd,
+      "build/libs/*.jar",
+      task,
+      preferredPluginName,
+    );
   } catch {
     throw Errors.noJarFound(task);
   }

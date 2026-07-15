@@ -214,12 +214,22 @@ export async function copyPaperToRun(
   }
 }
 
-export async function writeReloadTrigger(
+/** Write reload.list only — used at boot so Paper's first load is not race-reloaded. */
+export async function writeReloadList(
   cwd: string,
   jarPaths: string[],
 ): Promise<void> {
   const runDir = projectRunDir(cwd);
   await mkdir(runDir, { recursive: true });
   await writeFile(join(runDir, "reload.list"), jarPaths.join("\n") + "\n");
+}
+
+/** Write reload.list and bump .reload-trigger (watch / live sync). */
+export async function writeReloadTrigger(
+  cwd: string,
+  jarPaths: string[],
+): Promise<void> {
+  await writeReloadList(cwd, jarPaths);
+  const runDir = projectRunDir(cwd);
   await writeFile(join(runDir, ".reload-trigger"), String(Date.now()));
 }

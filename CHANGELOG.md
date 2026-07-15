@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.12.3 — 2026-07-15
+
+### [fixed]
+- JAR pick no longer prefers `*-shaded.jar` over finalName plugins (e.g. `WorldEvents-*.jar` wins over `worldevents-core-*-shaded.jar` when both match `target/*.jar`)
+- Boot no longer writes `.reload-trigger`, so Paper’s first load is not race-reloaded by bootstrap ~1s later
+- Bootstrap seeds `ReloadWatcher` from any leftover `.reload-trigger` stamp so stale triggers are ignored
+
+### [changed]
+- `doctor` shade tip suggests finalName / plugin.yml pick instead of `target/*-shaded.jar`
+- `plugdev sync` only bumps `.reload-trigger` when a live server session exists
+
 ## 0.12.2 — 2026-07-15
 
 ### [added]

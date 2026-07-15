@@ -79,7 +79,7 @@ export async function runServerStart(
 
     const build =
       project.buildSystem === "maven" || config.build.system === "maven"
-        ? await runMavenBuild(cwd, config)
+        ? await runMavenBuild(cwd, config, project.pluginName)
         : await runGradleBuild(cwd, config, project);
     const devJar = await deployPluginJar(build.jarPath, pluginsDir, project.pluginName);
     const bootstrap = await resolveBootstrapJar();

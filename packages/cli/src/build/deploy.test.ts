@@ -59,3 +59,24 @@ test("pruneStalePluginJars keeps destination and bootstrap", async () => {
   assert.ok(names.includes("WorldEvents-2.jar"));
   assert.ok(names.includes("plugdev-bootstrap-paper.jar"));
 });
+
+test("pruneStalePluginJars removes shaded sibling with same plugin.yml name", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "plugdev-prune-shaded-"));
+  await writeMinimalPluginJar(join(dir, "WorldEvents-1.8.29.jar"), "WorldEvents");
+  await writeMinimalPluginJar(
+    join(dir, "worldevents-core-1.8.29-shaded.jar"),
+    "WorldEvents",
+  );
+  await writeFile(join(dir, "plugdev-bootstrap-paper.jar"), "x");
+
+  const removed = await pruneStalePluginJars(
+    dir,
+    "WorldEvents",
+    "WorldEvents-1.8.29.jar",
+  );
+  assert.deepEqual(removed, ["worldevents-core-1.8.29-shaded.jar"]);
+  const names = await readdir(dir);
+  assert.ok(names.includes("WorldEvents-1.8.29.jar"));
+  assert.ok(names.includes("plugdev-bootstrap-paper.jar"));
+  assert.ok(!names.includes("worldevents-core-1.8.29-shaded.jar"));
+});

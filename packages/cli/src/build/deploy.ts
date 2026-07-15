@@ -1,69 +1,10 @@
-import { copyFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { inflateRawSync } from "node:zlib";
+import { readPluginNameFromJar } from "./jars.js";
+
+export { readPluginNameFromJar } from "./jars.js";
 
 const BOOTSTRAP_JAR = "plugdev-bootstrap-paper.jar";
-
-/** Read `name:` from plugin.yml / paper-plugin.yml inside a JAR (ZIP). */
-export async function readPluginNameFromJar(jarPath: string): Promise<string | null> {
-  try {
-    const buf = await readFile(jarPath);
-    for (const entry of ["plugin.yml", "paper-plugin.yml"]) {
-      const raw = extractZipEntry(buf, entry);
-      if (!raw) continue;
-      const text = raw.toString("utf8");
-      for (const line of text.split(/\r?\n/)) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith("name:")) continue;
-        let name = trimmed.slice("name:".length).trim();
-        if (
-          (name.startsWith('"') && name.endsWith('"')) ||
-          (name.startsWith("'") && name.endsWith("'"))
-        ) {
-          name = name.slice(1, -1);
-        }
-        if (name) return name;
-      }
-    }
-  } catch {
-    // fall through
-  }
-  return null;
-}
-
-/** Minimal ZIP local-file extract (stored or deflate) for small text entries. */
-function extractZipEntry(buf: Buffer, entryName: string): Buffer | null {
-  const nameBuf = Buffer.from(entryName, "utf8");
-  let offset = 0;
-  while (offset + 30 <= buf.length) {
-    if (buf.readUInt32LE(offset) !== 0x04034b50) break;
-    const method = buf.readUInt16LE(offset + 8);
-    const compSize = buf.readUInt32LE(offset + 18);
-    const uncompSize = buf.readUInt32LE(offset + 22);
-    const nameLen = buf.readUInt16LE(offset + 26);
-    const extraLen = buf.readUInt16LE(offset + 28);
-    const nameStart = offset + 30;
-    const nameEnd = nameStart + nameLen;
-    if (nameEnd + extraLen + compSize > buf.length) break;
-    const name = buf.subarray(nameStart, nameEnd).toString("utf8");
-    const dataStart = nameEnd + extraLen;
-    const dataEnd = dataStart + compSize;
-    if (name === entryName || Buffer.compare(buf.subarray(nameStart, nameEnd), nameBuf) === 0) {
-      const compressed = buf.subarray(dataStart, dataEnd);
-      if (method === 0) return Buffer.from(compressed);
-      if (method === 8) {
-        try {
-          return inflateRawSync(compressed, { maxOutputLength: Math.max(uncompSize, 64 * 1024) });
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    }
-    offset = dataEnd;
-  }
-  return null;
-}
 
 export function jarMatchesPluginName(fileName: string, pluginName: string): boolean {
   if (!pluginName) return false;
@@ -78,7 +19,7 @@ export function jarMatchesPluginName(fileName: string, pluginName: string): bool
 
 /**
  * Delete other JARs in pluginsDir that belong to the same plugin
- * (versioned builds and previous -reload-* copies).
+ * (versioned builds, previous -reload-* copies, and module-*-shaded siblings).
  */
 export async function pruneStalePluginJars(
   pluginsDir: string,

@@ -9,6 +9,7 @@ import {
   pickBestJar,
   findJarByPattern,
 } from "./jars.js";
+import { writeMinimalPluginJar } from "./deploy.js";
 import {
   findMavenJar,
   resolveMavenCommand,
@@ -32,17 +33,33 @@ test("matchGlob supports simple * patterns", () => {
   assert.equal(matchGlob("other.jar", "fixture-*.jar"), false);
 });
 
-test("pickBestJar prefers shaded over plain when both exist", async () => {
+test("pickBestJar prefers finalName plugin jar over module-shaded sibling", async () => {
   const dir = join(tmpdir(), `plugdev-jar-pick-${Date.now()}`);
   await mkdir(dir, { recursive: true });
   try {
-    await writeFile(join(dir, "app-1.0.0.jar"), "small");
-    await writeFile(join(dir, "app-1.0.0-shaded.jar"), "much larger shaded content here");
+    await writeMinimalPluginJar(join(dir, "WorldEvents-1.0.jar"), "WorldEvents");
+    await writeMinimalPluginJar(
+      join(dir, "worldevents-core-1.0-shaded.jar"),
+      "WorldEvents",
+    );
     const chosen = await pickBestJar(dir, [
-      "app-1.0.0.jar",
-      "app-1.0.0-shaded.jar",
+      "worldevents-core-1.0-shaded.jar",
+      "WorldEvents-1.0.jar",
     ]);
-    assert.ok(chosen.endsWith("app-1.0.0-shaded.jar"));
+    assert.ok(chosen.endsWith("WorldEvents-1.0.jar"));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("pickBestJar keeps lone shaded jar when it is the only plugin.yml jar", async () => {
+  const dir = join(tmpdir(), `plugdev-jar-lone-${Date.now()}`);
+  await mkdir(dir, { recursive: true });
+  try {
+    await writeFile(join(dir, "noise.jar"), "not a plugin");
+    await writeMinimalPluginJar(join(dir, "app-1.0-shaded.jar"), "App");
+    const chosen = await pickBestJar(dir, ["noise.jar", "app-1.0-shaded.jar"]);
+    assert.ok(chosen.endsWith("app-1.0-shaded.jar"));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

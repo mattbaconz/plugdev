@@ -23,6 +23,16 @@ public final class ReloadWatcher {
                             + "Prefer full server restart (watch.reloadJava: restart) for Folia plugins.");
         }
 
+        // Seed from any leftover stamp so a stale .reload-trigger is not treated as new.
+        File existing = new File(bootstrap.getServer().getWorldContainer(), ".reload-trigger");
+        if (existing.exists()) {
+            try {
+                lastTrigger = Long.parseLong(Files.readString(existing.toPath()).trim());
+            } catch (Exception ignored) {
+                lastTrigger = 0L;
+            }
+        }
+
         task = new BukkitRunnable() {
             @Override
             public void run() {

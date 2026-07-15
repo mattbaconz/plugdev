@@ -98,7 +98,7 @@ export function startPluginWatcher(
 
       const build =
         config.build.system === "maven"
-          ? await runMavenBuild(cwd, config)
+          ? await runMavenBuild(cwd, config, pluginName)
           : await runGradleBuild(cwd, config, project);
 
       if (reloadMode === "restart") {

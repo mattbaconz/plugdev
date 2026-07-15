@@ -62,9 +62,10 @@ export async function findMavenJar(
   cwd: string,
   jarPattern?: string,
   task = "package",
+  preferredPluginName?: string,
 ): Promise<string> {
   if (jarPattern) {
-    return findJarByPattern(cwd, jarPattern, task);
+    return findJarByPattern(cwd, jarPattern, task, preferredPluginName);
   }
 
   const targetDir = join(cwd, "target");
@@ -77,7 +78,7 @@ export async function findMavenJar(
 
   const jars = files.filter((f) => f.endsWith(".jar") && !isExcludedJar(f));
   if (jars.length === 0) throw Errors.noJarFound(task);
-  return pickBestJar(targetDir, jars);
+  return pickBestJar(targetDir, jars, { preferredPluginName });
 }
 
 /** True when pom.xml looks like a multi-module reactor. */
@@ -93,6 +94,7 @@ export async function pomHasModules(cwd: string): Promise<boolean> {
 export async function runMavenBuild(
   cwd: string,
   config?: ResolvedConfig,
+  preferredPluginName?: string,
 ): Promise<BuildResult> {
   const task =
     config?.build.task && config.build.task !== "build"
@@ -122,6 +124,11 @@ export async function runMavenBuild(
 
   const jarPattern =
     config?.build.jarPattern ?? defaultMavenJarPattern(module);
-  const jarPath = await findMavenJar(cwd, jarPattern, task);
+  const jarPath = await findMavenJar(
+    cwd,
+    jarPattern,
+    task,
+    preferredPluginName,
+  );
   return { jarPath, task };
 }

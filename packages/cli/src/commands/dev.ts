@@ -15,7 +15,7 @@ import {
 import {
   prepareRunDirectory,
   copyPaperToRun,
-  writeReloadTrigger,
+  writeReloadList,
   resolveWorldType,
 } from "../cache/run-template.js";
 import { applyExitCleanup, applyStartWorldCleanup } from "../cache/run-cleanup.js";
@@ -144,7 +144,7 @@ export async function runDev(
 
     if (config.build.system === "maven" || project.buildSystem === "maven") {
       return runPluginDev(cwd, config, project, overrides, async () =>
-        runMavenBuild(cwd, config),
+        runMavenBuild(cwd, config, project.pluginName),
       );
     }
 
@@ -406,7 +406,7 @@ async function runPluginDev(
       sessionId: undefined,
     });
 
-    await writeReloadTrigger(cwd, [devJar]);
+    await writeReloadList(cwd, [devJar]);
     phase("Sync plugin JAR to server");
 
     phase(`Start ${serverLabel}`, "active");

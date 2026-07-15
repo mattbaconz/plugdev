@@ -93,7 +93,7 @@ async function buildAndDeployProxyPlugin(
   let jarPath: string;
   try {
     if (project.buildSystem === "maven") {
-      const result = await runMavenBuild(cwd, buildConfig);
+      const result = await runMavenBuild(cwd, buildConfig, project.pluginName);
       jarPath = result.jarPath;
     } else {
       const result = await runGradleBuild(cwd, buildConfig, {
