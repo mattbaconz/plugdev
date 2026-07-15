@@ -2,7 +2,7 @@
 
 <img src="brand/plugdev-logo.png" alt="PlugDev" width="128" />
 
-# PlugDev · v0.12.4
+# PlugDev · v0.12.5
 
 ---
 
@@ -160,7 +160,7 @@ Recorded on Paper **26.1.2** with Prism + `plug run --hotswap`.
 
 ## Status
 
-**v0.12.4** — cleaner public setup, accurate tool comparisons, and consistent release checks. See [CHANGELOG.md](CHANGELOG.md).
+**v0.12.5** — configured server versions now replace stale JARs in persistent run directories. See [CHANGELOG.md](CHANGELOG.md).
 
 [Docs](https://pluglabs.app/plugdev) · [Discord](https://discord.gg/C4X3rThtAM) · [npm](https://www.npmjs.com/package/@plugdev/cli)
 

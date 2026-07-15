@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { constants } from "node:fs";
 import {
+  copyPaperToRun,
   prepareRunDirectoryAt,
   resolveWorldType,
 } from "./run-template.js";
@@ -87,6 +88,28 @@ describe("void world platform", () => {
       assert.equal(marker.trim(), "void");
     } finally {
       await rm(runDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("server JAR selection", () => {
+  it("replaces a persistent run JAR when the configured server version changes", async () => {
+    const root = join(tmpdir(), `plugdev-server-version-${Date.now()}`);
+    const runDir = join(root, "run");
+    const oldJar = join(root, "paper-1.21.4.jar");
+    const configuredJar = join(root, "paper-1.20.6.jar");
+    await mkdir(runDir, { recursive: true });
+    await writeFile(oldJar, "paper-1.21.4");
+    await writeFile(configuredJar, "paper-1.20.6");
+
+    try {
+      const runJar = await copyPaperToRun(runDir, oldJar);
+      assert.equal(await readFile(runJar, "utf8"), "paper-1.21.4");
+
+      await copyPaperToRun(runDir, configuredJar);
+      assert.equal(await readFile(runJar, "utf8"), "paper-1.20.6");
+    } finally {
+      await rm(root, { recursive: true, force: true });
     }
   });
 });

@@ -1,5 +1,5 @@
-import { mkdir, writeFile, access, symlink, cp, readFile, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, writeFile, access, symlink, cp, readFile, rm, stat } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { constants } from "node:fs";
 import { projectRunDir } from "../paths.js";
 import { ensurePaperDevTemplate, copyTemplateFiles, seedWorldCache } from "./templates.js";
@@ -13,6 +13,13 @@ export interface RconConfig {
 }
 
 const WORLD_TYPE_MARKER = ".plugdev-world-type";
+const SERVER_JAR_MARKER = ".plugdev-server-jar.json";
+
+interface ServerJarMarker {
+  source: string;
+  size: number;
+  mtimeMs: number;
+}
 
 /** Normalized world type used for marker + banner. */
 export function resolveWorldType(config: ResolvedConfig): "void" | "flat" | "default" {
@@ -189,29 +196,42 @@ export async function copyPaperToRun(
   paperJarPath: string,
 ): Promise<string> {
   const dest = join(runDir, "server.jar");
+  const markerPath = join(runDir, SERVER_JAR_MARKER);
+  const source = resolve(paperJarPath);
+  const sourceStat = await stat(source);
 
   try {
-    await access(dest, constants.F_OK);
-    return dest;
-  } catch {
-    // need to create link or copy
-  }
-
-  try {
-    await symlink(paperJarPath, dest);
-    return dest;
-  } catch {
-    try {
-      await cp(paperJarPath, dest);
-    } catch (e) {
-      const err = e as NodeJS.ErrnoException;
-      if (err.code === "EBUSY" || err.code === "EPERM") {
-        return dest;
-      }
-      throw e;
+    const marker = JSON.parse(
+      await readFile(markerPath, "utf8"),
+    ) as ServerJarMarker;
+    const destStat = await stat(dest);
+    if (
+      resolve(marker.source) === source &&
+      marker.size === sourceStat.size &&
+      marker.mtimeMs === sourceStat.mtimeMs &&
+      destStat.size === sourceStat.size
+    ) {
+      return dest;
     }
-    return dest;
+  } catch {
+    // Missing or stale marker/JAR — replace it from the selected cache entry.
   }
+
+  await rm(dest, { force: true });
+
+  try {
+    await symlink(source, dest);
+  } catch {
+    await cp(source, dest);
+  }
+
+  const marker: ServerJarMarker = {
+    source,
+    size: sourceStat.size,
+    mtimeMs: sourceStat.mtimeMs,
+  };
+  await writeFile(markerPath, JSON.stringify(marker, null, 2) + "\n");
+  return dest;
 }
 
 /** Write reload.list only — used at boot so Paper's first load is not race-reloaded. */

@@ -6,6 +6,12 @@ Release entries use `[added]`, `[changed]`, `[fixed]`, and `[removed]` in that o
 
 _No changes yet._
 
+## 0.12.5 — 2026-07-15
+
+### [fixed]
+- Persistent run directories now replace stale server JARs when the configured server software, version, or cached artifact changes
+- Server JAR selection is recorded and validated before reuse, preventing a project configured for Paper 1.20.6 from silently booting an older cached Paper 1.21.4 JAR
+
 ## 0.12.4 — 2026-07-15
 
 ### [added]
