@@ -61,6 +61,9 @@ Manual config:
 | `plugdev_list_deps` | Configured deps + presets |
 | `plugdev_add_dep` | Add Hangar/Modrinth/URL dep |
 | `plugdev_remove_dep` | Remove dep JAR + yml entry |
+| `plugdev_list_configs` | List live plugin config files + watch status |
+| `plugdev_get_config` | Read live config file or dotted `--key` |
+| `plugdev_set_config` | Set dotted key in live config (reload when watched) |
 | `plugdev_agent_install` | Write Cursor/Claude/Codex rules (+ MCP) |
 | `plugdev_cache_prefetch` | Warm server/client cache |
 | `plugdev_cache_status` | Cache sizes under `~/.plugdev` |

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Smoke: run fixture with watch -> edit live config -> assert targeted reload + same PID. */
 import { execa } from "execa";
-import { readFile, writeFile, mkdir, rm } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -71,8 +71,14 @@ try {
   const beforeSession = await waitForSession();
   const beforeLog = await readFile(logPath, "utf8");
 
-  await mkdir(dirname(liveConfig), { recursive: true });
-  await writeFile(liveConfig, "value: two\n", "utf8");
+  const set = await execa(
+    "node",
+    [cli, "--json", "config", "set", "config.yml", "--key", "value", "--value", "two"],
+    { cwd: fixture, reject: false },
+  );
+  if (set.exitCode !== 0) {
+    throw new Error(`config set failed: ${set.stdout || set.stderr}`);
+  }
   const after = await waitForLog(/Fixture config value: two/i, beforeLog.length, 60_000);
   if (!/\[PlugDev\] Reload complete/i.test(after.slice(beforeLog.length))) {
     throw new Error("Config changed but targeted reload marker was not found");
@@ -82,7 +88,7 @@ try {
   if (beforeSession.pid !== afterSession.pid) {
     throw new Error(`Server PID changed (${beforeSession.pid} -> ${afterSession.pid})`);
   }
-  console.log("OK live config applied through one targeted reload; server PID unchanged");
+  console.log("OK live config set via CLI applied through one targeted reload; server PID unchanged");
 } catch (error) {
   console.error("FAIL live-config smoke:", error instanceof Error ? error.message : String(error));
   try {

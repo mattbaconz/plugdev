@@ -51,9 +51,11 @@ When the user asks to test, run, or set up a Minecraft plugin project — or whe
 | Cold run folder | `plug clean --all` |
 | Multi-module pick | `plugdev module list|use` |
 | Test deps | `plugdev deps add|remove|list` |
+| Live plugin configs | `plugdev config list|get|set|open|watch|unwatch` |
 | Headless (agents) | `plugdev server start|stop|status|command|logs` |
 | Scripting | add `--json` |
 
+After the first boot, live plugin configs live under `.plugdev/run/plugins/<PluginName>/`. Prefer `plugdev config get|set` for keyed changes (allowlisted saves reload without rebuilding the JAR).
 After the server is ready, joining players are **auto-OP** when `dev.op` is true (default). Type console commands in the **same terminal** (RCON), e.g. `list`, `gamemode creative @a`.
 
 ## MCP (optional structured tools)
@@ -66,6 +68,7 @@ When `.cursor/mcp.json` or `.mcp.json` includes PlugDev (via `init --mcp` / `age
 - `plugdev_tail_logs`, `plugdev_run_server_command`, `plugdev_op_player`
 - `plugdev_list_modules`, `plugdev_use_module`
 - `plugdev_list_deps`, `plugdev_add_dep`, `plugdev_remove_dep`
+- `plugdev_list_configs`, `plugdev_get_config`, `plugdev_set_config`
 - `plugdev_agent_install`, `plugdev_cache_prefetch`, `plugdev_cache_status`, `plugdev_clean`
 - `plugdev_run_test_loop` — build → sync → start → OP
 
@@ -91,6 +94,7 @@ Install MCP alone: `npx -y @plugdev/mcp` (stdio).
 | Cache | `~/.plugdev/` |
 | Modules | `plugdev module list|use` (multi-module Maven/Gradle) |
 | Deps | `plugdev deps add|remove|list` (+ TUI Dependencies) |
+| Live configs | `plugdev config list|get|set|open|watch|unwatch` |
 | Reload | Safe JAR reload (not `/reload`); optional `--hotswap` for method bodies |
 | Folia | Prefer full restart over safe reload |
 | Headless | `plugdev server start|stop|status|command|logs` + `--json` |

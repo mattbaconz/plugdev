@@ -32,8 +32,10 @@ import { runClean } from "./cache/run-cleanup.js";
 import { runAgentInstall } from "./commands/agent.js";
 import { runModuleList, runModuleUse } from "./commands/module-cmd.js";
 import {
+  runConfigGet,
   runConfigList,
   runConfigOpen,
+  runConfigSet,
   runConfigWatch,
 } from "./commands/config-cmd.js";
 import {
@@ -283,6 +285,23 @@ configCmd
   .description("Stop reloading for this live config")
   .action(async (path: string) => {
     process.exit(await runConfigWatch(process.cwd(), path, false));
+  });
+
+configCmd
+  .command("get [path]")
+  .description("Read a live plugin config (whole file or --key)")
+  .option("--key <key>", "dotted YAML key (e.g. nested.flag)")
+  .action(async (path: string | undefined, opts: { key?: string }) => {
+    process.exit(await runConfigGet(process.cwd(), path ?? "config.yml", opts.key));
+  });
+
+configCmd
+  .command("set [path]")
+  .description("Set a dotted key in a live plugin config")
+  .requiredOption("--key <key>", "dotted YAML key (e.g. nested.flag)")
+  .requiredOption("--value <value>", "scalar or JSON value")
+  .action(async (path: string | undefined, opts: { key: string; value: string }) => {
+    process.exit(await runConfigSet(process.cwd(), path ?? "config.yml", opts.key, opts.value));
   });
 
 const clientCmd = program.command("client").description("Minecraft client setup");

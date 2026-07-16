@@ -6,6 +6,15 @@ Release entries use `[added]`, `[changed]`, `[fixed]`, and `[removed]` in that o
 
 _No changes yet._
 
+## 0.12.8 — 2026-07-16
+
+### [added]
+- `plugdev config get|set` for dotted YAML keys on live plugin configs (scalars or JSON values)
+- MCP `@plugdev/mcp@0.3.2`: `plugdev_list_configs`, `plugdev_get_config`, `plugdev_set_config`
+
+### [changed]
+- Live config docs, README, and agent skill cover keyed get/set alongside open/watch
+
 ## 0.12.7 — 2026-07-16
 
 ### [added]

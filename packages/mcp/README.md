@@ -1,6 +1,6 @@
 # @plugdev/mcp
 
-Structured, headless control for the same plugin test loop as `plug run`: build, sync, server, RCON, and logs.
+Structured, headless control for the same plugin test loop as `plug run`: build, sync, server, RCON, logs, and live configs.
 
 ## Config
 
@@ -9,7 +9,7 @@ Structured, headless control for the same plugin test loop as `plug run`: build,
   "mcpServers": {
     "plugdev": {
       "command": "npx",
-      "args": ["-y", "@plugdev/mcp@0.3.1"],
+      "args": ["-y", "@plugdev/mcp@0.3.2"],
       "env": {
         "PLUGDEV_PROJECT_ROOT": "${workspaceFolder}"
       }
@@ -20,7 +20,7 @@ Structured, headless control for the same plugin test loop as `plug run`: build,
 
 Or: `plugdev init --mcp`
 
-## Tools (0.3.1)
+## Tools (0.3.2)
 
 | Tool | Purpose |
 |------|---------|
@@ -30,6 +30,7 @@ Or: `plugdev init --mcp`
 | `plugdev_run_server_command` / `plugdev_op_player` | RCON |
 | `plugdev_list_modules` / `plugdev_use_module` | Multi-module |
 | `plugdev_list_deps` / `plugdev_add_dep` / `plugdev_remove_dep` | Test deps |
+| `plugdev_list_configs` / `plugdev_get_config` / `plugdev_set_config` | Live plugin configs |
 | `plugdev_agent_install` / `plugdev_cache_*` / `plugdev_clean` | Setup, cache, clean |
 | `plugdev_run_test_loop` | Build → sync → start → OP |
 

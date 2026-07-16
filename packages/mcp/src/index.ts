@@ -5,7 +5,7 @@ import { z } from "zod";
 import { parsePlugdevJson, type JsonResult } from "./json.js";
 import { resolvePlugdevInvocation } from "./resolve-cli.js";
 
-const MCP_VERSION = "0.3.1";
+const MCP_VERSION = "0.3.2";
 const projectRoot = process.env.PLUGDEV_PROJECT_ROOT ?? process.cwd();
 
 async function plugdev(args: string[]): Promise<JsonResult> {
@@ -306,6 +306,49 @@ server.tool(
   },
   async ({ name }) => {
     const result = await plugdev(["deps", "remove", name]);
+    if (!result.ok) return { ...textResult(result), isError: true };
+    return textResult(result.data ?? result);
+  },
+);
+
+server.tool(
+  "plugdev_list_configs",
+  "List live plugin config files under .plugdev/run/plugins/<PluginName>/ and watch status",
+  {},
+  async () => {
+    const result = await plugdev(["config", "list"]);
+    if (!result.data && !result.ok) return { ...textResult(result), isError: true };
+    return textResult(result.data ?? result);
+  },
+);
+
+server.tool(
+  "plugdev_get_config",
+  "Read a live plugin config file or a dotted YAML key (default file: config.yml)",
+  {
+    path: z.string().optional().describe("Relative path under the plugin data folder"),
+    key: z.string().optional().describe("Dotted YAML key e.g. nested.flag"),
+  },
+  async ({ path, key }) => {
+    const args = ["config", "get", path ?? "config.yml"];
+    if (key) args.push("--key", key);
+    const result = await plugdev(args);
+    if (!result.ok) return { ...textResult(result), isError: true };
+    return textResult(result.data ?? result);
+  },
+);
+
+server.tool(
+  "plugdev_set_config",
+  "Set a dotted YAML key in a live plugin config (triggers reload when watched)",
+  {
+    path: z.string().optional().describe("Relative path under the plugin data folder"),
+    key: z.string().describe("Dotted YAML key e.g. nested.flag"),
+    value: z.string().describe("Scalar or JSON value e.g. true, 42, \"text\", {\"a\":1}"),
+  },
+  async ({ path, key, value }) => {
+    const args = ["config", "set", path ?? "config.yml", "--key", key, "--value", value];
+    const result = await plugdev(args);
     if (!result.ok) return { ...textResult(result), isError: true };
     return textResult(result.data ?? result);
   },

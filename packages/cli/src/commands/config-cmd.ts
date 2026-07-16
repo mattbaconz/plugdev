@@ -9,6 +9,12 @@ import {
   resolveLiveConfigFile,
   setLiveConfigWatched,
 } from "../live-config/service.js";
+import {
+  formatConfigValue,
+  getLiveConfigValue,
+  parseConfigValue,
+  setLiveConfigValue,
+} from "../live-config/yaml-values.js";
 
 async function pluginContext(cwd: string) {
   const project = await detectProject(cwd);
@@ -93,6 +99,79 @@ export async function runConfigWatch(
       emitJson({ ok: true, data: { path, watched, configs } });
     } else {
       success(`${watched ? "Watching" : "Stopped watching"} live config: ${path}`);
+    }
+    return 0;
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : String(caught);
+    if (isJsonMode()) emitJson({ ok: false, error: message });
+    else warn(message);
+    return 1;
+  }
+}
+
+export async function runConfigGet(
+  cwd: string,
+  path = "config.yml",
+  key?: string,
+): Promise<number> {
+  try {
+    const { project } = await pluginContext(cwd);
+    const resolved = await resolveLiveConfigFile(cwd, project.pluginName!, path);
+    const result = await getLiveConfigValue(resolved, key);
+    if (isJsonMode()) {
+      emitJson({
+        ok: true,
+        data: {
+          path,
+          absolutePath: resolved,
+          ...(result.key ? { key: result.key } : {}),
+          value: result.value,
+          ...(result.key ? {} : { document: result.document }),
+        },
+      });
+      return 0;
+    }
+    if (result.key) {
+      if (result.value === undefined) {
+        warn(`Key not found: ${result.key}`);
+        return 1;
+      }
+      info(formatConfigValue(result.value));
+      return 0;
+    }
+    info(formatConfigValue(result.document));
+    return 0;
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : String(caught);
+    if (isJsonMode()) emitJson({ ok: false, error: message });
+    else warn(message);
+    return 1;
+  }
+}
+
+export async function runConfigSet(
+  cwd: string,
+  path: string,
+  key: string,
+  rawValue: string,
+): Promise<number> {
+  try {
+    const { project } = await pluginContext(cwd);
+    const resolved = await resolveLiveConfigFile(cwd, project.pluginName!, path);
+    const value = parseConfigValue(rawValue);
+    const result = await setLiveConfigValue(resolved, key, value);
+    if (isJsonMode()) {
+      emitJson({
+        ok: true,
+        data: {
+          path,
+          absolutePath: resolved,
+          key: result.key,
+          value: result.value,
+        },
+      });
+    } else {
+      success(`Set ${result.key} in live config: ${path}`);
     }
     return 0;
   } catch (caught) {

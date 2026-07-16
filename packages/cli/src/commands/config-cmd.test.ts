@@ -1,9 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { runConfigList, runConfigOpen, runConfigWatch } from "./config-cmd.js";
+import {
+  runConfigGet,
+  runConfigList,
+  runConfigOpen,
+  runConfigSet,
+  runConfigWatch,
+} from "./config-cmd.js";
 import { readPlugdevYml } from "../deps/config-write.js";
 import { setJsonMode } from "../util/output.js";
 
@@ -83,6 +89,34 @@ test("runConfigWatch toggles the persisted allowlist", async () => {
       "lang/en_US.yml",
     ]);
   } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("runConfigGet and runConfigSet read and write dotted keys", async () => {
+  const cwd = await fixture();
+  const lines: string[] = [];
+  const original = console.log;
+  console.log = (...args: unknown[]) => lines.push(args.map(String).join(" "));
+  setJsonMode(true);
+  try {
+    assert.equal(await runConfigSet(cwd, "config.yml", "secret", "updated"), 0);
+    assert.equal(await runConfigSet(cwd, "config.yml", "nested.flag", "true"), 0);
+    lines.length = 0;
+    assert.equal(await runConfigGet(cwd, "config.yml", "secret"), 0);
+    assert.match(lines.join("\n"), /"value":\s*"updated"/);
+    lines.length = 0;
+    assert.equal(await runConfigGet(cwd, "config.yml", "nested.flag"), 0);
+    assert.match(lines.join("\n"), /"value":\s*true/);
+    const text = await readFile(
+      join(cwd, ".plugdev", "run", "plugins", "ConfigCommand", "config.yml"),
+      "utf8",
+    );
+    assert.match(text, /secret: updated/);
+    assert.match(text, /flag: true/);
+  } finally {
+    setJsonMode(false);
+    console.log = original;
     await rm(cwd, { recursive: true, force: true });
   }
 });

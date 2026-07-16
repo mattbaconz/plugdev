@@ -17,6 +17,6 @@ plug run         # one-shot loop
 - Safe reload on save; optional `--hotswap`
 - Client join (embedded or Prism)
 - TUI: configure, module pick, deps, live config files
-- `plugdev config list|open|watch|unwatch` for generated plugin configs
+- `plugdev config list|open|get|set|watch|unwatch` for generated plugin configs
 
 Docs: [github.com/mattbaconz/plugdev](https://github.com/mattbaconz/plugdev) · [pluglabs.app/plugdev](https://pluglabs.app/plugdev) · [Discord](https://discord.gg/C4X3rThtAM)

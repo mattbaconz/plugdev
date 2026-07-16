@@ -1,6 +1,6 @@
 {
   "name": "@plugdev/mcp",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "MCP server for headless PlugDev build, server, command, and log control",
   "author": "PLUG Labs",
   "homepage": "https://github.com/mattbaconz/plugdev#readme",
