@@ -316,6 +316,12 @@ export async function writeReloadTrigger(
   jarPaths: string[],
 ): Promise<void> {
   await writeReloadList(cwd, jarPaths);
+  await bumpReloadTrigger(cwd);
+}
+
+/** Bump the watch trigger while preserving the existing reload.list. */
+export async function bumpReloadTrigger(cwd: string): Promise<void> {
   const runDir = projectRunDir(cwd);
+  await mkdir(runDir, { recursive: true });
   await writeFile(join(runDir, ".reload-trigger"), String(Date.now()));
 }

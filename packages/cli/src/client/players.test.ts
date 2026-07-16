@@ -10,7 +10,7 @@ function baseConfig(client?: ResolvedConfig["client"]): ResolvedConfig {
     version: "1.20.6",
     port: 25565,
     build: { system: "gradle", task: "build", jarTask: "shadowJar" },
-    watch: { paths: ["src/"], debounceMs: 300, reloadJava: "safe" },
+    watch: { paths: ["src/"], configs: ["config.yml"], debounceMs: 300, reloadJava: "safe" },
     jvm: { memory: "1G", debugPort: 5005 },
     run: { cleanup: "never" },
     dev: undefined,

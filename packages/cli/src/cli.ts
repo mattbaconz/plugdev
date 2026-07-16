@@ -32,6 +32,11 @@ import { runClean } from "./cache/run-cleanup.js";
 import { runAgentInstall } from "./commands/agent.js";
 import { runModuleList, runModuleUse } from "./commands/module-cmd.js";
 import {
+  runConfigList,
+  runConfigOpen,
+  runConfigWatch,
+} from "./commands/config-cmd.js";
+import {
   runTui,
   handoffRun,
   isInteractiveTty,
@@ -248,6 +253,36 @@ program
   .option("--port <n>", "server port", (v: string) => Number(v))
   .action(async (opts: { client?: boolean; embedded?: boolean; name?: string; port?: number }) => {
     process.exit(await runOpen(process.cwd(), opts));
+  });
+
+const configCmd = program.command("config").description("Edit live plugin config files");
+
+configCmd
+  .command("list")
+  .description("List live plugin config files and watched status")
+  .action(async () => {
+    process.exit(await runConfigList(process.cwd()));
+  });
+
+configCmd
+  .command("open [path]")
+  .description("Open a live plugin config (default: config.yml)")
+  .action(async (path?: string) => {
+    process.exit(await runConfigOpen(process.cwd(), path ?? "config.yml"));
+  });
+
+configCmd
+  .command("watch <path>")
+  .description("Reload the plugin when this live config is saved")
+  .action(async (path: string) => {
+    process.exit(await runConfigWatch(process.cwd(), path, true));
+  });
+
+configCmd
+  .command("unwatch <path>")
+  .description("Stop reloading for this live config")
+  .action(async (path: string) => {
+    process.exit(await runConfigWatch(process.cwd(), path, false));
   });
 
 const clientCmd = program.command("client").description("Minecraft client setup");

@@ -97,6 +97,9 @@ ${depsBlock}
 watch:
   paths:
 ${watchBlock}
+  # Live files under .plugdev/run/plugins/<PluginName>/ that reload on save.
+  configs:
+    - config.yml
   debounceMs: 300
   reload:
     java: ${opts.reloadJava}

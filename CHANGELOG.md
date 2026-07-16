@@ -6,6 +6,19 @@ Release entries use `[added]`, `[changed]`, `[fixed]`, and `[removed]` in that o
 
 _No changes yet._
 
+## 0.12.7 — 2026-07-16
+
+### [added]
+- Live plugin config workspace in the TUI and `plugdev config list|open|watch|unwatch`
+- Project-wide `watch.configs` allowlist, defaulting to the live `config.yml`
+- Config-only saves trigger targeted plugin reloads without rebuilding or redeploying the JAR
+
+### [changed]
+- Reload confirmation now ignores stale matching lines from earlier reloads
+
+### [fixed]
+- Config writes performed by plugins during code reloads are suppressed so they cannot cause reload loops
+
 ## 0.12.6 — 2026-07-15
 
 ### [fixed]

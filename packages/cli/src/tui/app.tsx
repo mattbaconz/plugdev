@@ -12,8 +12,9 @@ import { ConfigureScreen } from "./screens/Configure.js";
 import { InstancePickerScreen } from "./screens/InstancePicker.js";
 import { ModulePickerScreen } from "./screens/ModulePicker.js";
 import { DepsScreen } from "./screens/Deps.js";
+import { ConfigsScreen } from "./screens/Configs.js";
 
-type Screen = "home" | "configure" | "instances" | "modules" | "deps";
+type Screen = "home" | "configure" | "instances" | "modules" | "deps" | "configs";
 
 export function App(props: {
   cwd: string;
@@ -28,6 +29,7 @@ export function App(props: {
   const [config, setConfig] = useState<ResolvedConfig | null>(null);
   const [raw, setRaw] = useState<PlugDevConfig>({});
   const [showModule, setShowModule] = useState(false);
+  const [showConfigs, setShowConfigs] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
   const reload = useCallback(async () => {
@@ -38,6 +40,7 @@ export function App(props: {
       setConfig(resolved);
       setRaw(yml?.raw ?? {});
       setShowModule((project.modules?.length ?? 0) > 1);
+      setShowConfigs(project.type === "plugin" && Boolean(project.pluginName));
       setProjectName(
         project.pluginName ??
           project.loader ??
@@ -90,6 +93,11 @@ export function App(props: {
     }
     if (action === "deps") {
       setScreen("deps");
+      setStatus(undefined);
+      return;
+    }
+    if (action === "configs") {
+      setScreen("configs");
       setStatus(undefined);
       return;
     }
@@ -194,6 +202,20 @@ export function App(props: {
     );
   }
 
+  if (screen === "configs") {
+    return (
+      <ConfigsScreen
+        cwd={props.cwd}
+        pluginName={projectName}
+        onBack={() => {
+          setScreen("home");
+          void reload();
+        }}
+        onChanged={(message) => setStatus(message)}
+      />
+    );
+  }
+
   if (screen === "configure") {
     return (
       <ConfigureScreen
@@ -226,6 +248,7 @@ export function App(props: {
       offlineName={offlineName}
       secondPlayer={secondPlayer}
       showModule={showModule}
+      showConfigs={showConfigs}
       status={busy ? "Working…" : status}
       onAction={(a) => {
         void handleHome(a);

@@ -10,12 +10,13 @@ import { join } from "node:path";
 import { info, success, warn, error } from "../util/log.js";
 import { formatError, formatErrorJson } from "../util/errors.js";
 import { isJsonMode, emitJson } from "../util/output.js";
-import { confirmReload } from "../util/reload-feedback.js";
+import { captureReloadLogOffset, confirmReload } from "../util/reload-feedback.js";
 import { attemptHotswap } from "../hotswap/redefine.js";
 import { execa } from "execa";
 
 export interface PluginWatcherCallbacks {
   onSafeReload: (jarPath: string) => Promise<void>;
+  onReloadSettled?: () => Promise<void>;
   onRestart: () => Promise<void>;
 }
 
@@ -109,9 +110,14 @@ export function startPluginWatcher(
 
       const pluginsDir = join(projectRunDir(cwd), "plugins");
       const dest = await deployPluginJar(build.jarPath, pluginsDir, pluginName, true);
+      const reloadOffset = await captureReloadLogOffset(cwd);
       await writeReloadTrigger(cwd, [dest]);
       await callbacks.onSafeReload(dest);
-      await confirmReload(cwd);
+      try {
+        await confirmReload(cwd, 10_000, reloadOffset);
+      } finally {
+        await callbacks.onReloadSettled?.();
+      }
     } catch (e) {
       if (isJsonMode()) {
         emitJson(formatErrorJson(e, debug));

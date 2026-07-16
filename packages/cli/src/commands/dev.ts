@@ -16,6 +16,7 @@ import {
   prepareRunDirectory,
   copyPaperToRun,
   writeReloadList,
+  bumpReloadTrigger,
   resolveWorldType,
 } from "../cache/run-template.js";
 import { applyExitCleanup, applyStartWorldCleanup } from "../cache/run-cleanup.js";
@@ -32,6 +33,10 @@ import { attachInteractiveConsole, type InteractiveConsole } from "../process/in
 import { installDeps } from "../deps/hangar.js";
 import { installPlugTraceJar, writePlugDevIdentity } from "../deps/plugtrace.js";
 import { startPluginWatcher, startModWatchOrchestrator, startDiscordBotWatcher } from "../watch/watcher.js";
+import {
+  startLiveConfigWatcher,
+  type LiveConfigWatcherHandle,
+} from "../live-config/watcher.js";
 import { JOIN_HOST } from "../client/launch.js";
 import { launchPlayers } from "../client/players.js";
 import { banner, phase, info, warn, error as logError, resetPhases } from "../util/log.js";
@@ -45,6 +50,10 @@ import {
 import { isPortAvailable } from "../util/port.js";
 import { getLogMode, isJsonMode, emitJson } from "../util/output.js";
 import { resolveBootstrapJar } from "../util/bootstrap.js";
+import {
+  captureReloadLogOffset,
+  confirmReload,
+} from "../util/reload-feedback.js";
 import {
   writeSession,
   clearSession,
@@ -360,6 +369,7 @@ async function runPluginDev(
   let currentProc: ChildProcess | undefined;
   let currentDetachLogs: (() => void) | undefined;
   let closeWatcher: (() => void) | undefined;
+  let configWatcher: LiveConfigWatcherHandle | undefined;
   let consoleHandle: InteractiveConsole | undefined;
 
   const bootServer = async (first = false): Promise<ChildProcess> => {
@@ -499,6 +509,20 @@ async function runPluginDev(
 
     if (watchEnabled(overrides)) {
       phase("Watch src/ for changes");
+      configWatcher = await startLiveConfigWatcher({
+        cwd,
+        pluginName: project.pluginName!,
+        reloadMode: config.watch.reloadJava,
+        debounceMs: config.watch.debounceMs,
+        onSafeReload: async () => {
+          const offset = await captureReloadLogOffset(cwd);
+          await bumpReloadTrigger(cwd);
+          await confirmReload(cwd, 10_000, offset);
+        },
+        onRestart: async () => {
+          await bootServer(false);
+        },
+      });
       closeWatcher = startPluginWatcher(
         cwd,
         config,
@@ -506,10 +530,18 @@ async function runPluginDev(
         project.pluginName,
         {
           onSafeReload: async () => {
-            // bootstrap ReloadWatcher handles trigger file
+            configWatcher?.pause();
+          },
+          onReloadSettled: async () => {
+            await configWatcher?.resume();
           },
           onRestart: async () => {
-            await bootServer(false);
+            configWatcher?.pause();
+            try {
+              await bootServer(false);
+            } finally {
+              await configWatcher?.resume();
+            }
           },
         },
         debug,
@@ -522,6 +554,7 @@ async function runPluginDev(
       currentProc?.on("exit", () => resolve());
     });
     closeWatcher?.();
+    await configWatcher?.close();
     consoleHandle?.close();
     currentDetachLogs?.();
     await clearSession(cwd);
@@ -529,6 +562,7 @@ async function runPluginDev(
     return 0;
   } catch (e) {
     closeWatcher?.();
+    await configWatcher?.close();
     consoleHandle?.close();
     currentDetachLogs?.();
     if (currentProc) await stopPaperServer(currentProc);

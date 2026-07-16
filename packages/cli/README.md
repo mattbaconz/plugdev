@@ -3,7 +3,7 @@
 **`plugdev` opens a TUI; `plug run` starts the test loop.**
 
 ```powershell
-npm install -g @plugdev/cli@0.12.6
+npm install -g @plugdev/cli@0.12.7
 cd your-plugin
 plugdev init --setup
 plugdev          # TUI: configure + run
@@ -16,6 +16,7 @@ plug run         # one-shot loop
 - Paper-family server + deps cache in `~/.plugdev/`
 - Safe reload on save; optional `--hotswap`
 - Client join (embedded or Prism)
-- TUI: configure, module pick, deps
+- TUI: configure, module pick, deps, live config files
+- `plugdev config list|open|watch|unwatch` for generated plugin configs
 
 Docs: [github.com/mattbaconz/plugdev](https://github.com/mattbaconz/plugdev) · [pluglabs.app/plugdev](https://pluglabs.app/plugdev) · [Discord](https://discord.gg/C4X3rThtAM)

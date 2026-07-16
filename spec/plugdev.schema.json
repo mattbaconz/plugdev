@@ -43,6 +43,12 @@
           "items": { "type": "string" },
           "default": ["src/"]
         },
+        "configs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "default": ["config.yml"],
+          "description": "Live plugin-data files that trigger reload, relative to plugins/<PluginName>/."
+        },
         "debounceMs": { "type": "integer", "minimum": 100, "default": 500 },
         "reload": {
           "type": "object",

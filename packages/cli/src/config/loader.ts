@@ -52,6 +52,8 @@ export interface PlugDevConfig {
   };
   watch?: {
     paths?: string[];
+    /** Live plugin-data files that trigger reload, relative to plugins/<name>/. */
+    configs?: string[];
     debounceMs?: number;
     reload?: {
       java?: string;
@@ -115,6 +117,7 @@ export interface ResolvedConfig {
   };
   watch: {
     paths: string[];
+    configs: string[];
     debounceMs: number;
     reloadJava: "safe" | "restart" | "hotswap";
   };
@@ -332,6 +335,7 @@ export async function loadConfig(
     },
     watch: {
       paths: defaultWatchPaths,
+      configs: raw.watch?.configs ?? ["config.yml"],
       debounceMs: raw.watch?.debounceMs ?? (type === "discord-bot" ? 400 : 300),
       reloadJava: resolveReloadJava(raw, overrides),
     },
