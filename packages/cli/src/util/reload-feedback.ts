@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { projectRunDir } from "../paths.js";
 import { phase, success } from "./log.js";
@@ -17,20 +17,34 @@ function logMatchesReload(text: string): boolean {
   return RELOAD_PATTERNS.some((p) => p.test(text));
 }
 
-export async function confirmReload(cwd: string, timeoutMs = 10_000): Promise<boolean> {
+export async function captureReloadLogOffset(cwd: string): Promise<number> {
+  const logPath = join(projectRunDir(cwd), "logs", "latest.log");
+  try {
+    return (await stat(logPath)).size;
+  } catch {
+    return 0;
+  }
+}
+
+export async function confirmReload(
+  cwd: string,
+  timeoutMs = 10_000,
+  fromOffset = 0,
+): Promise<boolean> {
   const logPath = join(projectRunDir(cwd), "logs", "latest.log");
   if (!isJsonMode()) phase("Reloading plugin…", "active");
 
   const start = Date.now();
-  let lastSize = 0;
+  let lastSize = fromOffset;
 
   while (Date.now() - start < timeoutMs) {
     try {
       const content = await readFile(logPath, "utf8");
+      if (content.length < lastSize) lastSize = 0;
       if (content.length > lastSize) {
+        const appended = content.slice(lastSize);
         lastSize = content.length;
-        const tail = content.slice(-4000);
-        if (logMatchesReload(tail)) {
+        if (logMatchesReload(appended)) {
           if (!isJsonMode()) {
             phase("Reload complete");
           } else {

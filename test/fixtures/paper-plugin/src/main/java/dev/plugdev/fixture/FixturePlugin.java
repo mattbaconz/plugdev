@@ -8,7 +8,9 @@ public final class FixturePlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        saveDefaultConfig();
         getLogger().info("FixturePlugin enabled for PlugDev smoke tests");
+        getLogger().info("Fixture config value: " + getConfig().getString("value", "missing"));
     }
 
     @Override

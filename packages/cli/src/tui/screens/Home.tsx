@@ -9,6 +9,7 @@ export type HomeAction =
   | "configure"
   | "module"
   | "deps"
+  | "configs"
   | "open"
   | "open-second"
   | "setup"
@@ -25,6 +26,7 @@ export function HomeScreen(props: {
   offlineName: string;
   secondPlayer: string;
   showModule?: boolean;
+  showConfigs?: boolean;
   status?: string;
   onAction: (action: HomeAction) => void;
 }): React.ReactElement {
@@ -46,6 +48,14 @@ export function HomeScreen(props: {
       id: "module",
       label: "Module",
       hint: "pick build module",
+    });
+  }
+
+  if (props.showConfigs) {
+    items.push({
+      id: "configs",
+      label: "Config files",
+      hint: "live edit · reload on save",
     });
   }
 

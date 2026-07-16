@@ -1,6 +1,6 @@
 {
   "name": "@plugdev/cli",
-  "version": "0.12.6",
+  "version": "0.12.7",
   "description": "Test Minecraft plugins in one command — plug / plugdev CLI (Paper, Folia, Purpur, Pufferfish, Spigot)",
   "author": "PLUG Labs",
   "homepage": "https://pluglabs.app/plugdev",
@@ -42,6 +42,7 @@
     "start": "node dist/cli.js",
     "test": "node ../../scripts/run-tests.mjs",
     "smoke:reload": "node scripts/smoke-reload.mjs",
+    "smoke:config": "node scripts/smoke-live-config.mjs",
     "prepublishOnly": "cd ../.. && npm run build"
   },
   "dependencies": {

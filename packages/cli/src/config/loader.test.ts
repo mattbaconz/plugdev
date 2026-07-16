@@ -2,6 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadConfig } from "./loader.js";
 import type { DetectedProject } from "../detect/project.js";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { detectProject } from "../detect/project.js";
 
 const baseProject: DetectedProject = {
   type: "plugin",
@@ -51,6 +55,25 @@ test("loadConfig filters disabled deps", async () => {
 test("loadConfig defaults run.cleanup to never", async () => {
   const config = await loadConfig("/tmp", baseProject, {});
   assert.equal(config.run.cleanup, "never");
+});
+
+test("loadConfig defaults watched live configs and preserves explicit empty list", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "plugdev-config-files-"));
+  try {
+    await writeFile(join(dir, "plugdev.yml"), "type: plugin\nversion: 1.21.4\n");
+    const project = await detectProject(dir);
+    let config = await loadConfig(dir, project);
+    assert.deepEqual(config.watch.configs, ["config.yml"]);
+
+    await writeFile(
+      join(dir, "plugdev.yml"),
+      "type: plugin\nversion: 1.21.4\nwatch:\n  configs: []\n",
+    );
+    config = await loadConfig(dir, project);
+    assert.deepEqual(config.watch.configs, []);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("loadConfig reads run.cleanup on-exit", async () => {

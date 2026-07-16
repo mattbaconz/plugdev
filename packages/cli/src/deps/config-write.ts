@@ -142,6 +142,14 @@ export async function writeModuleToYml(
   return updatePlugdevYml(cwd, patch);
 }
 
+/** Replace the project-wide allowlist of live plugin config files. */
+export async function writeWatchedConfigsToYml(
+  cwd: string,
+  configs: string[],
+): Promise<{ ok: true; path: string } | { ok: false; reason: string }> {
+  return updatePlugdevYml(cwd, { watch: { configs } });
+}
+
 /** Remove a dep from plugdev.yml by name/slug (does not delete JARs). */
 export async function removeDepFromYml(cwd: string, name: string): Promise<boolean> {
   const loaded = await readPlugdevYml(cwd);
