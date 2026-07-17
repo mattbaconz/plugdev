@@ -1,12 +1,13 @@
 import { createHash } from "node:crypto";
 import { createWriteStream } from "node:fs";
-import { mkdir, readFile, writeFile, access } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile, access } from "node:fs/promises";
 import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { FILL_API_BASE, USER_AGENT } from "../constants.js";
 import { velocityCacheDir } from "../paths.js";
 import { Errors } from "../util/errors.js";
+import { fetchWithRetry, formatNetworkError } from "../util/fetch-retry.js";
 import type { PaperBuild } from "./fill.js";
 
 interface FillDownload {
@@ -24,7 +25,7 @@ interface FillBuild {
 const DEFAULT_VELOCITY_VERSION = "3.4.0";
 
 async function fillFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${FILL_API_BASE}${path}`, {
+  const res = await fetchWithRetry(`${FILL_API_BASE}${path}`, {
     headers: { "User-Agent": USER_AGENT },
   });
   if (!res.ok) {
@@ -79,21 +80,26 @@ export async function ensureVelocityJar(
     // download
   }
 
-  const res = await fetch(download.url, {
+  const res = await fetchWithRetry(download.url, {
     headers: { "User-Agent": USER_AGENT },
-    redirect: "follow",
   });
   if (!res.ok || !res.body) {
     throw Errors.downloadFailed(`Velocity download failed: HTTP ${res.status}`);
   }
 
-  await pipeline(
-    Readable.fromWeb(res.body as import("stream/web").ReadableStream),
-    createWriteStream(jarPath),
-  );
+  try {
+    await pipeline(
+      Readable.fromWeb(res.body as import("stream/web").ReadableStream),
+      createWriteStream(jarPath),
+    );
+  } catch (err) {
+    await unlink(jarPath).catch(() => undefined);
+    throw Errors.downloadFailed(formatNetworkError(err));
+  }
 
   const ok = await verifySha256(jarPath, download.checksums.sha256);
   if (!ok) {
+    await unlink(jarPath).catch(() => undefined);
     throw Errors.downloadFailed("SHA256 mismatch after Velocity download.");
   }
 

@@ -6,6 +6,16 @@ Release entries use `[added]`, `[changed]`, `[fixed]`, and `[removed]` in that o
 
 _No changes yet._
 
+## 0.12.10 — 2026-07-17
+
+### [added]
+- In-run live config from the same terminal as `plug run`: `.config open`, `.config list`, `.config get`, `.config set`, `.config editor`
+
+### [fixed]
+- Paper/Velocity Fill downloads retry on transient network errors (`ECONNRESET`, timeouts) and surface a clear PlugDev download error instead of crashing with `TypeError: fetch failed`
+- Parallel server+client prefetch no longer leaves an unhandled rejection when one side fails first
+- `plug run` now awaits the plugin/mod/discord loop so download and boot failures are handled by the normal error path
+
 ## 0.12.9 — 2026-07-17
 
 ### [added]

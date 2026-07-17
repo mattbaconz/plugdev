@@ -30,6 +30,7 @@ import {
 } from "../process/spawner.js";
 import { printServerConsoleSeparator } from "../process/server-log-stream.js";
 import { attachInteractiveConsole, type InteractiveConsole } from "../process/interactive-console.js";
+import { awaitWithSettledSibling } from "../util/fetch-retry.js";
 import { installDeps } from "../deps/hangar.js";
 import { installPlugTraceJar, writePlugDevIdentity } from "../deps/plugtrace.js";
 import { startPluginWatcher, startModWatchOrchestrator, startDiscordBotWatcher } from "../watch/watcher.js";
@@ -125,11 +126,11 @@ export async function runDev(
     if (!isJsonMode()) banner(CLI_VERSION);
 
     if (config.type === "discord-bot" || project.type === "discord-bot") {
-      return runDiscordBotDev(cwd, config, overrides, debug);
+      return await runDiscordBotDev(cwd, config, overrides, debug);
     }
 
     if (config.type === "mod" || project.type === "mod") {
-      return runModDev(cwd, config, project, overrides, debug);
+      return await runModDev(cwd, config, project, overrides, debug);
     }
 
     if (project.buildSystem === "none" && project.type !== "mod") {
@@ -152,12 +153,12 @@ export async function runDev(
     );
 
     if (config.build.system === "maven" || project.buildSystem === "maven") {
-      return runPluginDev(cwd, config, project, overrides, async () =>
+      return await runPluginDev(cwd, config, project, overrides, async () =>
         runMavenBuild(cwd, config, project.pluginName),
       );
     }
 
-    return runPluginDev(cwd, config, project, overrides, async () =>
+    return await runPluginDev(cwd, config, project, overrides, async () =>
       runGradleBuild(cwd, config, project),
     );
   } catch (e) {
@@ -310,28 +311,25 @@ async function runPluginDev(
     if (needsParallelPrefetch && prefetchClient && !serverCached && !clientReady) {
       phase(`Resolve ${serverLabel} ${config.version}`, "active");
       phase("Ensuring Minecraft client…", "active");
-      const [jar] = await Promise.all([
+      serverJarInfo = await awaitWithSettledSibling(
         ensureServerJar(config.version, serverProject, {
           onProgress: (percent, label) => onDownloadProgress(percent, label),
         }),
         ensureEmbeddedClient(config.version),
-      ]);
-      serverJarInfo = jar;
+      );
       phase(`Downloaded ${serverLabel} ${config.version}`);
       phase(`Minecraft client ${config.version} ready`);
     } else {
       phase(`Resolve ${serverLabel} ${config.version}`, "active");
-      const tasks: Promise<unknown>[] = [
-        ensureServerJar(config.version, serverProject, {
-          onProgress: (percent, label) => onDownloadProgress(percent, label),
-        }),
-      ];
+      const serverPromise = ensureServerJar(config.version, serverProject, {
+        onProgress: (percent, label) => onDownloadProgress(percent, label),
+      });
+      let clientPromise: Promise<unknown> | undefined;
       if (prefetchClient && !clientReady) {
         phase("Ensuring Minecraft client…", "active");
-        tasks.push(ensureEmbeddedClient(config.version));
+        clientPromise = ensureEmbeddedClient(config.version);
       }
-      const results = await Promise.all(tasks);
-      serverJarInfo = results[0] as Awaited<ReturnType<typeof ensureServerJar>>;
+      serverJarInfo = await awaitWithSettledSibling(serverPromise, clientPromise);
       phase(
         serverJarInfo.cacheHit
           ? `Cache hit — ${serverLabel} ${config.version}`
@@ -483,6 +481,10 @@ async function runPluginDev(
         host: rconHost,
         port: rconPort,
         password: rconPassword,
+        liveConfig: {
+          cwd,
+          pluginName: project.pluginName,
+        },
       });
     } else {
       consoleHandle.resume();

@@ -167,9 +167,21 @@ plugdev config watch lang/en_US.yml
 plugdev config unwatch config.yml
 ```
 
-While `plug run` is up: save an allowlisted live config → terminal prints **Config applied** and **Plugin reloaded — test it in Minecraft** → switch back to the game and verify.
+While `plug run` is up you can edit live configs in the **same terminal** (no second shell):
 
-The TUI has the same workflow under **Config files**. `Enter` opens with your preferred editor, `e` picks Cursor / VS Code / Notepad / System, and `Space` toggles reload-on-save. `config get` / `config set` change dotted keys without leaving the terminal (agents use the same commands via MCP).
+```text
+.config open
+.config list
+.config get --key value
+.config set value two
+.config set --key feature.enabled --value true
+.config editor cursor
+.config help
+```
+
+Saving an allowlisted live config (from `.config set`, an editor, or a second terminal) prints **Config applied** and **Plugin reloaded — test it in Minecraft** — switch back to the game and verify.
+
+The TUI has the same workflow under **Config files**. `Enter` opens with your preferred editor, `e` picks Cursor / VS Code / Notepad / System, and `Space` toggles reload-on-save. Outside a run session, use `plugdev config get|set|open|…` (agents use the same commands via MCP).
 
 ```yaml
 dev:

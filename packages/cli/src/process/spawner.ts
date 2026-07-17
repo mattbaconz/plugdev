@@ -282,5 +282,6 @@ export function printReadyBanner(
   }
   info(`Join: 127.0.0.1:${port}`);
   info("Tip: first boot remaps plugins (~10–30s); later boots are much faster.");
+  info("Live config: .config open | .config set key value (same terminal)");
   info("Ctrl+C stops the server — closing Minecraft does not.");
 }
