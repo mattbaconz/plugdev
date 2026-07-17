@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="brand/pluglabs-banner.png" alt="PLUG Labs" width="100%" />
-</p>
-
 <div align="center">
 
 <img src="brand/plugdev-logo.png" alt="PlugDev" width="128" />
@@ -21,6 +17,10 @@ Detect your project, boot a real server, deploy the JAR, reload on save, and joi
 [![release](https://img.shields.io/github/v/release/mattbaconz/plugdev?display_name=tag&label=release)](https://github.com/mattbaconz/plugdev/releases)
 [![site](https://img.shields.io/badge/site-pluglabs.app%2Fplugdev-0ea5e9)](https://pluglabs.app/plugdev)
 [![discord](https://img.shields.io/badge/discord-PLUG%20Labs-5865F2)](https://discord.gg/C4X3rThtAM)
+
+<br />
+
+<img src="brand/pluglabs-banner.png" alt="PLUG Labs" width="280" />
 
 </div>
 
