@@ -9,6 +9,7 @@ import {
   normalizeLiveConfigPath,
   resolvePluginDataDir,
   setLiveConfigWatched,
+  windowsStartArgv,
 } from "./service.js";
 import { readPlugdevYml } from "../deps/config-write.js";
 
@@ -110,9 +111,16 @@ test("editorCandidates auto prefers VISUAL, EDITOR, cursor, code, notepad, then 
     "cursor",
     "code",
     "notepad.exe",
-    "explorer.exe",
+    "cmd.exe",
   ]);
   assert.deepEqual(candidates[0]?.args, ["--wait", "C:\\project\\config.yml"]);
+  assert.deepEqual(candidates.at(-1)?.args, [
+    "/d",
+    "/c",
+    "start",
+    '""',
+    "C:\\project\\config.yml",
+  ]);
 });
 
 test("editorCandidates respects an explicit cursor preference", () => {
@@ -123,4 +131,23 @@ test("editorCandidates respects an explicit cursor preference", () => {
     "win32",
   );
   assert.deepEqual(candidates.map((c) => c.command), ["cursor"]);
+});
+
+test("windowsStartArgv wraps GUI editors with cmd start", () => {
+  assert.deepEqual(windowsStartArgv("notepad.exe", ["C:\\a b\\config.yml"]), {
+    command: "cmd.exe",
+    args: ["/d", "/c", "start", '""', "notepad.exe", "C:\\a b\\config.yml"],
+  });
+});
+
+test("editorCandidates notepad preference stays notepad.exe (spawn wraps on win32)", () => {
+  const candidates = editorCandidates(
+    "C:\\project\\config.yml",
+    "notepad",
+    {},
+    "win32",
+  );
+  assert.deepEqual(candidates, [
+    { command: "notepad.exe", args: ["C:\\project\\config.yml"], label: "notepad" },
+  ]);
 });

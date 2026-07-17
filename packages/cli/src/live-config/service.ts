@@ -254,7 +254,14 @@ function systemOpener(
   file: string,
   platform: NodeJS.Platform,
 ): EditorCandidate {
-  if (platform === "win32") return { command: "explorer.exe", args: [file], label: "system" };
+  if (platform === "win32") {
+    // Default file association via `start` (explorer.exe only selects the file).
+    return {
+      command: "cmd.exe",
+      args: ["/d", "/c", "start", '""', file],
+      label: "system",
+    };
+  }
   if (platform === "darwin") return { command: "open", args: [file], label: "system" };
   return { command: "xdg-open", args: [file], label: "system" };
 }
@@ -309,9 +316,32 @@ export function editorCandidates(
   return candidates;
 }
 
-function spawnDetached(command: string, args: string[]): Promise<void> {
+/**
+ * Windows: launch GUI apps via `cmd /c start "" …` so Notepad/Cursor get a visible window.
+ * (`detached` + direct spawn is unreliable for Win11 Notepad.)
+ */
+export function windowsStartArgv(
+  command: string,
+  args: string[],
+): { command: string; args: string[] } {
+  return {
+    command: "cmd.exe",
+    args: ["/d", "/c", "start", '""', command, ...args],
+  };
+}
+
+function spawnDetached(
+  command: string,
+  args: string[],
+  platform: NodeJS.Platform = process.platform,
+): Promise<void> {
+  const launch =
+    platform === "win32" && command.toLowerCase() !== "cmd.exe"
+      ? windowsStartArgv(command, args)
+      : { command, args };
+
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
+    const child = spawn(launch.command, launch.args, {
       detached: true,
       stdio: "ignore",
       windowsHide: true,
@@ -324,8 +354,10 @@ function spawnDetached(command: string, args: string[]): Promise<void> {
       fn();
     };
     child.once("error", (err) => settle(() => reject(err)));
-    child.unref();
-    setImmediate(() => settle(() => resolve()));
+    child.once("spawn", () => {
+      child.unref();
+      settle(() => resolve());
+    });
   });
 }
 
@@ -338,7 +370,7 @@ export async function openExternalEditor(
   const failures: string[] = [];
   for (const candidate of editorCandidates(file, preference, env, platform)) {
     try {
-      await spawnDetached(candidate.command, candidate.args);
+      await spawnDetached(candidate.command, candidate.args, platform);
       return { command: candidate.command, label: candidate.label };
     } catch (error) {
       failures.push(

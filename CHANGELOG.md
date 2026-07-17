@@ -6,6 +6,12 @@ Release entries use `[added]`, `[changed]`, `[fixed]`, and `[removed]` in that o
 
 _No changes yet._
 
+## 0.12.11 — 2026-07-17
+
+### [fixed]
+- Live config open on Windows now launches Notepad/Cursor/VS Code via `cmd /c start` so the editor window actually appears
+- System editor preference opens the file with the default association instead of selecting it in Explorer
+
 ## 0.12.10 — 2026-07-17
 
 ### [added]
