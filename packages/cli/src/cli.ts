@@ -32,6 +32,7 @@ import { runClean } from "./cache/run-cleanup.js";
 import { runAgentInstall } from "./commands/agent.js";
 import { runModuleList, runModuleUse } from "./commands/module-cmd.js";
 import {
+  runConfigEditor,
   runConfigGet,
   runConfigList,
   runConfigOpen,
@@ -269,8 +270,16 @@ configCmd
 configCmd
   .command("open [path]")
   .description("Open a live plugin config (default: config.yml)")
-  .action(async (path?: string) => {
-    process.exit(await runConfigOpen(process.cwd(), path ?? "config.yml"));
+  .option("--editor <name>", "auto | cursor | code | notepad | system")
+  .action(async (path: string | undefined, opts: { editor?: string }) => {
+    process.exit(await runConfigOpen(process.cwd(), path ?? "config.yml", { editor: opts.editor }));
+  });
+
+configCmd
+  .command("editor [name]")
+  .description("Show or set preferred live-config editor (auto|cursor|code|notepad|system)")
+  .action(async (name?: string) => {
+    process.exit(await runConfigEditor(process.cwd(), name));
   });
 
 configCmd

@@ -6,6 +6,16 @@ Release entries use `[added]`, `[changed]`, `[fixed]`, and `[removed]` in that o
 
 _No changes yet._
 
+## 0.12.9 — 2026-07-17
+
+### [added]
+- Choosable live-config editor: Cursor, VS Code, Notepad, or system default (`dev.configEditor`, `plugdev config editor`, `plugdev config open --editor`)
+- TUI Config files: press `e` to pick an editor and remember it
+- Clear terminal feedback after a live config save: `Config applied` plus `Plugin reloaded — test it in Minecraft`
+
+### [changed]
+- Live config editors spawn detached so Notepad/Cursor/VS Code no longer block the TUI
+
 ## 0.12.8 — 2026-07-16
 
 ### [added]

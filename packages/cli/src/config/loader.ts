@@ -49,6 +49,8 @@ export interface PlugDevConfig {
     op?: boolean;
     peaceful?: boolean;
     onlineMode?: boolean;
+    /** Preferred editor for live config open (default auto). */
+    configEditor?: "auto" | "cursor" | "code" | "notepad" | "system";
   };
   watch?: {
     paths?: string[];

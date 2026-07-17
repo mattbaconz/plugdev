@@ -51,7 +51,7 @@ When the user asks to test, run, or set up a Minecraft plugin project — or whe
 | Cold run folder | `plug clean --all` |
 | Multi-module pick | `plugdev module list|use` |
 | Test deps | `plugdev deps add|remove|list` |
-| Live plugin configs | `plugdev config list|get|set|open|watch|unwatch` |
+| Live plugin configs | `plugdev config list|get|set|open|editor|watch|unwatch` |
 | Headless (agents) | `plugdev server start|stop|status|command|logs` |
 | Scripting | add `--json` |
 
@@ -94,7 +94,7 @@ Install MCP alone: `npx -y @plugdev/mcp` (stdio).
 | Cache | `~/.plugdev/` |
 | Modules | `plugdev module list|use` (multi-module Maven/Gradle) |
 | Deps | `plugdev deps add|remove|list` (+ TUI Dependencies) |
-| Live configs | `plugdev config list|get|set|open|watch|unwatch` |
+| Live configs | `plugdev config list|get|set|open|editor|watch|unwatch` |
 | Reload | Safe JAR reload (not `/reload`); optional `--hotswap` for method bodies |
 | Folia | Prefer full restart over safe reload |
 | Headless | `plugdev server start|stop|status|command|logs` + `--json` |

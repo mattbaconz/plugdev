@@ -31,7 +31,13 @@
           "description": "When true (default), PlugDev bootstrap auto-OPs every player on join."
         },
         "peaceful": { "type": "boolean", "default": true },
-        "onlineMode": { "type": "boolean", "default": false }
+        "onlineMode": { "type": "boolean", "default": false },
+        "configEditor": {
+          "type": "string",
+          "enum": ["auto", "cursor", "code", "notepad", "system"],
+          "default": "auto",
+          "description": "Preferred editor for plugdev config open / TUI Config files (auto tries VISUAL, EDITOR, cursor, code, notepad, system)."
+        }
       },
       "additionalProperties": false
     },

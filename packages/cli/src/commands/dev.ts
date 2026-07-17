@@ -39,7 +39,7 @@ import {
 } from "../live-config/watcher.js";
 import { JOIN_HOST } from "../client/launch.js";
 import { launchPlayers } from "../client/players.js";
-import { banner, phase, info, warn, error as logError, resetPhases } from "../util/log.js";
+import { banner, phase, info, warn, success, error as logError, resetPhases } from "../util/log.js";
 import { createDownloadProgress, endDownloadProgress } from "../util/progress.js";
 import { CLI_VERSION } from "../constants.js";
 import { Errors, formatError, formatErrorJson, getExitCode, PlugDevError } from "../util/errors.js";
@@ -514,10 +514,20 @@ async function runPluginDev(
         pluginName: project.pluginName!,
         reloadMode: config.watch.reloadJava,
         debounceMs: config.watch.debounceMs,
-        onSafeReload: async () => {
+        onSafeReload: async (changedPath) => {
           const offset = await captureReloadLogOffset(cwd);
           await bumpReloadTrigger(cwd);
-          await confirmReload(cwd, 10_000, offset);
+          const ok = await confirmReload(cwd, 10_000, offset, { silentSuccess: true });
+          if (!isJsonMode()) {
+            if (ok) {
+              success(`Config applied: ${changedPath}`);
+              success("Plugin reloaded — test it in Minecraft");
+            } else {
+              warn(
+                `Config changed (${changedPath}) but reload was not confirmed — check server logs`,
+              );
+            }
+          }
         },
         onRestart: async () => {
           await bootServer(false);

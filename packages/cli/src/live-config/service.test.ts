@@ -97,17 +97,30 @@ test("setLiveConfigWatched persists an idempotent explicit allowlist", async () 
   }
 });
 
-test("editorCandidates honors VISUAL, EDITOR, VS Code, then platform opener", () => {
+test("editorCandidates auto prefers VISUAL, EDITOR, cursor, code, notepad, then system", () => {
   const candidates = editorCandidates(
     "C:\\project\\config.yml",
-    { VISUAL: "zed --wait", EDITOR: "notepad" },
+    "auto",
+    { VISUAL: "zed --wait", EDITOR: "nano" },
     "win32",
   );
   assert.deepEqual(candidates.map((candidate) => candidate.command), [
     "zed",
-    "notepad",
+    "nano",
+    "cursor",
     "code",
+    "notepad.exe",
     "explorer.exe",
   ]);
   assert.deepEqual(candidates[0]?.args, ["--wait", "C:\\project\\config.yml"]);
+});
+
+test("editorCandidates respects an explicit cursor preference", () => {
+  const candidates = editorCandidates(
+    "C:\\project\\config.yml",
+    "cursor",
+    {},
+    "win32",
+  );
+  assert.deepEqual(candidates.map((c) => c.command), ["cursor"]);
 });

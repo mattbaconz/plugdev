@@ -83,9 +83,12 @@ export function createLiveConfigChangeHandler(
 
     reloading = true;
     try {
-      info(`[config] ${relativePath}`);
-      if (options.reloadMode === "restart") await options.onRestart();
-      else await options.onSafeReload(relativePath);
+      if (options.reloadMode === "restart") {
+        info(`Config changed: ${relativePath} — restarting server…`);
+        await options.onRestart();
+      } else {
+        await options.onSafeReload(relativePath);
+      }
     } catch (caught) {
       options.onError?.(caught);
     } finally {

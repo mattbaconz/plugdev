@@ -5,11 +5,12 @@ import {
   stat,
 } from "node:fs/promises";
 import { constants } from "node:fs";
+import { spawn } from "node:child_process";
 import { isAbsolute, join, relative, sep } from "node:path";
-import { execa } from "execa";
 import { projectRunDir } from "../paths.js";
 import {
   readPlugdevYml,
+  writeConfigEditorToYml,
   writeWatchedConfigsToYml,
 } from "../deps/config-write.js";
 
@@ -21,6 +22,9 @@ const EDITABLE_EXTENSIONS = new Set([
   ".properties",
   ".conf",
 ]);
+
+export const CONFIG_EDITORS = ["auto", "cursor", "code", "notepad", "system"] as const;
+export type ConfigEditor = (typeof CONFIG_EDITORS)[number];
 
 export interface LiveConfigFile {
   path: string;
@@ -36,6 +40,7 @@ export interface LiveConfigListing {
 export interface EditorCandidate {
   command: string;
   args: string[];
+  label: string;
 }
 
 function extension(path: string): string {
@@ -65,6 +70,16 @@ export function normalizeLiveConfigPath(input: string): string {
     throw new Error("Config path must stay inside the plugin data folder");
   }
   return parts.join("/");
+}
+
+export function normalizeConfigEditor(value: string): ConfigEditor {
+  const trimmed = value.trim().toLowerCase();
+  if ((CONFIG_EDITORS as readonly string[]).includes(trimmed)) {
+    return trimmed as ConfigEditor;
+  }
+  throw new Error(
+    `Unknown config editor: ${value} (use ${CONFIG_EDITORS.join("|")})`,
+  );
 }
 
 function pathIsInside(root: string, target: string): boolean {
@@ -207,6 +222,26 @@ export async function setLiveConfigWatched(
   return next;
 }
 
+export async function readConfigEditor(cwd: string): Promise<ConfigEditor> {
+  const value = (await readPlugdevYml(cwd))?.raw?.dev?.configEditor;
+  if (!value) return "auto";
+  try {
+    return normalizeConfigEditor(value);
+  } catch {
+    return "auto";
+  }
+}
+
+export async function setConfigEditor(
+  cwd: string,
+  editor: ConfigEditor,
+): Promise<ConfigEditor> {
+  const normalized = normalizeConfigEditor(editor);
+  const result = await writeConfigEditorToYml(cwd, normalized);
+  if (!result.ok) throw new Error(result.reason);
+  return normalized;
+}
+
 function splitEditorCommand(value: string): { command: string; args: string[] } | undefined {
   const parts = value.match(/(?:[^\s"]+|"[^"]*")+/g)?.map((part) =>
     part.startsWith('"') && part.endsWith('"') ? part.slice(1, -1) : part,
@@ -215,33 +250,111 @@ function splitEditorCommand(value: string): { command: string; args: string[] } 
   return { command: parts[0]!, args: parts.slice(1) };
 }
 
+function systemOpener(
+  file: string,
+  platform: NodeJS.Platform,
+): EditorCandidate {
+  if (platform === "win32") return { command: "explorer.exe", args: [file], label: "system" };
+  if (platform === "darwin") return { command: "open", args: [file], label: "system" };
+  return { command: "xdg-open", args: [file], label: "system" };
+}
+
+function notepadCandidate(
+  file: string,
+  platform: NodeJS.Platform,
+): EditorCandidate {
+  if (platform === "win32") {
+    return { command: "notepad.exe", args: [file], label: "notepad" };
+  }
+  return systemOpener(file, platform);
+}
+
 export function editorCandidates(
   file: string,
+  preference: ConfigEditor = "auto",
   env: NodeJS.ProcessEnv = process.env,
   platform: NodeJS.Platform = process.platform,
 ): EditorCandidate[] {
+  if (preference === "cursor") {
+    return [{ command: "cursor", args: ["--reuse-window", file], label: "cursor" }];
+  }
+  if (preference === "code") {
+    return [{ command: "code", args: ["--reuse-window", file], label: "code" }];
+  }
+  if (preference === "notepad") {
+    return [notepadCandidate(file, platform)];
+  }
+  if (preference === "system") {
+    return [systemOpener(file, platform)];
+  }
+
   const candidates: EditorCandidate[] = [];
   for (const value of [env.VISUAL, env.EDITOR]) {
     if (!value?.trim()) continue;
     const parsed = splitEditorCommand(value.trim());
-    if (parsed) candidates.push({ command: parsed.command, args: [...parsed.args, file] });
+    if (parsed) {
+      candidates.push({
+        command: parsed.command,
+        args: [...parsed.args, file],
+        label: "env",
+      });
+    }
   }
-  candidates.push({ command: "code", args: ["--reuse-window", file] });
-  if (platform === "win32") candidates.push({ command: "explorer.exe", args: [file] });
-  else if (platform === "darwin") candidates.push({ command: "open", args: [file] });
-  else candidates.push({ command: "xdg-open", args: [file] });
+  candidates.push({ command: "cursor", args: ["--reuse-window", file], label: "cursor" });
+  candidates.push({ command: "code", args: ["--reuse-window", file], label: "code" });
+  if (platform === "win32") {
+    candidates.push({ command: "notepad.exe", args: [file], label: "notepad" });
+  }
+  candidates.push(systemOpener(file, platform));
   return candidates;
 }
 
-export async function openExternalEditor(file: string): Promise<void> {
+function spawnDetached(command: string, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+      shell: false,
+    });
+    let settled = false;
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      fn();
+    };
+    child.once("error", (err) => settle(() => reject(err)));
+    child.unref();
+    setImmediate(() => settle(() => resolve()));
+  });
+}
+
+export async function openExternalEditor(
+  file: string,
+  preference: ConfigEditor = "auto",
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): Promise<{ command: string; label: string }> {
   const failures: string[] = [];
-  for (const candidate of editorCandidates(file)) {
+  for (const candidate of editorCandidates(file, preference, env, platform)) {
     try {
-      await execa(candidate.command, candidate.args, { stdio: "inherit" });
-      return;
+      await spawnDetached(candidate.command, candidate.args);
+      return { command: candidate.command, label: candidate.label };
     } catch (error) {
-      failures.push(`${candidate.command}: ${error instanceof Error ? error.message : String(error)}`);
+      failures.push(
+        `${candidate.command}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
   throw new Error(`Could not open an editor for ${file}\n${failures.join("\n")}`);
 }
+
+export const CONFIG_EDITOR_PICKER_OPTIONS: Array<{
+  id: Exclude<ConfigEditor, "auto">;
+  label: string;
+}> = [
+  { id: "cursor", label: "Cursor" },
+  { id: "code", label: "VS Code" },
+  { id: "notepad", label: "Notepad" },
+  { id: "system", label: "System default" },
+];

@@ -5,9 +5,13 @@ import { heading, info, success, warn } from "../util/log.js";
 import { emitJson, isJsonMode } from "../util/output.js";
 import {
   listLiveConfigFiles,
+  normalizeConfigEditor,
   openExternalEditor,
+  readConfigEditor,
   resolveLiveConfigFile,
+  setConfigEditor,
   setLiveConfigWatched,
+  type ConfigEditor,
 } from "../live-config/service.js";
 import {
   formatConfigValue,
@@ -70,14 +74,59 @@ export async function runConfigList(cwd: string): Promise<number> {
 export async function runConfigOpen(
   cwd: string,
   path = "config.yml",
-  opener: (path: string) => Promise<void> = openExternalEditor,
+  options: {
+    editor?: string;
+    opener?: (
+      absolutePath: string,
+      preference: ConfigEditor,
+    ) => Promise<{ command: string; label: string } | void>;
+  } = {},
 ): Promise<number> {
   try {
     const { project } = await pluginContext(cwd);
     const resolved = await resolveLiveConfigFile(cwd, project.pluginName!, path);
-    await opener(resolved);
-    if (isJsonMode()) emitJson({ ok: true, data: { path, absolutePath: resolved } });
-    else success(`Opened live config: ${path}`);
+    const preference = options.editor
+      ? normalizeConfigEditor(options.editor)
+      : await readConfigEditor(cwd);
+    const opener = options.opener ?? openExternalEditor;
+    const opened = await opener(resolved, preference);
+    if (isJsonMode()) {
+      emitJson({
+        ok: true,
+        data: {
+          path,
+          absolutePath: resolved,
+          editor: preference,
+          ...(opened && typeof opened === "object" ? { command: opened.command } : {}),
+        },
+      });
+    } else {
+      success(`Opened live config: ${path}${opened && typeof opened === "object" ? ` (${opened.label})` : ""}`);
+    }
+    return 0;
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : String(caught);
+    if (isJsonMode()) emitJson({ ok: false, error: message });
+    else warn(message);
+    return 1;
+  }
+}
+
+export async function runConfigEditor(
+  cwd: string,
+  editor?: string,
+): Promise<number> {
+  try {
+    await pluginContext(cwd);
+    if (!editor) {
+      const current = await readConfigEditor(cwd);
+      if (isJsonMode()) emitJson({ ok: true, data: { configEditor: current } });
+      else info(`Config editor: ${current}`);
+      return 0;
+    }
+    const next = await setConfigEditor(cwd, normalizeConfigEditor(editor));
+    if (isJsonMode()) emitJson({ ok: true, data: { configEditor: next } });
+    else success(`Config editor set to ${next}`);
     return 0;
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : String(caught);

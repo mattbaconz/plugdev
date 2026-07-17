@@ -54,9 +54,19 @@ test("runConfigList JSON includes paths and status but never file contents", asy
 test("runConfigOpen resolves the live file before invoking the editor", async () => {
   const cwd = await fixture();
   let opened: string | undefined;
+  let preference: string | undefined;
   try {
-    assert.equal(await runConfigOpen(cwd, "config.yml", async (path) => { opened = path; }), 0);
+    assert.equal(
+      await runConfigOpen(cwd, "config.yml", {
+        opener: async (path, pref) => {
+          opened = path;
+          preference = pref;
+        },
+      }),
+      0,
+    );
     assert.equal(opened?.endsWith(join("ConfigCommand", "config.yml")), true);
+    assert.equal(preference, "auto");
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }
@@ -66,8 +76,10 @@ test("runConfigOpen reports editor failures without crashing", async () => {
   const cwd = await fixture();
   try {
     assert.equal(
-      await runConfigOpen(cwd, "config.yml", async () => {
-        throw new Error("editor unavailable");
+      await runConfigOpen(cwd, "config.yml", {
+        opener: async () => {
+          throw new Error("editor unavailable");
+        },
       }),
       1,
     );

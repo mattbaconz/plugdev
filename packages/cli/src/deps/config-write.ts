@@ -150,6 +150,14 @@ export async function writeWatchedConfigsToYml(
   return updatePlugdevYml(cwd, { watch: { configs } });
 }
 
+/** Persist preferred editor for live config open. */
+export async function writeConfigEditorToYml(
+  cwd: string,
+  configEditor: "auto" | "cursor" | "code" | "notepad" | "system",
+): Promise<{ ok: true; path: string } | { ok: false; reason: string }> {
+  return updatePlugdevYml(cwd, { dev: { configEditor } });
+}
+
 /** Remove a dep from plugdev.yml by name/slug (does not delete JARs). */
 export async function removeDepFromYml(cwd: string, name: string): Promise<boolean> {
   const loaded = await readPlugdevYml(cwd);

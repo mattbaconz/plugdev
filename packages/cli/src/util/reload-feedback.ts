@@ -30,6 +30,7 @@ export async function confirmReload(
   cwd: string,
   timeoutMs = 10_000,
   fromOffset = 0,
+  opts?: { silentSuccess?: boolean },
 ): Promise<boolean> {
   const logPath = join(projectRunDir(cwd), "logs", "latest.log");
   if (!isJsonMode()) phase("Reloading plugin…", "active");
@@ -45,9 +46,9 @@ export async function confirmReload(
         const appended = content.slice(lastSize);
         lastSize = content.length;
         if (logMatchesReload(appended)) {
-          if (!isJsonMode()) {
+          if (!isJsonMode() && !opts?.silentSuccess) {
             phase("Reload complete");
-          } else {
+          } else if (isJsonMode() && !opts?.silentSuccess) {
             success("Reload complete");
           }
           return true;

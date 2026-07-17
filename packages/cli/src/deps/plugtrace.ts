@@ -16,7 +16,7 @@ export interface PlugTraceIntegrationConfig {
 }
 
 export const DEFAULT_PLUGTRACE_HINT =
-  "Build PlugTrace locally, then set integrations.plugtrace.jar to e.g. ../pluglabs/plugtrace/plugtrace/paper-modern/build/libs/PlugTrace-0.3.0.jar (or folia / bukkit-modern). PlugTrace is private — no Hangar/Modrinth fetch.";
+  "Build PlugTrace locally, then set integrations.plugtrace.jar to e.g. ../pluglabs/plugtrace/plugtrace/paper-modern/build/libs/PlugTrace-0.4.0.jar (or folia / bukkit-modern). PlugTrace is private — no Hangar/Modrinth fetch.";
 
 export function resolvePlugTraceIntegration(
   raw?: {
