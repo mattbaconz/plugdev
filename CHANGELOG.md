@@ -6,6 +6,19 @@ Release entries use `[added]`, `[changed]`, `[fixed]`, and `[removed]` in that o
 
 _No changes yet._
 
+## 1.0.0 — 2026-07-18
+
+First stable release: the local Paper play loop and live-config UX are the product. Prefer additive `plugdev.yml` schema changes after 1.0.
+
+### [added]
+- In-run config picker TUI: type `.config` / `.config ui` / `.config pick` in the same terminal as `plug run` (Esc returns to the server console)
+
+### [changed]
+- README and roadmap define v1.0 as the stable local loop + live config UX (multi-loader deferred to 1.x)
+
+### [fixed]
+- Opening live configs in VS Code or Cursor on Windows no longer flashes a console window (Notepad still uses `start`; Code/Cursor use direct spawn)
+
 ## 0.12.11 — 2026-07-17
 
 ### [fixed]

@@ -2,7 +2,7 @@
 
 <img src="brand/plugdev-logo.png" alt="PlugDev" width="128" />
 
-# PlugDev · v0.12.9
+# PlugDev · v1.0.0
 
 ---
 
@@ -170,6 +170,8 @@ plugdev config unwatch config.yml
 While `plug run` is up you can edit live configs in the **same terminal** (no second shell):
 
 ```text
+.config                 # Ink picker — open / watch / choose editor · Esc back
+.config ui
 .config open
 .config list
 .config get --key value
@@ -213,7 +215,7 @@ Recorded on Paper **26.1.2** with Prism + `plug run --hotswap`.
 
 ## Status
 
-**v0.12.9** — choosable config editors and clearer live-config reload feedback. See [CHANGELOG.md](CHANGELOG.md).
+**v1.0.0** — stable local Paper loop + live config UX (in-run `.config` picker; Windows editors without console flash). After 1.0, prefer additive `plugdev.yml` changes. See [CHANGELOG.md](CHANGELOG.md).
 
 [Docs](https://pluglabs.app/plugdev) · [Discord](https://discord.gg/C4X3rThtAM) · [npm](https://www.npmjs.com/package/@plugdev/cli)
 

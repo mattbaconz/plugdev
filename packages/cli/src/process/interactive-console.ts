@@ -4,8 +4,10 @@ import { sendRconCommand } from "./rcon.js";
 import {
   handleConfigConsoleCommand,
   isConfigConsoleCommand,
+  isConfigUiCommand,
   type ConfigConsoleContext,
 } from "./console-config.js";
+import { runInRunConfigPicker } from "../live-config/in-run-config-picker.js";
 import { info, warn } from "../util/log.js";
 import { isJsonMode } from "../util/output.js";
 
@@ -21,6 +23,8 @@ export interface InteractiveConsole {
   pause(): void;
   resume(): void;
   close(): void;
+  /** Release stdin, run overlay, then restore readline (do not nest under open rl). */
+  withStdinOverlay(run: () => Promise<void>): Promise<void>;
 }
 
 /** Shared empty-RCON hint (also used in tests). */
@@ -41,31 +45,28 @@ export function attachInteractiveConsole(
       pause() {},
       resume() {},
       close() {},
+      async withStdinOverlay(run) {
+        await run();
+      },
     };
   }
 
   let paused = false;
   let closed = false;
-
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    terminal: true,
-  });
-
-  info("Type server commands below (e.g. list, gamemode creative @a). Ctrl+C stops PlugDev.");
-  info("Players are auto-OP on join when dev.op is true (default).");
-  if (opts.liveConfig) {
-    info("Live config: .config open | .config set key value | .config help");
-  }
+  let overlayBusy = false;
+  let rl: readline.Interface | null = null;
 
   const onLine = async (line: string) => {
-    if (closed || paused) return;
+    if (closed || paused || overlayBusy) return;
     const cmd = line.trim();
     if (!cmd) return;
     process.stdout.write(pc.dim(`> ${cmd}\n`));
 
     if (opts.liveConfig && isConfigConsoleCommand(cmd)) {
+      if (isConfigUiCommand(cmd)) {
+        await withStdinOverlay(() => runInRunConfigPicker(opts.liveConfig!));
+        return;
+      }
       await handleConfigConsoleCommand(cmd, opts.liveConfig);
       return;
     }
@@ -82,16 +83,57 @@ export function attachInteractiveConsole(
       } else {
         warn(emptyRconHint());
       }
-      // Brief pause so any ERROR lines from the command can flush on the log stream
       await new Promise((r) => setTimeout(r, 400));
     } catch (e) {
       warn(`RCON: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
-  rl.on("line", (line) => {
-    void onLine(line);
-  });
+  function attachReadline(): void {
+    if (rl || closed) return;
+    rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+      terminal: true,
+    });
+    rl.on("line", (line) => {
+      void onLine(line);
+    });
+  }
+
+  function detachReadline(): void {
+    if (!rl) return;
+    const current = rl;
+    rl = null;
+    current.removeAllListeners("line");
+    current.close();
+  }
+
+  async function withStdinOverlay(run: () => Promise<void>): Promise<void> {
+    if (closed || overlayBusy) return;
+    overlayBusy = true;
+    paused = true;
+    detachReadline();
+    // Let readline finish releasing stdin before Ink takes over.
+    await new Promise((r) => setImmediate(r));
+    try {
+      await run();
+    } finally {
+      overlayBusy = false;
+      if (!closed) {
+        attachReadline();
+        paused = false;
+      }
+    }
+  }
+
+  attachReadline();
+
+  info("Type server commands below (e.g. list, gamemode creative @a). Ctrl+C stops PlugDev.");
+  info("Players are auto-OP on join when dev.op is true (default).");
+  if (opts.liveConfig) {
+    info("Live config: .config (picker) | .config set key value | .config help");
+  }
 
   return {
     pause() {
@@ -103,8 +145,9 @@ export function attachInteractiveConsole(
     close() {
       if (closed) return;
       closed = true;
-      rl.close();
+      detachReadline();
     },
+    withStdinOverlay,
   };
 }
 

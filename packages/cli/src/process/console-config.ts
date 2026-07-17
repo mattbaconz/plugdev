@@ -27,6 +27,16 @@ export function isConfigConsoleCommand(line: string): boolean {
   return trimmed === ".config" || trimmed.startsWith(".config ");
 }
 
+/**
+ * Bare `.config` / `.config ui` / `.config pick` → in-run Ink picker (not open).
+ */
+export function isConfigUiCommand(line: string): boolean {
+  if (!isConfigConsoleCommand(line)) return false;
+  const tokens = tokenize(line.trim());
+  const sub = tokens[1]?.toLowerCase();
+  return sub === undefined || sub === "ui" || sub === "pick";
+}
+
 function tokenize(line: string): string[] {
   const parts = line.match(/(?:[^\s"]+|"[^"]*")+/g) ?? [];
   return parts.map((part) =>
@@ -66,11 +76,12 @@ async function dispatchConfigConsoleCommand(
   ctx: ConfigConsoleContext,
 ): Promise<void> {
   const tokens = tokenize(line.trim());
-  const sub = (tokens[1] ?? "open").toLowerCase();
+  const sub = (tokens[1] ?? "help").toLowerCase();
   const rest = tokens.slice(2);
 
-  if (sub === "help" || sub === "?") {
-    info("Live config: .config | .config open [path] | .config list");
+  if (sub === "help" || sub === "?" || sub === "ui" || sub === "pick") {
+    info("Live config: .config | .config ui     → picker (same terminal)");
+    info("            .config open [path] | .config list");
     info("            .config get [--key k] [path] | .config set key value");
     info("            .config set --key k --value v [path] | .config editor [name]");
     return;

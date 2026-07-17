@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import {
   editorCandidates,
   listLiveConfigFiles,
+  needsWindowsStart,
   normalizeLiveConfigPath,
   resolvePluginDataDir,
   setLiveConfigWatched,
@@ -119,6 +120,7 @@ test("editorCandidates auto prefers VISUAL, EDITOR, cursor, code, notepad, then 
     "/c",
     "start",
     '""',
+    "/B",
     "C:\\project\\config.yml",
   ]);
 });
@@ -133,11 +135,28 @@ test("editorCandidates respects an explicit cursor preference", () => {
   assert.deepEqual(candidates.map((c) => c.command), ["cursor"]);
 });
 
-test("windowsStartArgv wraps GUI editors with cmd start", () => {
+test("windowsStartArgv wraps notepad with cmd start", () => {
   assert.deepEqual(windowsStartArgv("notepad.exe", ["C:\\a b\\config.yml"]), {
     command: "cmd.exe",
     args: ["/d", "/c", "start", '""', "notepad.exe", "C:\\a b\\config.yml"],
   });
+});
+
+test("windowsStartArgv background uses start /B", () => {
+  assert.deepEqual(
+    windowsStartArgv("code", ["--reuse-window", "C:\\a.yml"], { background: true }),
+    {
+      command: "cmd.exe",
+      args: ["/d", "/c", "start", '""', "/B", "code", "--reuse-window", "C:\\a.yml"],
+    },
+  );
+});
+
+test("needsWindowsStart is true only for notepad", () => {
+  assert.equal(needsWindowsStart("notepad.exe"), true);
+  assert.equal(needsWindowsStart("notepad"), true);
+  assert.equal(needsWindowsStart("code"), false);
+  assert.equal(needsWindowsStart("cursor"), false);
 });
 
 test("editorCandidates notepad preference stays notepad.exe (spawn wraps on win32)", () => {

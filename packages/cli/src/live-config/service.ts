@@ -255,10 +255,10 @@ function systemOpener(
   platform: NodeJS.Platform,
 ): EditorCandidate {
   if (platform === "win32") {
-    // Default file association via `start` (explorer.exe only selects the file).
+    // `/B` = no new console window (avoids flash for .cmd associations).
     return {
       command: "cmd.exe",
-      args: ["/d", "/c", "start", '""', file],
+      args: ["/d", "/c", "start", '""', "/B", file],
       label: "system",
     };
   }
@@ -317,31 +317,32 @@ export function editorCandidates(
 }
 
 /**
- * Windows: launch GUI apps via `cmd /c start "" …` so Notepad/Cursor get a visible window.
- * (`detached` + direct spawn is unreliable for Win11 Notepad.)
+ * Windows: Notepad (and similar) need `cmd /c start "" …` for a visible GUI.
+ * Do not use bare `start` for VS Code/Cursor — that flashes a console for `.cmd` stubs.
  */
 export function windowsStartArgv(
   command: string,
   args: string[],
+  opts: { background?: boolean } = {},
 ): { command: string; args: string[] } {
-  return {
-    command: "cmd.exe",
-    args: ["/d", "/c", "start", '""', command, ...args],
-  };
+  const startArgs = opts.background
+    ? ["/d", "/c", "start", '""', "/B", command, ...args]
+    : ["/d", "/c", "start", '""', command, ...args];
+  return { command: "cmd.exe", args: startArgs };
 }
 
-function spawnDetached(
+/** Commands that should use Windows `start` (Notepad / Win11 stub). */
+export function needsWindowsStart(command: string): boolean {
+  const base = command.replace(/^.*[/\\]/, "").toLowerCase();
+  return base === "notepad.exe" || base === "notepad";
+}
+
+function spawnOnce(
   command: string,
   args: string[],
-  platform: NodeJS.Platform = process.platform,
 ): Promise<void> {
-  const launch =
-    platform === "win32" && command.toLowerCase() !== "cmd.exe"
-      ? windowsStartArgv(command, args)
-      : { command, args };
-
   return new Promise((resolve, reject) => {
-    const child = spawn(launch.command, launch.args, {
+    const child = spawn(command, args, {
       detached: true,
       stdio: "ignore",
       windowsHide: true,
@@ -359,6 +360,32 @@ function spawnDetached(
       settle(() => resolve());
     });
   });
+}
+
+async function spawnDetached(
+  command: string,
+  args: string[],
+  platform: NodeJS.Platform = process.platform,
+): Promise<void> {
+  if (platform !== "win32" || command.toLowerCase() === "cmd.exe") {
+    await spawnOnce(command, args);
+    return;
+  }
+
+  // Notepad: visible window via start (no /B — GUI needs a normal start).
+  if (needsWindowsStart(command)) {
+    const launch = windowsStartArgv(command, args);
+    await spawnOnce(launch.command, launch.args);
+    return;
+  }
+
+  // Cursor / VS Code / env: direct spawn — no console flash from `start` + .cmd.
+  try {
+    await spawnOnce(command, args);
+  } catch {
+    const fallback = windowsStartArgv(command, args, { background: true });
+    await spawnOnce(fallback.command, fallback.args);
+  }
 }
 
 export async function openExternalEditor(
