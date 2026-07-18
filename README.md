@@ -215,6 +215,8 @@ Recorded on Paper **26.1.2** with Prism + `plug run --hotswap`.
 
 <img src="brand/demos/live-config-tui.gif" alt="TUI Config files opens live config.yml in VS Code" width="800" />
 
+<img src="brand/demos/in-run-config.gif" alt="In-run .config picker: edit config.yml, reload, test in Minecraft" width="800" />
+
 ## Status
 
 **v1.0.1** — stable local Paper loop + live config UX. Update with `plugdev update` (or set `update.auto: true`). After 1.0, prefer additive `plugdev.yml` changes. See [CHANGELOG.md](CHANGELOG.md).
