@@ -93,6 +93,10 @@ export interface PlugDevConfig {
     /** never (default) | on-exit | worlds */
     cleanup?: "never" | "on-exit" | "worlds";
   };
+  update?: {
+    /** When true, auto-install @plugdev/cli@latest when outdated. */
+    auto?: boolean;
+  };
   /** Optional private PlugTrace dogfood integration (local JAR copy + identity). */
   integrations?: {
     plugtrace?: {

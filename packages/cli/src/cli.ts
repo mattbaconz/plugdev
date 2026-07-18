@@ -45,6 +45,8 @@ import {
   isInteractiveTty,
   printNonTtyHelp,
 } from "./commands/tui.js";
+import { runUpdate } from "./commands/update-cmd.js";
+import { maybeNotifyUpdate } from "./util/update-check.js";
 import { isJsonMode } from "./util/output.js";
 
 const program = new Command();
@@ -125,6 +127,7 @@ program
       printNonTtyHelp(bin);
       process.exit(0);
     }
+    void maybeNotifyUpdate(process.cwd());
     const { run } = await runTui(process.cwd());
     if (run) {
       process.exit(await handoffRun(process.cwd()));
@@ -136,7 +139,16 @@ program
   .command("doctor")
   .description("Check project detection and toolchain")
   .action(async () => {
+    void maybeNotifyUpdate(process.cwd());
     process.exit(await runDoctor(process.cwd()));
+  });
+
+program
+  .command("update")
+  .description("Update @plugdev/cli from npm (or --check for versions only)")
+  .option("--check", "Check for a newer version without installing")
+  .action(async (opts: { check?: boolean }) => {
+    process.exit(await runUpdate(process.cwd(), { check: opts.check }));
   });
 
 program
@@ -576,6 +588,7 @@ program
       process.exit(0);
     }
 
+    void maybeNotifyUpdate(process.cwd());
     const { run } = await runTui(process.cwd());
     if (run) {
       process.exit(await handoffRun(process.cwd()));

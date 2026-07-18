@@ -5,12 +5,12 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   editorCandidates,
+  editorChildSpawnOptions,
   listLiveConfigFiles,
-  needsWindowsStart,
   normalizeLiveConfigPath,
   resolvePluginDataDir,
   setLiveConfigWatched,
-  windowsStartArgv,
+  windowsPowerShellStartProcess,
 } from "./service.js";
 import { readPlugdevYml } from "../deps/config-write.js";
 
@@ -112,17 +112,14 @@ test("editorCandidates auto prefers VISUAL, EDITOR, cursor, code, notepad, then 
     "cursor",
     "code",
     "notepad.exe",
-    "cmd.exe",
+    "powershell.exe",
   ]);
   assert.deepEqual(candidates[0]?.args, ["--wait", "C:\\project\\config.yml"]);
-  assert.deepEqual(candidates.at(-1)?.args, [
-    "/d",
-    "/c",
-    "start",
-    '""',
-    "/B",
-    "C:\\project\\config.yml",
-  ]);
+  const system = candidates.at(-1)!;
+  assert.equal(system.label, "system");
+  assert.ok(system.args.includes("-WindowStyle"));
+  assert.ok(system.args.includes("Hidden"));
+  assert.ok(system.args.some((a) => a.includes("Start-Process") && a.includes("config.yml")));
 });
 
 test("editorCandidates respects an explicit cursor preference", () => {
@@ -135,31 +132,21 @@ test("editorCandidates respects an explicit cursor preference", () => {
   assert.deepEqual(candidates.map((c) => c.command), ["cursor"]);
 });
 
-test("windowsStartArgv wraps notepad with cmd start", () => {
-  assert.deepEqual(windowsStartArgv("notepad.exe", ["C:\\a b\\config.yml"]), {
-    command: "cmd.exe",
-    args: ["/d", "/c", "start", '""', "notepad.exe", "C:\\a b\\config.yml"],
-  });
+test("windowsPowerShellStartProcess never uses cmd.exe", () => {
+  const opened = windowsPowerShellStartProcess("C:\\a b\\config.yml");
+  assert.equal(opened.command, "powershell.exe");
+  assert.ok(!opened.args.some((a) => /cmd/i.test(a)));
+  assert.ok(opened.args.includes("Hidden"));
 });
 
-test("windowsStartArgv background uses start /B", () => {
-  assert.deepEqual(
-    windowsStartArgv("code", ["--reuse-window", "C:\\a.yml"], { background: true }),
-    {
-      command: "cmd.exe",
-      args: ["/d", "/c", "start", '""', "/B", "code", "--reuse-window", "C:\\a.yml"],
-    },
-  );
+test("editorChildSpawnOptions disables detached on Windows", () => {
+  const opts = editorChildSpawnOptions("win32");
+  assert.equal(opts.detached, false);
+  assert.equal(opts.windowsHide, true);
+  assert.equal(opts.stdio, "ignore");
 });
 
-test("needsWindowsStart is true only for notepad", () => {
-  assert.equal(needsWindowsStart("notepad.exe"), true);
-  assert.equal(needsWindowsStart("notepad"), true);
-  assert.equal(needsWindowsStart("code"), false);
-  assert.equal(needsWindowsStart("cursor"), false);
-});
-
-test("editorCandidates notepad preference stays notepad.exe (spawn wraps on win32)", () => {
+test("editorCandidates notepad preference stays notepad.exe", () => {
   const candidates = editorCandidates(
     "C:\\project\\config.yml",
     "notepad",
@@ -169,4 +156,15 @@ test("editorCandidates notepad preference stays notepad.exe (spawn wraps on win3
   assert.deepEqual(candidates, [
     { command: "notepad.exe", args: ["C:\\project\\config.yml"], label: "notepad" },
   ]);
+});
+
+test("editorCandidates system preference uses PowerShell Start-Process", () => {
+  const candidates = editorCandidates(
+    "C:\\project\\config.yml",
+    "system",
+    {},
+    "win32",
+  );
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0]?.command, "powershell.exe");
 });

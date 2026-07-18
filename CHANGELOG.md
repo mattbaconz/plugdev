@@ -6,6 +6,16 @@ Release entries use `[added]`, `[changed]`, `[fixed]`, and `[removed]` in that o
 
 _No changes yet._
 
+## 1.0.1 — 2026-07-18
+
+### [added]
+- `plugdev update` / `plugdev update --check` — install or report the latest `@plugdev/cli` from npm
+- Optional `update.auto: true` in `plugdev.yml` or `~/.plugdev/config.yml` to auto-install when outdated
+- At-most-daily update reminder on `plug run`, TUI, and `doctor` (skip with `PLUGDEV_NO_UPDATE=1` or `--json`)
+
+### [fixed]
+- Opening live configs on Windows no longer leaves an empty `cmd` window (`detached` + `cmd /c start` removed; PowerShell `Start-Process` / direct GUI spawn)
+
 ## 1.0.0 — 2026-07-18
 
 First stable release: the local Paper play loop and live-config UX are the product. Prefer additive `plugdev.yml` schema changes after 1.0.

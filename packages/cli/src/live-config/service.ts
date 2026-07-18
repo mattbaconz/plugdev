@@ -255,12 +255,8 @@ function systemOpener(
   platform: NodeJS.Platform,
 ): EditorCandidate {
   if (platform === "win32") {
-    // `/B` = no new console window (avoids flash for .cmd associations).
-    return {
-      command: "cmd.exe",
-      args: ["/d", "/c", "start", '""', "/B", file],
-      label: "system",
-    };
+    // Default association via PowerShell — never cmd/start (that leaves empty consoles).
+    return windowsPowerShellStartProcess(file);
   }
   if (platform === "darwin") return { command: "open", args: [file], label: "system" };
   return { command: "xdg-open", args: [file], label: "system" };
@@ -316,38 +312,55 @@ export function editorCandidates(
   return candidates;
 }
 
-/**
- * Windows: Notepad (and similar) need `cmd /c start "" …` for a visible GUI.
- * Do not use bare `start` for VS Code/Cursor — that flashes a console for `.cmd` stubs.
- */
-export function windowsStartArgv(
-  command: string,
-  args: string[],
-  opts: { background?: boolean } = {},
-): { command: string; args: string[] } {
-  const startArgs = opts.background
-    ? ["/d", "/c", "start", '""', "/B", command, ...args]
-    : ["/d", "/c", "start", '""', command, ...args];
-  return { command: "cmd.exe", args: startArgs };
+function psQuote(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
 }
 
-/** Commands that should use Windows `start` (Notepad / Win11 stub). */
-export function needsWindowsStart(command: string): boolean {
-  const base = command.replace(/^.*[/\\]/, "").toLowerCase();
-  return base === "notepad.exe" || base === "notepad";
+/**
+ * Launch a GUI app or open a file with the default association, without a console window.
+ * Uses PowerShell Start-Process (hidden host) — never cmd.exe / start.
+ */
+export function windowsPowerShellStartProcess(
+  fileOrExe: string,
+  exeArgs: string[] = [],
+  label = "system",
+): EditorCandidate {
+  const command =
+    exeArgs.length > 0
+      ? `Start-Process -FilePath ${psQuote(fileOrExe)} -ArgumentList ${exeArgs.map(psQuote).join(",")}`
+      : `Start-Process -FilePath ${psQuote(fileOrExe)}`;
+  return {
+    command: "powershell.exe",
+    args: ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", command],
+    label,
+  };
+}
+
+/** Spawn options for live-config editors — never detached on Windows (avoids empty cmd). */
+export function editorChildSpawnOptions(
+  platform: NodeJS.Platform = process.platform,
+): {
+  detached: boolean;
+  stdio: "ignore";
+  windowsHide: boolean;
+  shell: false;
+} {
+  return {
+    // detached + cmd/console apps → visible empty console on Windows
+    detached: false,
+    stdio: "ignore",
+    windowsHide: platform === "win32",
+    shell: false,
+  };
 }
 
 function spawnOnce(
   command: string,
   args: string[],
+  platform: NodeJS.Platform = process.platform,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      detached: true,
-      stdio: "ignore",
-      windowsHide: true,
-      shell: false,
-    });
+    const child = spawn(command, args, editorChildSpawnOptions(platform));
     let settled = false;
     const settle = (fn: () => void) => {
       if (settled) return;
@@ -362,29 +375,29 @@ function spawnOnce(
   });
 }
 
-async function spawnDetached(
+async function spawnEditorProcess(
   command: string,
   args: string[],
   platform: NodeJS.Platform = process.platform,
 ): Promise<void> {
-  if (platform !== "win32" || command.toLowerCase() === "cmd.exe") {
-    await spawnOnce(command, args);
+  if (platform !== "win32") {
+    await spawnOnce(command, args, platform);
     return;
   }
 
-  // Notepad: visible window via start (no /B — GUI needs a normal start).
-  if (needsWindowsStart(command)) {
-    const launch = windowsStartArgv(command, args);
-    await spawnOnce(launch.command, launch.args);
+  // Already a PowerShell Start-Process candidate (system opener).
+  if (command.toLowerCase() === "powershell.exe") {
+    await spawnOnce(command, args, platform);
     return;
   }
 
-  // Cursor / VS Code / env: direct spawn — no console flash from `start` + .cmd.
+  // Prefer direct GUI spawn (notepad.exe, cursor, code) — no host console.
   try {
-    await spawnOnce(command, args);
+    await spawnOnce(command, args, platform);
   } catch {
-    const fallback = windowsStartArgv(command, args, { background: true });
-    await spawnOnce(fallback.command, fallback.args);
+    // Fallback: hidden PowerShell Start-Process (still no cmd.exe).
+    const fallback = windowsPowerShellStartProcess(command, args, "powershell");
+    await spawnOnce(fallback.command, fallback.args, platform);
   }
 }
 
@@ -397,7 +410,7 @@ export async function openExternalEditor(
   const failures: string[] = [];
   for (const candidate of editorCandidates(file, preference, env, platform)) {
     try {
-      await spawnDetached(candidate.command, candidate.args, platform);
+      await spawnEditorProcess(candidate.command, candidate.args, platform);
       return { command: candidate.command, label: candidate.label };
     } catch (error) {
       failures.push(

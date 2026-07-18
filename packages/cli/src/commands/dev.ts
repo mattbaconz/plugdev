@@ -50,6 +50,7 @@ import {
 } from "../util/tools.js";
 import { isPortAvailable } from "../util/port.js";
 import { getLogMode, isJsonMode, emitJson } from "../util/output.js";
+import { maybeNotifyUpdate } from "../util/update-check.js";
 import { resolveBootstrapJar } from "../util/bootstrap.js";
 import {
   captureReloadLogOffset,
@@ -124,6 +125,7 @@ export async function runDev(
     }
 
     if (!isJsonMode()) banner(CLI_VERSION);
+    void maybeNotifyUpdate(cwd);
 
     if (config.type === "discord-bot" || project.type === "discord-bot") {
       return await runDiscordBotDev(cwd, config, overrides, debug);
