@@ -103,6 +103,9 @@ export function startPluginWatcher(
           : await runGradleBuild(cwd, config, project);
 
       if (reloadMode === "restart") {
+        info(
+          "watch.reload.java is restart — rebuilding then restarting the server",
+        );
         await callbacks.onRestart();
         success("Server restarted after code change");
         return;
@@ -114,7 +117,12 @@ export function startPluginWatcher(
       await writeReloadTrigger(cwd, [dest]);
       await callbacks.onSafeReload(dest);
       try {
-        await confirmReload(cwd, 10_000, reloadOffset);
+        const ok = await confirmReload(cwd, 10_000, reloadOffset);
+        if (!ok && !isJsonMode()) {
+          warn(
+            "Safe reload did not confirm — plugin may be unchanged in-game",
+          );
+        }
       } finally {
         await callbacks.onReloadSettled?.();
       }

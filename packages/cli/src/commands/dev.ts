@@ -474,6 +474,8 @@ async function runPluginDev(
         peaceful: config.dev?.peaceful !== false,
         onlineMode: config.dev?.onlineMode === true,
         op: config.dev?.op !== false,
+        reloadJava: config.watch.reloadJava,
+        server: config.server,
       });
       printServerConsoleSeparator();
     }

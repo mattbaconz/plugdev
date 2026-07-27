@@ -20,4 +20,5 @@ test("printNonTtyHelp mentions run and tui", () => {
   const text = lines.join("\n");
   assert.match(text, /plugdev run/);
   assert.match(text, /plugdev tui/);
+  assert.match(text, /npx @plugdev\/cli@latest run/);
 });

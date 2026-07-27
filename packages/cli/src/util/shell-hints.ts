@@ -4,6 +4,11 @@ export function isWindowsShell(): boolean {
   return process.platform === "win32";
 }
 
+/** One-liner when `plug` / `plugdev` is not on PATH. */
+export function npxRunHint(): string {
+  return "npx @plugdev/cli@latest run";
+}
+
 /**
  * Print-ready steps after init.
  * Prefer global `plug` / `plugdev` bins; fall back to npx when requested.
@@ -21,16 +26,16 @@ export function initNextSteps(opts?: {
   ]
     .filter(Boolean)
     .join(" ");
-  const initCmd = `plugdev init ${flags}`;
+  const initCmd = `plugdev init ${flags}`.trimEnd();
   if (opts?.usedNpx) {
-    const npxInit = opts?.agents || opts?.mcp
-      ? `npx @plugdev/cli@latest init ${flags}`
-      : "npx @plugdev/cli@latest setup";
-    return [npxInit, "npx @plugdev/cli@latest run"];
+    return [
+      `npx @plugdev/cli@latest init ${flags}`.trimEnd(),
+      "npx @plugdev/cli@latest run",
+    ];
   }
   // Global install is the primary UX (plug + plugdev bins)
   if (opts?.globalPreferred !== false) {
-    return ["npm install -g @plugdev/cli", initCmd, "plug run"];
+    return ["npm i -g @plugdev/cli@latest", initCmd, "plug run"];
   }
   return ["npm install", "npm run setup", "npm run dev"];
 }

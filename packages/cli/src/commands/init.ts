@@ -346,8 +346,8 @@ export async function runInit(
   info("");
   info("Next (global install — recommended):");
   info(formatNextSteps(initNextSteps({ agents: opts.agents, mcp: opts.mcp })));
-  info("Or with npx only:");
+  info("Or with npx only (if plugdev is not on PATH):");
   info(formatNextSteps(initNextSteps({ usedNpx: true, agents: opts.agents, mcp: opts.mcp })));
-  info("Faster one-shot: npx @plugdev/cli@latest init --setup");
+  info("(PowerShell tip: run each command on its own line — do not use &&)");
   return 0;
 }

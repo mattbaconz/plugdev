@@ -6,6 +6,16 @@ Release entries use `[added]`, `[changed]`, `[fixed]`, and `[removed]` in that o
 
 _No changes yet._
 
+## 1.0.2 — 2026-07-27
+
+### [changed]
+- Ready banner sticky cues: edit→reload mode, Folia restart honesty, join + `.config` tips
+- `plugdev doctor` prints a prioritized `Fix:` copy-paste line (and matching `--json` `hint`) when not ready
+- Init next steps: `npm i -g @plugdev/cli@latest` primary path; clearer npx fallback (PowerShell-safe)
+
+### [fixed]
+- Reload timeout now says reload was not confirmed and points at `latest.log` / Folia `watch.reload.java: restart`
+
 ## 1.0.1 — 2026-07-18
 
 ### [added]

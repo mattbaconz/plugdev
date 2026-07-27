@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { success, info, dumpLogTail } from "../util/log.js";
+import { success, info, warn, dumpLogTail } from "../util/log.js";
 import { Errors } from "../util/errors.js";
 import type { LogMode } from "../util/output.js";
 import {
@@ -265,6 +265,8 @@ export function printReadyBanner(
     peaceful?: boolean;
     onlineMode?: boolean;
     op?: boolean;
+    reloadJava?: "safe" | "restart" | "hotswap";
+    server?: string;
   },
 ): void {
   success("Server ready");
@@ -281,7 +283,29 @@ export function printReadyBanner(
     );
   }
   info(`Join: 127.0.0.1:${port}`);
-  info("Tip: first boot remaps plugins (~10–30s); later boots are much faster.");
-  info("Live config: .config (picker) | .config set key value (same terminal)");
+  info(readyWatchHint(opts?.reloadJava ?? "safe"));
+  const folia = readyFoliaHint(opts?.server);
+  if (folia) warn(folia);
+  info("Live config: .config (picker) | .config set key value");
   info("Ctrl+C stops the server — closing Minecraft does not.");
+}
+
+/** Sticky cue for edit → save during `plug run`. */
+export function readyWatchHint(
+  reloadJava: "safe" | "restart" | "hotswap",
+): string {
+  switch (reloadJava) {
+    case "restart":
+      return "Edit src/ → save → full server restart";
+    case "hotswap":
+      return "Edit src/ → save → hotswap (falls back to safe reload)";
+    default:
+      return "Edit src/ → save → safe reload";
+  }
+}
+
+/** Folia honesty line for the ready banner (undefined when not Folia). */
+export function readyFoliaHint(server?: string): string | undefined {
+  if (server !== "folia") return undefined;
+  return "Folia: prefer full restart after code changes (watch.reload.java: restart)";
 }

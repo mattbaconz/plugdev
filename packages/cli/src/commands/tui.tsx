@@ -16,6 +16,8 @@ export function printNonTtyHelp(binName: string): void {
   console.log(`  ${binName} doctor    Check toolchain`);
   console.log(`  ${binName} setup     Prefetch server + client`);
   console.log(`  ${binName} --help    All commands`);
+  console.log("");
+  console.log("If plugdev is not on PATH: npx @plugdev/cli@latest run");
 }
 
 /**

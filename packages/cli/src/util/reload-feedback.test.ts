@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile, appendFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { captureReloadLogOffset, confirmReload } from "./reload-feedback.js";
+import { captureReloadLogOffset, confirmReload, reloadNotConfirmedFix } from "./reload-feedback.js";
 
 test("confirmReload ignores matching lines written before the captured offset", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "plugdev-reload-offset-"));
@@ -35,4 +35,10 @@ test("confirmReload accepts a new reload marker after the captured offset", asyn
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }
+});
+
+test("reloadNotConfirmedFix points at latest.log and Folia restart", () => {
+  const lines = reloadNotConfirmedFix();
+  assert.ok(lines.some((l) => l.includes("latest.log")));
+  assert.ok(lines.some((l) => l.includes("watch.reload.java: restart")));
 });

@@ -1,7 +1,7 @@
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { projectRunDir } from "../paths.js";
-import { phase, success } from "./log.js";
+import { phase, success, warn, info } from "./log.js";
 import { isJsonMode } from "./output.js";
 
 /** Prefer stable bootstrap markers; fall back to broader PlugDev reload lines. */
@@ -24,6 +24,14 @@ export async function captureReloadLogOffset(cwd: string): Promise<number> {
   } catch {
     return 0;
   }
+}
+
+/** Human Fix lines when reload markers never appear in latest.log. */
+export function reloadNotConfirmedFix(): string[] {
+  return [
+    "Fix: check [PlugDev] / ERROR lines in .plugdev/run/logs/latest.log",
+    "     Folia or stuck reload: set watch.reload.java: restart (or restart the server)",
+  ];
 }
 
 export async function confirmReload(
@@ -61,7 +69,10 @@ export async function confirmReload(
   }
 
   if (!isJsonMode()) {
-    phase("Reload triggered (check server if plugin did not update)");
+    warn("Reload not confirmed within timeout");
+    for (const line of reloadNotConfirmedFix()) {
+      info(line);
+    }
   }
   return false;
 }

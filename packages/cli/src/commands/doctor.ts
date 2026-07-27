@@ -14,6 +14,7 @@ import { serversCacheDir } from "../paths.js";
 import { join } from "node:path";
 import { banner, phase, info, warn } from "../util/log.js";
 import { isJsonMode, emitJson } from "../util/output.js";
+import { doctorFixCommand } from "../util/doctor-fix.js";
 import pc from "picocolors";
 
 type ClientTier = "prism" | "multimc" | "embedded" | "needs-setup";
@@ -176,6 +177,28 @@ export async function runDoctor(cwd: string): Promise<number> {
       ? toolchainReady
       : serverCached && clientReady;
 
+  const fixCommand = doctorFixCommand({
+    isDiscordBot,
+    isMod,
+    projectType: project.type,
+    javaOk,
+    minJava,
+    gradleOk,
+    mavenOk,
+    buildSystem: project.buildSystem,
+    bootstrapOk: bootstrap.ok,
+    spigotMissing,
+    spigotJarPath,
+    spigotVersion: config.version,
+    nodeOk,
+    tokenPresent,
+    tokenEnvName,
+    setupReady,
+    toolchainReady,
+    needsModuleSelection: project.needsModuleSelection === true,
+    pluginModuleIds: modules.filter((m) => m.kind === "plugin").map((m) => m.id),
+  });
+
   if (isJsonMode()) {
     emitJson({
       ok: toolchainReady && setupReady,
@@ -252,21 +275,7 @@ export async function runDoctor(cwd: string): Promise<number> {
         },
         toolchainReady,
         setupReady,
-        hint: isDiscordBot
-          ? !nodeOk
-            ? "Install Node.js from https://nodejs.org/"
-            : !tokenPresent
-              ? `Set ${tokenEnvName ?? "DISCORD_TOKEN"} in the environment or .env`
-              : undefined
-          : !bootstrap.ok
-            ? "Bootstrap JAR missing — run npm run build:bootstrap from the plugdev monorepo"
-            : spigotMissing
-              ? `Spigot jar missing — place at ${spigotJarPath}`
-              : !javaOk
-                ? `Install JDK ${minJava}+ from https://adoptium.net/`
-                : !setupReady
-                  ? "Run: plugdev setup"
-                  : undefined,
+        hint: fixCommand,
       },
     });
     if (!toolchainReady) return 3;
@@ -361,6 +370,7 @@ export async function runDoctor(cwd: string): Promise<number> {
 
   if (project.type === "unknown") {
     warn("Could not detect plugin, mod, or Discord bot project");
+    if (fixCommand) info(`Fix: ${fixCommand}`);
     return 3;
   }
 
@@ -438,6 +448,7 @@ export async function runDoctor(cwd: string): Promise<number> {
 
   if (!toolchainReady) {
     warn("Not ready — fix toolchain issues above");
+    if (fixCommand) info(`Fix: ${fixCommand}`);
     return 3;
   }
 
@@ -447,6 +458,7 @@ export async function runDoctor(cwd: string): Promise<number> {
         ? `Not ready — set ${tokenEnvName ?? "DISCORD_TOKEN"} then re-run doctor`
         : "Not ready — run: plugdev setup",
     );
+    if (fixCommand) info(`Fix: ${fixCommand}`);
     return 2;
   }
 
