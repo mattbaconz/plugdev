@@ -6,6 +6,11 @@ Release entries use `[added]`, `[changed]`, `[fixed]`, and `[removed]` in that o
 
 _No changes yet._
 
+## 1.0.3 — 2026-08-01
+
+### [fixed]
+- Bootstrap reload watcher no longer polls `.reload-trigger` on the server thread (off-thread mtime gate; sync reload only on change)
+
 ## 1.0.2 — 2026-07-27
 
 ### [changed]
