@@ -6,6 +6,11 @@ Release entries use `[added]`, `[changed]`, `[fixed]`, and `[removed]` in that o
 
 _No changes yet._
 
+## 1.0.5 — 2026-08-04
+
+### [fixed]
+- `plugdev-identity.json` is no longer rewritten on every boot when only `recordedAt` would change (stops PlugTrace false `CONFIG_HASH_CHANGED` on PlugDev runs)
+
 ## 1.0.4 — 2026-08-04
 
 ### [fixed]

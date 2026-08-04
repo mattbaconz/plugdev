@@ -122,6 +122,47 @@ export interface PlugDevIdentityInput {
   sessionId?: string;
 }
 
+/** Identity fields PlugTrace cares about — exclude recordedAt (boot churn). */
+export type PlugDevIdentityPayload = {
+  schemaVersion: "1";
+  gitCommit: string | null;
+  gitDirty: boolean;
+  buildSystem: string;
+  buildTask: string;
+  artifactHash: string | null;
+  projectName: string;
+  sessionId: string | null;
+  plugdevVersion: string;
+  recordedAt: string;
+};
+
+export function stableIdentityFingerprint(
+  identity: Omit<PlugDevIdentityPayload, "recordedAt"> | PlugDevIdentityPayload,
+): string {
+  const {
+    schemaVersion,
+    gitCommit,
+    gitDirty,
+    buildSystem,
+    buildTask,
+    artifactHash,
+    projectName,
+    sessionId,
+    plugdevVersion,
+  } = identity;
+  return JSON.stringify({
+    schemaVersion,
+    gitCommit,
+    gitDirty,
+    buildSystem,
+    buildTask,
+    artifactHash,
+    projectName,
+    sessionId,
+    plugdevVersion,
+  });
+}
+
 export async function writePlugDevIdentity(input: PlugDevIdentityInput): Promise<string> {
   const dataDir = join(input.runDir, "plugins", "PlugTrace");
   await mkdir(dataDir, { recursive: true });
@@ -143,8 +184,11 @@ export async function writePlugDevIdentity(input: PlugDevIdentityInput): Promise
     artifactHash = createHash("sha256").update(bytes).digest("hex");
   }
 
-  const identity = {
-    schemaVersion: "1",
+  const dest = join(dataDir, "plugdev-identity.json");
+  const mirrorPath = join(input.cwd, ".plugdev", "plugtrace-identity.json");
+
+  const nextStable = {
+    schemaVersion: "1" as const,
     gitCommit: gitCommit ?? null,
     gitDirty,
     buildSystem: input.buildSystem,
@@ -153,16 +197,30 @@ export async function writePlugDevIdentity(input: PlugDevIdentityInput): Promise
     projectName: input.projectName,
     sessionId: input.sessionId ?? null,
     plugdevVersion: input.plugdevVersion ?? CLI_VERSION,
+  };
+
+  // Avoid rewriting on every boot — recordedAt alone was tripping PlugTrace CONFIG_HASH_CHANGED.
+  try {
+    const existing = JSON.parse(await readFile(dest, "utf8")) as PlugDevIdentityPayload;
+    if (stableIdentityFingerprint(existing) === stableIdentityFingerprint(nextStable)) {
+      return dest;
+    }
+  } catch {
+    // missing or invalid — write fresh
+  }
+
+  const identity: PlugDevIdentityPayload = {
+    ...nextStable,
     recordedAt: new Date().toISOString(),
   };
 
-  const dest = join(dataDir, "plugdev-identity.json");
-  await writeFile(dest, `${JSON.stringify(identity, null, 2)}\n`, "utf8");
+  const body = `${JSON.stringify(identity, null, 2)}\n`;
+  await writeFile(dest, body, "utf8");
 
   // Also mirror under .plugdev for secondary search path
   const mirrorDir = join(input.cwd, ".plugdev");
   await mkdir(mirrorDir, { recursive: true });
-  await writeFile(join(mirrorDir, "plugtrace-identity.json"), `${JSON.stringify(identity, null, 2)}\n`, "utf8");
+  await writeFile(mirrorPath, body, "utf8");
 
   return dest;
 }

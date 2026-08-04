@@ -53,3 +53,74 @@ test("writePlugDevIdentity writes schema fields", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("writePlugDevIdentity skips rewrite when stable fields match", async () => {
+  const root = await mkdtemp(join(tmpdir(), "plugdev-pt-stable-"));
+  try {
+    const runDir = join(root, ".plugdev", "run");
+    await mkdir(runDir, { recursive: true });
+    const projectJar = join(root, "Demo.jar");
+    await writeFile(projectJar, "fake-jar-bytes");
+
+    const input = {
+      cwd: root,
+      runDir,
+      projectName: "DemoShop",
+      buildSystem: "gradle" as const,
+      buildTask: "shadowJar",
+      projectJarPath: projectJar,
+      plugdevVersion: "1.0.4",
+      sessionId: "sess-1",
+    };
+
+    const dest = await writePlugDevIdentity(input);
+    const first = await readFile(dest, "utf8");
+    await new Promise((r) => setTimeout(r, 20));
+    const dest2 = await writePlugDevIdentity(input);
+    const second = await readFile(dest2, "utf8");
+
+    assert.equal(dest, dest2);
+    assert.equal(first, second);
+    assert.equal(JSON.parse(first).recordedAt, JSON.parse(second).recordedAt);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("writePlugDevIdentity rewrites when artifactHash changes", async () => {
+  const root = await mkdtemp(join(tmpdir(), "plugdev-pt-hash-"));
+  try {
+    const runDir = join(root, ".plugdev", "run");
+    await mkdir(runDir, { recursive: true });
+    const projectJar = join(root, "Demo.jar");
+    await writeFile(projectJar, "bytes-v1");
+
+    const dest = await writePlugDevIdentity({
+      cwd: root,
+      runDir,
+      projectName: "DemoShop",
+      buildSystem: "gradle",
+      buildTask: "jar",
+      projectJarPath: projectJar,
+      plugdevVersion: "1.0.4",
+    });
+    const firstAt = JSON.parse(await readFile(dest, "utf8")).recordedAt as string;
+
+    await writeFile(projectJar, "bytes-v2");
+    await new Promise((r) => setTimeout(r, 20));
+    await writePlugDevIdentity({
+      cwd: root,
+      runDir,
+      projectName: "DemoShop",
+      buildSystem: "gradle",
+      buildTask: "jar",
+      projectJarPath: projectJar,
+      plugdevVersion: "1.0.4",
+    });
+    const second = JSON.parse(await readFile(dest, "utf8"));
+    assert.notEqual(second.recordedAt, firstAt);
+    assert.match(second.artifactHash, /^[a-f0-9]{64}$/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
