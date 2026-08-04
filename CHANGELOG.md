@@ -6,6 +6,11 @@ Release entries use `[added]`, `[changed]`, `[fixed]`, and `[removed]` in that o
 
 _No changes yet._
 
+## 1.0.6 — 2026-08-04
+
+### [fixed]
+- Pin `@xmcl/core@2.15.1` and `@xmcl/installer@6.1.2` — newer registry versions ship broken `workspace:^*` deps and break `npm i -g @plugdev/cli`
+
 ## 1.0.5 — 2026-08-04
 
 ### [fixed]

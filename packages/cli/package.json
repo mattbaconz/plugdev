@@ -1,6 +1,6 @@
 {
   "name": "@plugdev/cli",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Test Minecraft plugins in one command — plug / plugdev CLI (Paper, Folia, Purpur, Pufferfish, Spigot)",
   "author": "PLUG Labs",
   "homepage": "https://pluglabs.app/plugdev",
@@ -46,8 +46,8 @@
     "prepublishOnly": "cd ../.. && npm run build"
   },
   "dependencies": {
-    "@xmcl/core": "^2.15.1",
-    "@xmcl/installer": "^6.1.2",
+    "@xmcl/core": "2.15.1",
+    "@xmcl/installer": "6.1.2",
     "ajv": "^8.17.1",
     "chokidar": "^4.0.3",
     "commander": "^13.1.0",

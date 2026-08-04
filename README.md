@@ -2,7 +2,7 @@
 
 <img src="brand/plugdev-logo.png" alt="PlugDev" width="128" />
 
-# PlugDev · v1.0.5
+# PlugDev · v1.0.6
 
 ---
 
@@ -219,7 +219,7 @@ Recorded on Paper **26.1.2** with Prism + `plug run --hotswap`.
 
 ## Status
 
-**v1.0.5** — stable local Paper loop + live config UX. Update with `plugdev update` (or set `update.auto: true`). After 1.0, prefer additive `plugdev.yml` changes. See [CHANGELOG.md](CHANGELOG.md).
+**v1.0.6** — stable local Paper loop + live config UX. Update with `plugdev update` (or set `update.auto: true`). After 1.0, prefer additive `plugdev.yml` changes. See [CHANGELOG.md](CHANGELOG.md).
 
 [Docs](https://pluglabs.app/plugdev) · [Discord](https://discord.gg/C4X3rThtAM) · [npm](https://www.npmjs.com/package/@plugdev/cli)
 
