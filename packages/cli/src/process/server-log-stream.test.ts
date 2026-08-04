@@ -41,6 +41,25 @@ describe("isNotableServerLine / formatServerLogLine", () => {
     assert.match(out, /SEVERE/);
     assert.match(out, /│/);
   });
+
+  it("formats Adventure hex without wrapping the payload in dim", () => {
+    const prevForce = process.env.FORCE_COLOR;
+    const prevNo = process.env.NO_COLOR;
+    process.env.FORCE_COLOR = "1";
+    delete process.env.NO_COLOR;
+    try {
+      const out = formatServerLogLine("§x§2§2§d§3§e§e§lPlugTrace§r §8|§r ok");
+      assert.match(out, /│/);
+      assert.match(out, /\x1b\[38;2;34;211;238m/);
+      assert.match(out, /PlugTrace/);
+      assert.doesNotMatch(out, /§/);
+    } finally {
+      if (prevForce === undefined) delete process.env.FORCE_COLOR;
+      else process.env.FORCE_COLOR = prevForce;
+      if (prevNo === undefined) delete process.env.NO_COLOR;
+      else process.env.NO_COLOR = prevNo;
+    }
+  });
 });
 
 describe("createServerLogWriter", () => {

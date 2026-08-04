@@ -29,6 +29,7 @@ import {
   requireJava,
 } from "../util/tools.js";
 import { heading, info, success } from "../util/log.js";
+import { minecraftToAnsi } from "../util/minecraft-ansi.js";
 import { isJsonMode, emitJson, getLogMode } from "../util/output.js";
 import { formatError, getExitCode, Errors } from "../util/errors.js";
 import { resolveBootstrapJar } from "../util/bootstrap.js";
@@ -262,7 +263,7 @@ export async function runServerCommand(cwd: string, command: string): Promise<nu
       emitJson({ ok: true, data: { command, response } });
       return 0;
     }
-    success(response || "(no output)");
+    success(minecraftToAnsi(response) || "(no output)");
     return 0;
   } catch (e) {
     if (isJsonMode()) {
@@ -288,7 +289,7 @@ export async function runServerLogs(cwd: string, lines = 50): Promise<number> {
       emitJson({ ok: true, data: { lines: tail.split("\n").filter(Boolean), path: logPath } });
       return 0;
     }
-    console.log(tail);
+    console.log(minecraftToAnsi(tail));
     return 0;
   } catch (e) {
     if (isJsonMode()) {

@@ -1,4 +1,8 @@
 import pc from "picocolors";
+import {
+  hasMinecraftCodes,
+  minecraftToAnsi,
+} from "../util/minecraft-ansi.js";
 import type { LogMode } from "../util/output.js";
 import { isJsonMode } from "../util/output.js";
 
@@ -40,6 +44,10 @@ export function formatServerLogLine(line: string): string {
   const raw = line.replace(/\r$/, "");
   if (!raw.trim()) return "";
   const prefix = pc.dim("│ ");
+  // Preserve Adventure/legacy § colors — do not wrap the whole line in dim/red.
+  if (hasMinecraftCodes(raw)) {
+    return prefix + minecraftToAnsi(raw);
+  }
   if (ERROR_RE.test(raw) || EXCEPTION_RE.test(raw) || STACK_RE.test(raw) || STACK_MORE_RE.test(raw)) {
     return prefix + pc.red(raw);
   }
@@ -67,7 +75,8 @@ export function createServerLogWriter(logMode: LogMode): ServerLogWriter {
   const emitLine = (line: string, stream: NodeJS.WriteStream) => {
     if (!shouldShowServerLine(line, logMode, phase)) return;
     if (phase === "boot" && logMode === "verbose") {
-      stream.write(line.endsWith("\n") ? line : `${line}\n`);
+      const rendered = minecraftToAnsi(line);
+      stream.write(rendered.endsWith("\n") ? rendered : `${rendered}\n`);
       return;
     }
     const formatted = formatServerLogLine(line);

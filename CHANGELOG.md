@@ -6,6 +6,11 @@ Release entries use `[added]`, `[changed]`, `[fixed]`, and `[removed]` in that o
 
 _No changes yet._
 
+## 1.0.7 — 2026-08-04
+
+### [added]
+- Render Minecraft legacy (`§c`) and Adventure hex (`§x§R§R§G§G§B§B`) colors as ANSI in RCON replies and server console output (respects `NO_COLOR`)
+
 ## 1.0.6 — 2026-08-04
 
 ### [fixed]

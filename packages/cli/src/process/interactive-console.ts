@@ -9,6 +9,7 @@ import {
 } from "./console-config.js";
 import { runInRunConfigPicker } from "../live-config/in-run-config-picker.js";
 import { info, warn } from "../util/log.js";
+import { minecraftToAnsi } from "../util/minecraft-ansi.js";
 import { isJsonMode } from "../util/output.js";
 
 export interface InteractiveConsoleOptions {
@@ -79,7 +80,8 @@ export function attachInteractiveConsole(
         cmd,
       );
       if (response.trim()) {
-        process.stdout.write(response.endsWith("\n") ? response : `${response}\n`);
+        const rendered = minecraftToAnsi(response);
+        process.stdout.write(rendered.endsWith("\n") ? rendered : `${rendered}\n`);
       } else {
         warn(emptyRconHint());
       }

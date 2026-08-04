@@ -1,5 +1,6 @@
 import pc from "picocolors";
 import { isJsonMode } from "./output.js";
+import { minecraftToAnsi } from "./minecraft-ansi.js";
 
 let phaseCounter = 0;
 
@@ -67,6 +68,6 @@ export function dumpLogTail(lines: string[]): void {
   if (isJsonMode() || lines.length === 0) return;
   warn("Recent server log:");
   for (const line of lines.slice(-25)) {
-    if (line.trim()) console.log(pc.dim(`    ${line}`));
+    if (line.trim()) console.log(pc.dim("    ") + minecraftToAnsi(line));
   }
 }
