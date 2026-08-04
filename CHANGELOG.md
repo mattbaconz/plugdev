@@ -6,6 +6,11 @@ Release entries use `[added]`, `[changed]`, `[fixed]`, and `[removed]` in that o
 
 _No changes yet._
 
+## 1.0.4 — 2026-08-04
+
+### [fixed]
+- `plugdev update` on Windows no longer crashes with `spawn EINVAL` when launching npm (CVE-2024-27980 `.cmd` + `shell: false`)
+
 ## 1.0.3 — 2026-08-01
 
 ### [fixed]

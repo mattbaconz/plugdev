@@ -157,20 +157,66 @@ export async function maybeNotifyUpdate(cwd?: string): Promise<void> {
 }
 
 export async function runNpmGlobalUpdate(): Promise<number> {
-  const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
   return new Promise((resolve) => {
-    const child = spawn(npmCmd, ["install", "-g", `${PACKAGE_NAME}@latest`], {
-      stdio: "inherit",
-      shell: false,
-      windowsHide: true,
-      detached: false,
-    });
+    let child;
+    try {
+      child = spawnNpmGlobalInstall();
+    } catch (err) {
+      warn(`npm update failed: ${err instanceof Error ? err.message : String(err)}`);
+      resolve(1);
+      return;
+    }
     child.on("error", (err) => {
       warn(`npm update failed: ${err.message}`);
       resolve(1);
     });
     child.on("close", (code) => resolve(code ?? 1));
   });
+}
+
+/** Spawn args for `npm install -g @plugdev/cli@latest` (static — no user input). */
+export function npmGlobalInstallSpawnSpec(platform: NodeJS.Platform = process.platform): {
+  command: string;
+  args: string[];
+  options: {
+    stdio: "inherit";
+    shell: boolean;
+    windowsHide?: boolean;
+    detached: boolean;
+  };
+} {
+  const installArgs = ["install", "-g", `${PACKAGE_NAME}@latest`];
+  if (platform === "win32") {
+    // CVE-2024-27980: .cmd/.bat require shell. One command string avoids DEP0190.
+    return {
+      command: `npm ${installArgs.join(" ")}`,
+      args: [],
+      options: {
+        stdio: "inherit",
+        shell: true,
+        windowsHide: true,
+        detached: false,
+      },
+    };
+  }
+  return {
+    command: "npm",
+    args: installArgs,
+    options: {
+      stdio: "inherit",
+      shell: false,
+      detached: false,
+    },
+  };
+}
+
+/**
+ * Spawn `npm install -g @plugdev/cli@latest`.
+ * On Windows, Node refuses `.cmd` without `shell: true` (CVE-2024-27980 / EINVAL).
+ */
+export function spawnNpmGlobalInstall(): ReturnType<typeof spawn> {
+  const spec = npmGlobalInstallSpawnSpec();
+  return spawn(spec.command, spec.args, spec.options);
 }
 
 export async function runUpdateCommand(opts: {

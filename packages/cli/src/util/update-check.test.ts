@@ -8,6 +8,7 @@ import {
   compareSemver,
   formatUpdateReminder,
   readUpdateAuto,
+  npmGlobalInstallSpawnSpec,
 } from "./update-check.js";
 
 test("compareSemver orders versions", () => {
@@ -26,6 +27,18 @@ test("formatUpdateReminder mentions plugdev update", () => {
     }),
     /plugdev update/,
   );
+});
+
+test("npmGlobalInstallSpawnSpec uses shell command string on Windows", () => {
+  const win = npmGlobalInstallSpawnSpec("win32");
+  assert.equal(win.options.shell, true);
+  assert.equal(win.args.length, 0);
+  assert.match(win.command, /^npm install -g @plugdev\/cli@latest$/);
+
+  const unix = npmGlobalInstallSpawnSpec("linux");
+  assert.equal(unix.options.shell, false);
+  assert.equal(unix.command, "npm");
+  assert.deepEqual(unix.args, ["install", "-g", "@plugdev/cli@latest"]);
 });
 
 test("checkForUpdate detects outdated from mocked registry", async () => {
