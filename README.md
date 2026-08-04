@@ -2,7 +2,7 @@
 
 <img src="brand/plugdev-logo.png" alt="PlugDev" width="128" />
 
-# PlugDev · v1.0.7
+# PlugDev · v1.0.8
 
 ---
 
@@ -118,6 +118,7 @@ Reactor roots without a root `plugin.yml` still detect as `type: plugin` when a 
 |---------|-------------|
 | `plug` / `plugdev` | Interactive TUI |
 | `plug run` | Full loop (plugin or mod path) |
+| `plug run --no-join` | Same loop without launching Minecraft |
 | `plug setup` | Prefetch server/client (plugins) |
 | `plug doctor` | Detect project + toolchain |
 | `plug clean` | Wipe worlds or `.plugdev/run` |
@@ -219,7 +220,7 @@ Recorded on Paper **26.1.2** with Prism + `plug run --hotswap`.
 
 ## Status
 
-**v1.0.7** — stable local Paper loop + live config UX. Update with `plugdev update` (or set `update.auto: true`). After 1.0, prefer additive `plugdev.yml` changes. See [CHANGELOG.md](CHANGELOG.md).
+**v1.0.8** — stable local Paper loop + live config UX. Update with `plugdev update` (or set `update.auto: true`). After 1.0, prefer additive `plugdev.yml` changes. See [CHANGELOG.md](CHANGELOG.md).
 
 [Docs](https://pluglabs.app/plugdev) · [Discord](https://discord.gg/C4X3rThtAM) · [npm](https://www.npmjs.com/package/@plugdev/cli)
 

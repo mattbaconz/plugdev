@@ -11,7 +11,8 @@ export function printNonTtyHelp(binName: string): void {
   console.log(`${binName} — interactive TUI requires a terminal.`);
   console.log("");
   console.log("Commands:");
-  console.log(`  ${binName} run       Full test loop (server + watch + join)`);
+  console.log(`  ${binName} run            Full test loop (server + watch + join)`);
+  console.log(`  ${binName} run --no-join  Server + watch only (no Minecraft client)`);
   console.log(`  ${binName} tui       Open TUI (TTY required)`);
   console.log(`  ${binName} doctor    Check toolchain`);
   console.log(`  ${binName} setup     Prefetch server + client`);

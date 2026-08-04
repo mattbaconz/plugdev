@@ -246,6 +246,7 @@ program
   .option("--datagen", "run mod datagen Gradle task")
   .option("--test", "mod server/test mode (same as --server)")
   .option("--loader <name>", "mod loader subproject (fabric, neoforge, forge)")
+  .option("--no-join", "do not launch Minecraft client (server + watch only)")
   .option("--no-watch", "disable file watcher")
   .option("--config <path>", "config file path")
   .option("--debug", "enable JDWP debug port (5005)")
@@ -254,7 +255,7 @@ program
   .action(async (opts) => {
     process.exit(
       await runDev(process.cwd(), {
-        ...parseDevOpts({ ...devOptions(), ...opts, join: true }),
+        ...parseDevOpts({ ...devOptions(), ...opts }),
       }),
     );
   });

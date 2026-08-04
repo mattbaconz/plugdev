@@ -6,6 +6,11 @@ Release entries use `[added]`, `[changed]`, `[fixed]`, and `[removed]` in that o
 
 _No changes yet._
 
+## 1.0.8 — 2026-08-05
+
+### [added]
+- `plug run --no-join` / `plugdev run --no-join` — start server + watch without launching the Minecraft client
+
 ## 1.0.7 — 2026-08-04
 
 ### [added]
